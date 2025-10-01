@@ -22,5 +22,10 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "@colyseus/schema": "^3.0.61",
+    "colyseus": "^0.16.4",
+    "colyseus.js": "^0.16.21"
   }
 }

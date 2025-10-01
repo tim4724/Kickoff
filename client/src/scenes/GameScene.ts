@@ -9,6 +9,7 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private scoreText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
+  private possessionIndicator!: Phaser.GameObjects.Circle
 
   // Mobile controls
   private joystick!: VirtualJoystick
@@ -17,6 +18,19 @@ export class GameScene extends Phaser.Scene {
 
   private playerVelocity = { x: 0, y: 0 }
   private ballVelocity = { x: 0, y: 0 }
+
+  // Goal zones and scoring
+  private leftGoal = { x: 10, yMin: 0, yMax: 0, width: 20 }
+  private rightGoal = { x: 0, yMin: 0, yMax: 0, width: 20 }
+  private scoreBlue: number = 0
+  private scoreRed: number = 0
+  private goalScored: boolean = false
+
+  // Match timer
+  private matchDuration: number = 120 // 2 minutes in seconds
+  private timeRemaining: number = 120
+  private timerEvent?: Phaser.Time.TimerEvent
+  private matchEnded: boolean = false
 
   constructor() {
     super({ key: 'GameScene' })
@@ -27,12 +41,24 @@ export class GameScene extends Phaser.Scene {
     this.isMobile = this.sys.game.device.os.android || this.sys.game.device.os.iOS ||
                     this.sys.game.device.os.iPad || this.sys.game.device.os.iPhone
 
+    // Initialize goal zones based on screen size
+    const { height } = this.scale
+    this.leftGoal.yMin = height / 2 - 60
+    this.leftGoal.yMax = height / 2 + 60
+    this.rightGoal.x = this.scale.width - 10
+    this.rightGoal.yMin = height / 2 - 60
+    this.rightGoal.yMax = height / 2 + 60
+
+    // Create particle texture for goal celebrations
+    this.createParticleTexture()
+
     this.createField()
     this.createBall()
     this.createPlayer()
     this.createUI()
     this.setupInput()
     this.createMobileControls()
+    this.startMatchTimer()
 
     // Expose controls for testing (development only)
     if (typeof window !== 'undefined' && import.meta.env.DEV) {
@@ -117,6 +143,11 @@ export class GameScene extends Phaser.Scene {
     this.player = this.add.rectangle(width / 2 - 100, height / 2, 30, 40, 0x0066ff)
     this.player.setStrokeStyle(2, 0xffffff)
 
+    // Possession indicator (yellow circle glow)
+    this.possessionIndicator = this.add.circle(0, 0, 40, 0xffff00, 0)
+    this.possessionIndicator.setStrokeStyle(3, 0xffff00, 0.6)
+    this.possessionIndicator.setDepth(999)
+
     // Player indicator (small circle on top)
     const indicator = this.add.circle(0, -25, 8, 0xffff00)
     this.add.container(this.player.x, this.player.y, [indicator])
@@ -195,6 +226,24 @@ export class GameScene extends Phaser.Scene {
     this.updatePlayerMovement(dt)
     this.updateBallPhysics(dt)
     this.checkCollisions()
+
+    // Check for goals
+    const goalResult = this.checkGoal()
+    if (goalResult.scored && goalResult.team) {
+      this.onGoalScored(goalResult.team)
+    }
+
+    // Update possession indicator
+    const dx = this.ball.x - this.player.x
+    const dy = this.ball.y - this.player.y
+    const dist = Math.sqrt(dx * dx + dy * dy)
+
+    if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
+      this.possessionIndicator.setPosition(this.player.x, this.player.y)
+      this.possessionIndicator.setAlpha(0.6)
+    } else {
+      this.possessionIndicator.setAlpha(0)
+    }
 
     // Update mobile controls
     if (this.actionButton) {
@@ -276,13 +325,20 @@ export class GameScene extends Phaser.Scene {
     this.ball.x += this.ballVelocity.x * dt
     this.ball.y += this.ballVelocity.y * dt
 
-    // Bounce off field boundaries
+    // Bounce off field boundaries (but allow goal zones)
     const margin = 20
-    if (this.ball.x <= margin || this.ball.x >= this.scale.width - margin) {
+
+    // Left/right boundaries (exclude goal zones)
+    if (this.ball.x <= margin && (this.ball.y < this.leftGoal.yMin || this.ball.y > this.leftGoal.yMax)) {
       this.ballVelocity.x *= -0.8
-      this.ball.x = Phaser.Math.Clamp(this.ball.x, margin, this.scale.width - margin)
+      this.ball.x = margin
+    }
+    if (this.ball.x >= this.scale.width - margin && (this.ball.y < this.rightGoal.yMin || this.ball.y > this.rightGoal.yMax)) {
+      this.ballVelocity.x *= -0.8
+      this.ball.x = this.scale.width - margin
     }
 
+    // Top/bottom boundaries
     if (this.ball.y <= margin || this.ball.y >= this.scale.height - margin) {
       this.ballVelocity.y *= -0.8
       this.ball.y = Phaser.Math.Clamp(this.ball.y, margin, this.scale.height - margin)
@@ -303,5 +359,224 @@ export class GameScene extends Phaser.Scene {
         this.ball.y = this.player.y + (dy / dist) * 25
       }
     }
+  }
+
+  // Goal detection system
+  private checkGoal(): { scored: boolean; team?: 'blue' | 'red' } {
+    // Prevent multiple goal triggers
+    if (this.goalScored) {
+      return { scored: false }
+    }
+
+    // Check left goal (red scores when ball enters left goal)
+    if (
+      this.ball.x <= this.leftGoal.x + this.leftGoal.width &&
+      this.ball.y >= this.leftGoal.yMin &&
+      this.ball.y <= this.leftGoal.yMax
+    ) {
+      return { scored: true, team: 'red' }
+    }
+
+    // Check right goal (blue scores when ball enters right goal)
+    if (
+      this.ball.x >= this.rightGoal.x - this.rightGoal.width &&
+      this.ball.y >= this.rightGoal.yMin &&
+      this.ball.y <= this.rightGoal.yMax
+    ) {
+      return { scored: true, team: 'blue' }
+    }
+
+    return { scored: false }
+  }
+
+  private onGoalScored(team: 'blue' | 'red') {
+    // Update score
+    if (team === 'blue') {
+      this.scoreBlue++
+    } else {
+      this.scoreRed++
+    }
+
+    // Update UI
+    this.scoreText.setText(`${this.scoreBlue} - ${this.scoreRed}`)
+
+    // Set goal scored flag
+    this.goalScored = true
+
+    // Log for debugging
+    console.log(`⚽ Goal! ${team} scores. Score: ${this.scoreBlue}-${this.scoreRed}`)
+
+    // Celebration effects
+    const goalX = team === 'blue' ? this.rightGoal.x : this.leftGoal.x
+    const goalY = this.scale.height / 2
+
+    this.createGoalCelebration(goalX, goalY, team)
+    this.flashScreen(team === 'blue' ? 0x0066ff : 0xff4444)
+    this.shakeScreen()
+
+    // Reset ball to center after celebration delay
+    this.time.delayedCall(1000, () => {
+      this.resetBall()
+      this.goalScored = false
+    })
+  }
+
+  private resetBall() {
+    this.ball.x = this.scale.width / 2
+    this.ball.y = this.scale.height / 2
+    this.ballVelocity.x = 0
+    this.ballVelocity.y = 0
+  }
+
+  // Goal celebration effects
+  private createParticleTexture() {
+    // Create a simple white circle particle using Graphics
+    const graphics = this.add.graphics()
+    graphics.fillStyle(0xffffff, 1)
+    graphics.fillCircle(4, 4, 4)
+    graphics.generateTexture('spark', 8, 8)
+    graphics.destroy()
+  }
+
+  private createGoalCelebration(x: number, y: number, team: 'blue' | 'red') {
+    // Particle color based on team
+    const particleColor = team === 'blue' ? 0x0066ff : 0xff4444
+
+    // Particle explosion at goal position
+    const particles = this.add.particles(x, y, 'spark', {
+      speed: { min: -200, max: 200 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0 },
+      blendMode: 'ADD',
+      lifespan: 600,
+      gravityY: 300,
+      quantity: 30,
+      tint: particleColor
+    })
+
+    // Auto-destroy after animation
+    this.time.delayedCall(1000, () => {
+      particles.destroy()
+    })
+  }
+
+  private flashScreen(color: number = 0xffffff) {
+    const flash = this.add.rectangle(
+      this.scale.width / 2,
+      this.scale.height / 2,
+      this.scale.width,
+      this.scale.height,
+      color,
+      0.5
+    )
+    flash.setDepth(1500)
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => flash.destroy()
+    })
+  }
+
+  private shakeScreen() {
+    this.cameras.main.shake(200, 0.01)
+  }
+
+  // Match timer system
+  private startMatchTimer() {
+    this.timerEvent = this.time.addEvent({
+      delay: 1000,
+      callback: this.updateTimer,
+      callbackScope: this,
+      loop: true
+    })
+  }
+
+  private updateTimer() {
+    if (this.matchEnded) return
+
+    this.timeRemaining--
+
+    // Update UI (MM:SS format)
+    const minutes = Math.floor(this.timeRemaining / 60)
+    const seconds = this.timeRemaining % 60
+    this.timerText.setText(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+
+    // Add warning color when under 30 seconds
+    if (this.timeRemaining <= 30 && this.timeRemaining > 0) {
+      this.timerText.setColor('#ff4444')
+    }
+
+    // Check for match end
+    if (this.timeRemaining <= 0) {
+      this.onMatchEnd()
+    }
+  }
+
+  private onMatchEnd() {
+    this.matchEnded = true
+
+    // Stop timer
+    if (this.timerEvent) {
+      this.timerEvent.remove()
+    }
+
+    // Determine winner
+    const winner = this.scoreBlue > this.scoreRed ? 'Blue' :
+                   this.scoreRed > this.scoreBlue ? 'Red' : 'Draw'
+
+    console.log(`🏁 Match End! Winner: ${winner}. Final Score: ${this.scoreBlue}-${this.scoreRed}`)
+
+    // Show end screen
+    this.showMatchEndScreen(winner)
+  }
+
+  private showMatchEndScreen(winner: string) {
+    // Dark overlay
+    const overlay = this.add.rectangle(
+      this.scale.width / 2,
+      this.scale.height / 2,
+      this.scale.width,
+      this.scale.height,
+      0x000000,
+      0.7
+    )
+    overlay.setDepth(2000)
+
+    // Winner text
+    const resultText = this.add.text(
+      this.scale.width / 2,
+      this.scale.height / 2 - 50,
+      winner === 'Draw' ? 'Match Draw!' : `${winner} Team Wins!`,
+      { fontSize: '48px', color: '#ffffff', fontStyle: 'bold' }
+    )
+    resultText.setOrigin(0.5)
+    resultText.setDepth(2001)
+
+    // Final score
+    const scoreText = this.add.text(
+      this.scale.width / 2,
+      this.scale.height / 2 + 20,
+      `${this.scoreBlue} - ${this.scoreRed}`,
+      { fontSize: '36px', color: '#ffffff' }
+    )
+    scoreText.setOrigin(0.5)
+    scoreText.setDepth(2001)
+
+    // Restart hint
+    const restartText = this.add.text(
+      this.scale.width / 2,
+      this.scale.height / 2 + 80,
+      'Tap to restart',
+      { fontSize: '24px', color: '#aaaaaa' }
+    )
+    restartText.setOrigin(0.5)
+    restartText.setDepth(2001)
+
+    // Handle restart
+    this.input.once('pointerdown', () => {
+      this.scene.restart()
+    })
   }
 }

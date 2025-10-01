@@ -73,11 +73,11 @@ export class MatchRoom extends Room<GameState> {
       // Update physics
       this.state.updatePhysics(dt)
 
-      // Update timer
+      // Update timer (countdown)
       this.state.updateTimer(dt)
 
-      // Check for match end
-      if (this.state.matchTime >= GAME_CONFIG.MATCH_DURATION) {
+      // Check for match end (timer reaches 0)
+      if (this.state.matchTime <= 0) {
         this.endMatch()
       }
     }

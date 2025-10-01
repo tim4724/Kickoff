@@ -21,6 +21,10 @@ const GAME_CONFIG = {
   POSSESSION_RADIUS: 30,
   TICK_RATE: 30,
   MATCH_DURATION: 120,
+  // Goal zones (match client implementation)
+  GOAL_WIDTH: 20,
+  GOAL_Y_MIN: 200,
+  GOAL_Y_MAX: 400,
 } as const
 
 export class Player extends Schema {
@@ -67,7 +71,7 @@ export class Ball extends Schema {
 }
 
 export class GameState extends Schema {
-  @type('number') matchTime: number = 0
+  @type('number') matchTime: number = GAME_CONFIG.MATCH_DURATION // Countdown timer (matches client)
   @type('number') scoreBlue: number = 0
   @type('number') scoreRed: number = 0
   @type('string') phase: GamePhase = 'waiting'
@@ -76,6 +80,7 @@ export class GameState extends Schema {
   @type(Ball) ball = new Ball()
 
   private playerCount = 0
+  private goalScored: boolean = false // Prevent duplicate goal detection
 
   addPlayer(sessionId: string) {
     // Assign team (alternate between blue and red)
@@ -153,13 +158,21 @@ export class GameState extends Schema {
     this.ball.x += this.ball.velocityX * dt
     this.ball.y += this.ball.velocityY * dt
 
-    // Bounce off boundaries
+    // Bounce off boundaries (exclude goal zones)
     const margin = 20
-    if (this.ball.x <= margin || this.ball.x >= GAME_CONFIG.FIELD_WIDTH - margin) {
+    const goalY = { min: 200, max: 400 }
+
+    // Left/right boundaries (exclude goal zones where y is in goal range)
+    if (this.ball.x <= margin && (this.ball.y < goalY.min || this.ball.y > goalY.max)) {
       this.ball.velocityX *= -0.8
-      this.ball.x = Math.max(margin, Math.min(GAME_CONFIG.FIELD_WIDTH - margin, this.ball.x))
+      this.ball.x = margin
+    }
+    if (this.ball.x >= GAME_CONFIG.FIELD_WIDTH - margin && (this.ball.y < goalY.min || this.ball.y > goalY.max)) {
+      this.ball.velocityX *= -0.8
+      this.ball.x = GAME_CONFIG.FIELD_WIDTH - margin
     }
 
+    // Top/bottom boundaries (always bounce)
     if (this.ball.y <= margin || this.ball.y >= GAME_CONFIG.FIELD_HEIGHT - margin) {
       this.ball.velocityY *= -0.8
       this.ball.y = Math.max(margin, Math.min(GAME_CONFIG.FIELD_HEIGHT - margin, this.ball.y))
@@ -212,15 +225,27 @@ export class GameState extends Schema {
   }
 
   private checkGoals() {
-    const goalY = { min: 200, max: 400 }
-
-    // Left goal (blue defends)
-    if (this.ball.x <= 30 && this.ball.y >= goalY.min && this.ball.y <= goalY.max) {
-      this.onGoalScored('red')
+    // Skip if goal already scored this frame
+    if (this.goalScored) {
+      return
     }
 
-    // Right goal (red defends)
-    if (this.ball.x >= GAME_CONFIG.FIELD_WIDTH - 30 && this.ball.y >= goalY.min && this.ball.y <= goalY.max) {
+    // Left goal (red scores when ball enters left goal)
+    if (
+      this.ball.x <= 10 + GAME_CONFIG.GOAL_WIDTH &&
+      this.ball.y >= GAME_CONFIG.GOAL_Y_MIN &&
+      this.ball.y <= GAME_CONFIG.GOAL_Y_MAX
+    ) {
+      this.onGoalScored('red')
+      return
+    }
+
+    // Right goal (blue scores when ball enters right goal)
+    if (
+      this.ball.x >= GAME_CONFIG.FIELD_WIDTH - 10 - GAME_CONFIG.GOAL_WIDTH &&
+      this.ball.y >= GAME_CONFIG.GOAL_Y_MIN &&
+      this.ball.y <= GAME_CONFIG.GOAL_Y_MAX
+    ) {
       this.onGoalScored('blue')
     }
   }
@@ -228,17 +253,27 @@ export class GameState extends Schema {
   private onGoalScored(team: Team) {
     console.log(`⚽ GOAL! Team ${team} scores!`)
 
+    // Set flag to prevent duplicate detection
+    this.goalScored = true
+
     if (team === 'blue') {
       this.scoreBlue++
     } else {
       this.scoreRed++
     }
 
-    // Reset ball to center
-    this.ball.reset()
+    // Reset ball to center after 1 second delay
+    setTimeout(() => {
+      this.ball.reset()
+      this.goalScored = false
+    }, 1000)
   }
 
   updateTimer(dt: number) {
-    this.matchTime += dt
+    // Countdown timer (matches client implementation)
+    this.matchTime -= dt
+    if (this.matchTime < 0) {
+      this.matchTime = 0
+    }
   }
 }
