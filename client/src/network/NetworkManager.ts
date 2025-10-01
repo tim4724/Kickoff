@@ -55,7 +55,7 @@ export class NetworkManager {
 
   // Input buffering
   private inputBuffer: PlayerInput[] = []
-  private readonly MAX_BUFFER_SIZE = 3 // Reduced for better responsiveness
+  private readonly MAX_BUFFER_SIZE = 1 // Send immediately
 
   // Event callbacks
   private onStateChange?: (state: GameStateData) => void

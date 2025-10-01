@@ -2,80 +2,109 @@
 
 Fast-paced multiplayer arcade soccer game for mobile web.
 
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Run development servers (client + server)
+npm run dev
+
+# Client: http://localhost:5173
+# Server: http://localhost:3000
+```
+
 ## Project Structure
 
 ```
 socca2/
-├── client/          # Phaser 3 game client
-├── server/          # Colyseus multiplayer server
-├── shared/          # Shared TypeScript types
-└── docs/            # Specifications and documentation
-```
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- npm 9+
-
-### Installation
-
-```bash
-# Install all dependencies (root + workspaces)
-npm install
-
-# Run development servers (client + server concurrently)
-npm run dev
-```
-
-### Development
-
-```bash
-# Client only (http://localhost:5173)
-npm run dev:client
-
-# Server only (http://localhost:3000)
-npm run dev:server
-
-# Both concurrently
-npm run dev
+├── client/          # Phaser 3 game client (TypeScript + Vite)
+├── server/          # Colyseus multiplayer server (Node.js)
+├── tests/           # Playwright E2E tests
+└── claudedocs/      # Technical documentation and analysis
 ```
 
 ## Tech Stack
 
 - **Client:** Phaser 3, TypeScript, Vite
 - **Server:** Colyseus, Node.js, TypeScript
+- **Testing:** Playwright E2E tests
 - **Deployment:** PWA (Progressive Web App)
 
 ## Documentation
 
-### Core Documentation
+### Essential Reading
 - [SPECIFICATION.md](SPECIFICATION.md) - Complete product specification
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Technical architecture details
-- [MVP_ROADMAP.md](MVP_ROADMAP.md) - Week-by-week development plan
-- [QUICKSTART.md](QUICKSTART.md) - Quick start guide
+- [QUICKSTART.md](QUICKSTART.md) - Development guide and commands
+- [MVP_ROADMAP.md](MVP_ROADMAP.md) - Development roadmap and progress
 
-### Mobile Controls
-- [MOBILE_CONTROLS.md](MOBILE_CONTROLS.md) - Touch controls implementation guide
-- [TOUCH_TESTING_API.md](TOUCH_TESTING_API.md) - Testing API reference
-- [TOUCH_CONTROLS_WORKFLOW.md](TOUCH_CONTROLS_WORKFLOW.md) - Implementation workflow
+### Recent Work
+- [TEST_SUMMARY.md](TEST_SUMMARY.md) - Latest test results
+- [claudedocs/LAG_OPTIMIZATION_SUMMARY.md](claudedocs/LAG_OPTIMIZATION_SUMMARY.md) - Input lag optimization (85% reduction achieved)
 
-### Testing & Progress
-- [WEEK1-2_SUMMARY.md](WEEK1-2_SUMMARY.md) - Week 1-2 implementation summary
-- [DESKTOP_TEST_REPORT.md](DESKTOP_TEST_REPORT.md) - Desktop testing checklist
-- [MANUAL_TEST_GUIDE.md](MANUAL_TEST_GUIDE.md) - Manual testing procedures
+### Archive
+- Historical sprint reports and analysis: `claudedocs/archive/`
 
 ## Current Status
 
-✅ **Week 1-2: Foundation** - Complete!
+### ✅ Completed (Weeks 1-6)
 
-- [x] Project scaffolding
-- [x] Basic rendering (field + player + ball)
-- [x] Virtual joystick controls (dynamic spawning)
-- [x] Action button (power-based shooting)
-- [x] Single player movement
-- [x] Zone-based control separation
-- [x] Automated testing API (14/14 tests passing)
+**Core Multiplayer:**
+- Client-server architecture with Colyseus
+- Real-time position synchronization (<20px delta)
+- Two-player matchmaking with team assignment
+- Professional-grade input responsiveness (55ms lag)
+
+**Player Controls:**
+- Virtual joystick with dynamic spawning
+- Action button with power-based mechanics
+- Touch controls for mobile devices
+- Responsive movement with client prediction
+
+**Game Physics:**
+- Ball physics and movement
+- Player-ball interactions
+- Field boundaries and collision
+
+**Testing:**
+- 20 passing E2E tests (Playwright)
+- Automated lag measurement
+- Position synchronization validation
+
+### 🚧 Next Up (Week 7+)
+
+**Priority Features:**
+- Ball possession mechanics (magnetism + indicators)
+- Ball kicking system
+- Goal detection and scoring
+- Match timer and victory conditions
+
+See [MVP_ROADMAP.md](MVP_ROADMAP.md) for detailed development plan.
+
+## Development Commands
+
+```bash
+# Development
+npm run dev              # Both client + server
+npm run dev:client       # Client only (port 5173)
+npm run dev:server       # Server only (port 3000)
+
+# Testing
+npx playwright test                    # Run all E2E tests
+npx playwright test --ui              # Interactive test UI
+npx playwright test tests/lag-measurement.spec.ts  # Lag test
+
+# Building
+npm run build           # Build for production
+```
+
+## Performance
+
+**Input Lag:** 55ms average (professional-grade, <100ms threshold)
+**Network RTT:** <2ms (local network)
+**Test Coverage:** 20 E2E tests covering core multiplayer functionality
 
 ## License
 

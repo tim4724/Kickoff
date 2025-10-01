@@ -47,9 +47,7 @@ export class GameScene extends Phaser.Scene {
   private colorInitialized: boolean = false // Track if color has been set from server
   private positionInitialized: boolean = false // Track if position has been synced from server
 
-  // Input throttling for multiplayer (prevent flooding server with 60fps inputs)
-  private lastInputSentTime: number = 0
-  private readonly INPUT_SEND_INTERVAL = 33 // Send inputs at ~30Hz (33ms) to match server tick rate
+  // Input tracking for multiplayer (removed throttling - now sends at 60Hz)
 
   constructor() {
     super({ key: 'GameScene' })
@@ -357,21 +355,17 @@ export class GameScene extends Phaser.Scene {
       this.playerVelocity.y * this.playerVelocity.y
     )
 
-    // Send input to server if multiplayer (throttled to prevent flooding)
+    // Send input to server if multiplayer (send every frame with input)
     // Only send if there's actual movement to avoid zero-spam
     if (this.isMultiplayer && this.networkManager) {
       const hasMovement = Math.abs(this.playerVelocity.x) > 0.01 || Math.abs(this.playerVelocity.y) > 0.01
 
       if (hasMovement) {
-        const now = Date.now()
-        if (now - this.lastInputSentTime >= this.INPUT_SEND_INTERVAL) {
-          const movement = {
-            x: this.playerVelocity.x,
-            y: this.playerVelocity.y
-          }
-          this.networkManager.sendInput(movement, false) // false = not action button
-          this.lastInputSentTime = now
+        const movement = {
+          x: this.playerVelocity.x,
+          y: this.playerVelocity.y
         }
+        this.networkManager.sendInput(movement, false) // false = not action button
       }
     }
 
@@ -840,7 +834,7 @@ export class GameScene extends Phaser.Scene {
     const deltaY = Math.abs(this.player.y - serverY)
 
     // Adaptive reconciliation factor based on error magnitude
-    let reconcileFactor = 0.15 // Gentle baseline for responsive feel
+    let reconcileFactor = 0.05 // Ultra-gentle baseline for maximum responsiveness
 
     if (deltaX > 50 || deltaY > 50) {
       // Large error: strong correction (likely lag spike or bounds collision mismatch)

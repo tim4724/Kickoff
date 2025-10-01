@@ -5,7 +5,7 @@ const { Room } = Colyseus
 type Client = Colyseus.Client
 
 const GAME_CONFIG = {
-  TICK_RATE: 30,
+  TICK_RATE: 60, // Increased from 30 for lower latency
   MATCH_DURATION: 120,
 } as const
 
@@ -24,6 +24,12 @@ export class MatchRoom extends Room<GameState> {
     // Handle player input
     this.onMessage('input', (client, message) => {
       this.onPlayerInput(client, message)
+    })
+
+    // Handle ping for latency measurement
+    this.onMessage('ping', (client, message) => {
+      // Echo back immediately
+      client.send('pong', message)
     })
 
     console.log('✅ Match room initialized')
