@@ -40,8 +40,39 @@ async function getLocalPlayerData(page: Page, sessionId: string) {
 
 /**
  * Helper: Get what remote client sees for a specific player
+ * Includes retry logic to handle timing issues
  */
 async function getRemotePlayerView(page: Page, targetSessionId: string) {
+  // Retry up to 3 times with 100ms delays if remote sprite isn't ready
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await page.evaluate((sid) => {
+      const scene = (window as any).__gameControls?.scene
+      if (!scene?.networkManager) return null
+
+      const state = scene.networkManager.getState()
+      if (!state) return null
+
+      // What remote client's sprite shows
+      const remoteSprite = scene.remotePlayers?.get(sid)
+      const serverPlayer = state.players?.get(sid)
+
+      return {
+        remoteSpritePosition: remoteSprite ? { x: remoteSprite.x, y: remoteSprite.y } : null,
+        serverState: { x: serverPlayer?.x || 0, y: serverPlayer?.y || 0 }
+      }
+    }, targetSessionId)
+
+    if (result && result.remoteSpritePosition) {
+      return result
+    }
+
+    // Wait and retry
+    if (attempt < 2) {
+      await page.waitForTimeout(100)
+    }
+  }
+
+  // Return result anyway (will be null if not found)
   return await page.evaluate((sid) => {
     const scene = (window as any).__gameControls?.scene
     if (!scene?.networkManager) return null
@@ -49,7 +80,6 @@ async function getRemotePlayerView(page: Page, targetSessionId: string) {
     const state = scene.networkManager.getState()
     if (!state) return null
 
-    // What remote client's sprite shows
     const remoteSprite = scene.remotePlayers?.get(sid)
     const serverPlayer = state.players?.get(sid)
 

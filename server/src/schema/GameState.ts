@@ -62,12 +62,18 @@ export class Ball extends Schema {
   @type('number') velocityY: number = 0
   @type('string') possessedBy: string = ''
 
+  // Server-side only: prevent immediate re-possession after shooting
+  lastShotTime: number = 0
+  lastShooter: string = ''
+
   reset() {
     this.x = GAME_CONFIG.FIELD_WIDTH / 2
     this.y = GAME_CONFIG.FIELD_HEIGHT / 2
     this.velocityX = 0
     this.velocityY = 0
     this.possessedBy = ''
+    this.lastShotTime = 0
+    this.lastShooter = ''
   }
 }
 
@@ -256,9 +262,19 @@ export class GameState extends Schema {
 
     // Check for new possession if ball is free
     if (this.ball.possessedBy === '') {
+      // Immunity period after shooting (300ms)
+      const SHOT_IMMUNITY_MS = 300
+      const timeSinceShot = Date.now() - this.ball.lastShotTime
+      const hasImmunity = timeSinceShot < SHOT_IMMUNITY_MS
+
       this.players.forEach((player) => {
         // Skip if ball already possessed (first-come-first-served)
         if (this.ball.possessedBy !== '') return
+
+        // Skip shooter during immunity period to prevent immediate re-possession
+        if (hasImmunity && player.id === this.ball.lastShooter) {
+          return
+        }
 
         const dx = this.ball.x - player.x
         const dy = this.ball.y - player.y
@@ -284,6 +300,10 @@ export class GameState extends Schema {
       this.ball.velocityX = dx * GAME_CONFIG.SHOOT_SPEED * power
       this.ball.velocityY = dy * GAME_CONFIG.SHOOT_SPEED * power
       this.ball.possessedBy = ''
+
+      // Set shoot immunity to prevent immediate re-possession
+      this.ball.lastShotTime = Date.now()
+      this.ball.lastShooter = player.id
 
       player.state = 'kicking'
 
