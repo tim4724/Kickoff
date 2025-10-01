@@ -40,3 +40,7 @@ Thumbs.db
 
 # Debug
 .vscode-test/
+
+# MCP Testing
+.playwright-mcp/
+.chrome-devtools/
