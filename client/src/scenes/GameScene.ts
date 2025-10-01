@@ -227,8 +227,8 @@ export class GameScene extends Phaser.Scene {
 
   private shootBall(power: number = 0.8) {
     if (this.isMultiplayer && this.networkManager) {
-      // Multiplayer: send action to server
-      this.networkManager.sendInput({ x: 0, y: 0 }, true) // true = action button
+      // Multiplayer: send action to server with power value
+      this.networkManager.sendInput({ x: 0, y: 0 }, true, power) // Pass power to server
       console.log('📤 Shoot action sent to server, power:', power.toFixed(2))
     } else {
       // Single-player: apply local physics

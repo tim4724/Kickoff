@@ -8,6 +8,7 @@ type GamePhase = 'waiting' | 'playing' | 'ended'
 interface PlayerInput {
   movement: { x: number; y: number }
   action: boolean
+  actionPower?: number // 0.0-1.0, power for shooting (optional, defaults to 0.8)
   timestamp: number
 }
 
@@ -159,7 +160,7 @@ export class GameState extends Schema {
 
         // Handle action (shoot/pass)
         if (input.action) {
-          this.handlePlayerAction(player)
+          this.handlePlayerAction(player, input.actionPower)
         }
       }
     })
@@ -289,11 +290,12 @@ export class GameState extends Schema {
     }
   }
 
-  private handlePlayerAction(player: Player) {
+  private handlePlayerAction(player: Player, actionPower?: number) {
     // Check if this player has possession
     if (this.ball.possessedBy === player.id) {
       // Shoot in the direction player is facing
-      const power = 0.8
+      // Use client-provided power if available, otherwise default to 0.8
+      const power = actionPower !== undefined ? actionPower : 0.8
       const dx = Math.cos(player.direction)
       const dy = Math.sin(player.direction)
 

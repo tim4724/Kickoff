@@ -8,6 +8,7 @@ export interface NetworkConfig {
 export interface PlayerInput {
   movement: { x: number; y: number }
   action: boolean
+  actionPower?: number // 0.0-1.0, power for shooting (optional, defaults to 0.8)
   timestamp: number
 }
 
@@ -143,7 +144,7 @@ export class NetworkManager {
    * Send player input to the server
    * Inputs are buffered to reduce network traffic
    */
-  sendInput(movement: { x: number; y: number }, action: boolean): void {
+  sendInput(movement: { x: number; y: number }, action: boolean, actionPower?: number): void {
     if (!this.connected || !this.room) {
       return
     }
@@ -151,6 +152,7 @@ export class NetworkManager {
     const input: PlayerInput = {
       movement,
       action,
+      actionPower, // Include power value if provided (for action button hold-to-power)
       timestamp: Date.now(),
     }
 
