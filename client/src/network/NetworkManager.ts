@@ -55,7 +55,7 @@ export class NetworkManager {
 
   // Input buffering
   private inputBuffer: PlayerInput[] = []
-  private readonly MAX_BUFFER_SIZE = 10
+  private readonly MAX_BUFFER_SIZE = 3 // Reduced for better responsiveness
 
   // Event callbacks
   private onStateChange?: (state: GameStateData) => void
@@ -257,7 +257,7 @@ export class NetworkManager {
     })
 
     // Listen for players leaving
-    this.room.state.players.onRemove((player: any, key: string) => {
+    this.room.state.players.onRemove((_player: any, key: string) => {
       try {
         console.log('[NetworkManager] Player left:', key)
         this.onPlayerLeave?.(key)

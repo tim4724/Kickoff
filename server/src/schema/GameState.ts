@@ -11,16 +11,17 @@ interface PlayerInput {
   timestamp: number
 }
 
+// Game configuration (synced with shared/src/types.ts)
 const GAME_CONFIG = {
   FIELD_WIDTH: 800,
   FIELD_HEIGHT: 600,
-  PLAYER_SPEED: 200,
+  PLAYER_SPEED: 600, // pixels per second (increased from 200 for playable movement)
   BALL_FRICTION: 0.98,
   SHOOT_SPEED: 400,
   PASS_SPEED: 300,
-  POSSESSION_RADIUS: 30,
-  TICK_RATE: 30,
-  MATCH_DURATION: 120,
+  POSSESSION_RADIUS: 50, // increased from 30 for easier possession gain
+  TICK_RATE: 30, // server updates per second
+  MATCH_DURATION: 120, // seconds (2 minutes)
   // Goal zones (match client implementation)
   GOAL_WIDTH: 20,
   GOAL_Y_MIN: 200,
@@ -98,6 +99,12 @@ export class GameState extends Schema {
   }
 
   removePlayer(sessionId: string) {
+    // Release ball possession if this player had it
+    if (this.ball.possessedBy === sessionId) {
+      this.ball.possessedBy = ''
+      console.log(`⚽ [Server] Ball released (player ${sessionId} left)`)
+    }
+
     this.players.delete(sessionId)
   }
 
@@ -119,6 +126,9 @@ export class GameState extends Schema {
         player.velocityX = input.movement.x * GAME_CONFIG.PLAYER_SPEED
         player.velocityY = input.movement.y * GAME_CONFIG.PLAYER_SPEED
 
+        const oldX = player.x
+        const oldY = player.y
+
         // Update position
         player.x += player.velocityX * dt
         player.y += player.velocityY * dt
@@ -126,6 +136,12 @@ export class GameState extends Schema {
         // Clamp to field bounds
         player.x = Math.max(30, Math.min(GAME_CONFIG.FIELD_WIDTH - 30, player.x))
         player.y = Math.max(30, Math.min(GAME_CONFIG.FIELD_HEIGHT - 30, player.y))
+
+        // DEBUG: Log significant movement (moved >1 pixel)
+        const moved = Math.abs(player.x - oldX) > 1 || Math.abs(player.y - oldY) > 1
+        if (moved) {
+          console.log(`🏃 [Server] Player ${player.id} moved: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${player.x.toFixed(1)}, ${player.y.toFixed(1)})`)
+        }
 
         // Update state
         const moving = Math.abs(input.movement.x) > 0.1 || Math.abs(input.movement.y) > 0.1
@@ -144,83 +160,151 @@ export class GameState extends Schema {
   }
 
   updatePhysics(dt: number) {
-    // Update ball physics
-    this.ball.velocityX *= GAME_CONFIG.BALL_FRICTION
-    this.ball.velocityY *= GAME_CONFIG.BALL_FRICTION
-
-    // Stop if too slow
-    if (Math.abs(this.ball.velocityX) < 1 && Math.abs(this.ball.velocityY) < 1) {
-      this.ball.velocityX = 0
-      this.ball.velocityY = 0
-    }
-
-    // Update position
-    this.ball.x += this.ball.velocityX * dt
-    this.ball.y += this.ball.velocityY * dt
-
-    // Bounce off boundaries (exclude goal zones)
-    const margin = 20
-    const goalY = { min: 200, max: 400 }
-
-    // Left/right boundaries (exclude goal zones where y is in goal range)
-    if (this.ball.x <= margin && (this.ball.y < goalY.min || this.ball.y > goalY.max)) {
-      this.ball.velocityX *= -0.8
-      this.ball.x = margin
-    }
-    if (this.ball.x >= GAME_CONFIG.FIELD_WIDTH - margin && (this.ball.y < goalY.min || this.ball.y > goalY.max)) {
-      this.ball.velocityX *= -0.8
-      this.ball.x = GAME_CONFIG.FIELD_WIDTH - margin
-    }
-
-    // Top/bottom boundaries (always bounce)
-    if (this.ball.y <= margin || this.ball.y >= GAME_CONFIG.FIELD_HEIGHT - margin) {
-      this.ball.velocityY *= -0.8
-      this.ball.y = Math.max(margin, Math.min(GAME_CONFIG.FIELD_HEIGHT - margin, this.ball.y))
-    }
-
-    // Check ball possession
+    // Handle ball possession first (before physics)
     this.updateBallPossession()
 
-    // Check goals
+    // Only update ball physics if NOT possessed
+    if (this.ball.possessedBy === '') {
+      // Update ball physics
+      this.ball.velocityX *= GAME_CONFIG.BALL_FRICTION
+      this.ball.velocityY *= GAME_CONFIG.BALL_FRICTION
+
+      // Stop if too slow
+      if (Math.abs(this.ball.velocityX) < 1 && Math.abs(this.ball.velocityY) < 1) {
+        this.ball.velocityX = 0
+        this.ball.velocityY = 0
+      }
+
+      // Store old position for delta logging
+      const oldX = this.ball.x
+      const oldY = this.ball.y
+
+      // Update position
+      this.ball.x += this.ball.velocityX * dt
+      this.ball.y += this.ball.velocityY * dt
+
+      // DEBUG: Log ball state mutations
+      const moved = Math.abs(this.ball.x - oldX) > 0.5 || Math.abs(this.ball.y - oldY) > 0.5
+      if (moved) {
+        console.log(`⚽ [Server Schema] Ball position mutated: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${this.ball.x.toFixed(1)}, ${this.ball.y.toFixed(1)})`)
+      }
+
+      // Bounce off boundaries (exclude goal zones)
+      const margin = 20
+      const goalY = { min: 200, max: 400 }
+
+      // Left/right boundaries (exclude goal zones where y is in goal range)
+      if (this.ball.x <= margin && (this.ball.y < goalY.min || this.ball.y > goalY.max)) {
+        this.ball.velocityX *= -0.8
+        this.ball.x = margin
+      }
+      if (this.ball.x >= GAME_CONFIG.FIELD_WIDTH - margin && (this.ball.y < goalY.min || this.ball.y > goalY.max)) {
+        this.ball.velocityX *= -0.8
+        this.ball.x = GAME_CONFIG.FIELD_WIDTH - margin
+      }
+
+      // Top/bottom boundaries (always bounce)
+      if (this.ball.y <= margin || this.ball.y >= GAME_CONFIG.FIELD_HEIGHT - margin) {
+        this.ball.velocityY *= -0.8
+        this.ball.y = Math.max(margin, Math.min(GAME_CONFIG.FIELD_HEIGHT - margin, this.ball.y))
+      }
+    }
+
+    // Check goals (even when possessed)
     this.checkGoals()
   }
 
   private updateBallPossession() {
-    this.players.forEach((player) => {
-      const dx = this.ball.x - player.x
-      const dy = this.ball.y - player.y
-      const dist = Math.sqrt(dx * dx + dy * dy)
+    // First, check if current possessor is still close enough
+    if (this.ball.possessedBy !== '') {
+      const possessor = this.players.get(this.ball.possessedBy)
+      if (possessor) {
+        const dx = this.ball.x - possessor.x
+        const dy = this.ball.y - possessor.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
 
-      if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
-        // Player is close to ball
-        if (this.ball.possessedBy === '') {
-          this.ball.possessedBy = player.id
-        }
+        // Release possession if player moves too far from ball
+        if (dist > 50) {
+          console.log(`⚠️ [Server] Possession released - too far (${dist.toFixed(1)}px)`)
+          this.ball.possessedBy = ''
+        } else {
+          // Apply continuous magnetism - ball sticks in front of player
+          // Position ball 25px in front of player in the direction they're facing
+          const offsetDistance = 25
+          const ballX = possessor.x + Math.cos(possessor.direction) * offsetDistance
+          const ballY = possessor.y + Math.sin(possessor.direction) * offsetDistance
 
-        // Ball magnetism (stick to player)
-        if (this.ball.velocityX === 0 && this.ball.velocityY === 0) {
-          this.ball.x = player.x + (dx / dist) * 25
-          this.ball.y = player.y + (dy / dist) * 25
+          // Only log if ball actually moved (reduce spam)
+          const moved = Math.abs(this.ball.x - ballX) > 0.1 || Math.abs(this.ball.y - ballY) > 0.1
+          if (moved) {
+            console.log(`🧲 [Server] Magnetism: ball follows player ${possessor.id} at (${ballX.toFixed(1)}, ${ballY.toFixed(1)})`)
+          }
+
+          this.ball.x = ballX
+          this.ball.y = ballY
+
+          // Clear ball velocity while possessed (moves with player)
+          this.ball.velocityX = 0
+          this.ball.velocityY = 0
         }
+      } else {
+        // Possessor no longer exists, release ball
+        console.log(`⚠️ [Server] Possession released - player disconnected`)
+        this.ball.possessedBy = ''
       }
-    })
+    }
+
+    // Check for new possession if ball is free
+    if (this.ball.possessedBy === '') {
+      this.players.forEach((player) => {
+        // Skip if ball already possessed (first-come-first-served)
+        if (this.ball.possessedBy !== '') return
+
+        const dx = this.ball.x - player.x
+        const dy = this.ball.y - player.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+
+        if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
+          // Player gains possession
+          this.ball.possessedBy = player.id
+          console.log(`✅ [Server] Player ${player.id} GAINED possession at dist=${dist.toFixed(1)}px`)
+        }
+      })
+    }
   }
 
   private handlePlayerAction(player: Player) {
-    const dx = this.ball.x - player.x
-    const dy = this.ball.y - player.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
-
-    // Only shoot if close to ball
-    if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
+    // Check if this player has possession
+    if (this.ball.possessedBy === player.id) {
+      // Shoot in the direction player is facing
       const power = 0.8
-      this.ball.velocityX = (dx / dist) * GAME_CONFIG.SHOOT_SPEED * power
-      this.ball.velocityY = (dy / dist) * GAME_CONFIG.SHOOT_SPEED * power
+      const dx = Math.cos(player.direction)
+      const dy = Math.sin(player.direction)
+
+      this.ball.velocityX = dx * GAME_CONFIG.SHOOT_SPEED * power
+      this.ball.velocityY = dy * GAME_CONFIG.SHOOT_SPEED * power
       this.ball.possessedBy = ''
 
       player.state = 'kicking'
 
-      console.log(`Player ${player.id} kicked the ball!`)
+      // DEBUG: Log ball physics update
+      console.log(`⚽ [Server] Ball kicked by ${player.id}!`)
+      console.log(`   Direction: ${player.direction.toFixed(2)} rad (${(player.direction * 180 / Math.PI).toFixed(1)}°)`)
+      console.log(`   Position: (${this.ball.x.toFixed(1)}, ${this.ball.y.toFixed(1)})`)
+      console.log(`   Velocity: (${this.ball.velocityX.toFixed(1)}, ${this.ball.velocityY.toFixed(1)})`)
+    } else {
+      // Try to gain possession first if close enough
+      const dx = this.ball.x - player.x
+      const dy = this.ball.y - player.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (dist < GAME_CONFIG.POSSESSION_RADIUS && this.ball.possessedBy === '') {
+        // Gain possession
+        this.ball.possessedBy = player.id
+        console.log(`🏀 [Server] Player ${player.id} gained possession via action (dist: ${dist.toFixed(1)}px)`)
+      } else {
+        console.log(`⚠️ [Server] Player ${player.id} tried to shoot but doesn't have possession (dist: ${dist.toFixed(1)}px, possessed by: ${this.ball.possessedBy || 'none'})`)
+      }
     }
   }
 

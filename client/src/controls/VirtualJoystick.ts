@@ -5,8 +5,8 @@
 
 export class VirtualJoystick {
   private scene: Phaser.Scene
-  private base!: Phaser.GameObjects.Circle
-  private stick!: Phaser.GameObjects.Circle
+  private base!: Phaser.GameObjects.Arc
+  private stick!: Phaser.GameObjects.Arc
   private pointer: Phaser.Input.Pointer | null = null
 
   private baseX: number = 0

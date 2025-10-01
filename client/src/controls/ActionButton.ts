@@ -6,7 +6,7 @@
 
 export class ActionButton {
   private scene: Phaser.Scene
-  private button!: Phaser.GameObjects.Circle
+  private button!: Phaser.GameObjects.Arc
   private label!: Phaser.GameObjects.Text
   private pointer: Phaser.Input.Pointer | null = null
 

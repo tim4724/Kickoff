@@ -26,6 +26,6 @@
       "@shared/*": ["../shared/src/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "vite-env.d.ts"],
   "references": [{ "path": "../shared" }]
 }

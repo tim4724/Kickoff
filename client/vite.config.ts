@@ -8,6 +8,9 @@ export default defineConfig({
       '@shared': resolve(__dirname, '../shared/src'),
     },
   },
+  define: {
+    'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV !== 'production'),
+  },
   server: {
     port: 5173,
     open: true,

@@ -96,9 +96,6 @@ export async function testButtonPower(holdMs: number): Promise<number> {
     controls.test.pressButton()
     await new Promise(r => setTimeout(r, 50))
 
-    const stateBefore = controls.test.getState()
-    const powerBefore = stateBefore.button.currentPower
-
     controls.test.releaseButton(holdMs)
 
     const expectedPower = Math.min(holdMs / 1500, 1)
