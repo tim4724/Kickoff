@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { GAME_CONFIG } from '@shared/types'
 import { VirtualJoystick } from '../controls/VirtualJoystick'
 import { ActionButton } from '../controls/ActionButton'
+import { NetworkManager } from '../network/NetworkManager'
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Rectangle
@@ -18,6 +19,13 @@ export class GameScene extends Phaser.Scene {
 
   private playerVelocity = { x: 0, y: 0 }
   private ballVelocity = { x: 0, y: 0 }
+
+  // Multiplayer networking
+  private networkManager?: NetworkManager
+  private mySessionId?: string
+  private isMultiplayer: boolean = false
+  private remotePlayers: Map<string, Phaser.GameObjects.Rectangle> = new Map()
+  private remotePlayerIndicators: Map<string, Phaser.GameObjects.Circle> = new Map()
 
   // Goal zones and scoring
   private leftGoal = { x: 10, yMin: 0, yMax: 0, width: 20 }
@@ -58,7 +66,10 @@ export class GameScene extends Phaser.Scene {
     this.createUI()
     this.setupInput()
     this.createMobileControls()
-    this.startMatchTimer()
+
+    // Connect to multiplayer server AFTER all game objects are created
+    // This prevents update() from running before initialization is complete
+    this.connectToMultiplayer()
 
     // Expose controls for testing (development only)
     if (typeof window !== 'undefined' && import.meta.env.DEV) {
@@ -206,17 +217,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shootBall(power: number = 0.8) {
-    // Calculate shoot direction (from player to ball direction)
-    const dx = this.ball.x - this.player.x
-    const dy = this.ball.y - this.player.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (this.isMultiplayer && this.networkManager) {
+      // Multiplayer: send action to server
+      this.networkManager.sendInput({ x: 0, y: 0 }, true) // true = action button
+      console.log('📤 Shoot action sent to server, power:', power.toFixed(2))
+    } else {
+      // Single-player: apply local physics
+      const dx = this.ball.x - this.player.x
+      const dy = this.ball.y - this.player.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
 
-    // Only shoot if close to ball
-    if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
-      this.ballVelocity.x = (dx / dist) * GAME_CONFIG.SHOOT_SPEED * power
-      this.ballVelocity.y = (dy / dist) * GAME_CONFIG.SHOOT_SPEED * power
-
-      console.log('⚽ Shot! Power:', power.toFixed(2))
+      if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
+        this.ballVelocity.x = (dx / dist) * GAME_CONFIG.SHOOT_SPEED * power
+        this.ballVelocity.y = (dy / dist) * GAME_CONFIG.SHOOT_SPEED * power
+        console.log('⚽ Shot! Power:', power.toFixed(2))
+      }
     }
   }
 
@@ -224,13 +239,32 @@ export class GameScene extends Phaser.Scene {
     const dt = delta / 1000 // Convert to seconds
 
     this.updatePlayerMovement(dt)
-    this.updateBallPhysics(dt)
-    this.checkCollisions()
 
-    // Check for goals
-    const goalResult = this.checkGoal()
-    if (goalResult.scored && goalResult.team) {
-      this.onGoalScored(goalResult.team)
+    // Update from server state first if multiplayer
+    if (this.isMultiplayer) {
+      this.updateBallFromServer()
+
+      // Update remote players from server state
+      if (this.networkManager) {
+        const state = this.networkManager.getState()
+        if (state) {
+          state.players.forEach((player: any, sessionId: string) => {
+            if (sessionId !== this.mySessionId) {
+              this.updateRemotePlayer(sessionId, player)
+            }
+          })
+        }
+      }
+    } else {
+      // Single-player: run local physics
+      this.updateBallPhysics(dt)
+      this.checkCollisions()
+
+      // Only check goals locally in single-player mode
+      const goalResult = this.checkGoal()
+      if (goalResult.scored && goalResult.team) {
+        this.onGoalScored(goalResult.team)
+      }
     }
 
     // Update possession indicator
@@ -262,7 +296,7 @@ export class GameScene extends Phaser.Scene {
       const joystickInput = this.joystick.getInput()
       this.playerVelocity.x = joystickInput.x
       this.playerVelocity.y = joystickInput.y
-    } else {
+    } else if (this.cursors) {
       // Fallback to keyboard input
       if (this.cursors.left.isDown) {
         this.playerVelocity.x = -1
@@ -294,7 +328,16 @@ export class GameScene extends Phaser.Scene {
       this.playerVelocity.y * this.playerVelocity.y
     )
 
-    // Apply velocity
+    // Send input to server if multiplayer
+    if (this.isMultiplayer && this.networkManager) {
+      const movement = {
+        x: this.playerVelocity.x,
+        y: this.playerVelocity.y
+      }
+      this.networkManager.sendInput(movement, false) // false = not action button
+    }
+
+    // Apply velocity (local prediction)
     this.player.x += this.playerVelocity.x * GAME_CONFIG.PLAYER_SPEED * dt
     this.player.y += this.playerVelocity.y * GAME_CONFIG.PLAYER_SPEED * dt
 
@@ -311,6 +354,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateBallPhysics(dt: number) {
+    // Skip if multiplayer (server handles physics)
+    if (this.isMultiplayer) return
+
     // Apply friction
     this.ballVelocity.x *= GAME_CONFIG.BALL_FRICTION
     this.ballVelocity.y *= GAME_CONFIG.BALL_FRICTION
@@ -485,6 +531,9 @@ export class GameScene extends Phaser.Scene {
 
   // Match timer system
   private startMatchTimer() {
+    // Skip if multiplayer (server handles timer)
+    if (this.isMultiplayer) return
+
     this.timerEvent = this.time.addEvent({
       delay: 1000,
       callback: this.updateTimer,
@@ -494,6 +543,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateTimer() {
+    // Skip if multiplayer
+    if (this.isMultiplayer) return
     if (this.matchEnded) return
 
     this.timeRemaining--
@@ -578,5 +629,209 @@ export class GameScene extends Phaser.Scene {
     this.input.once('pointerdown', () => {
       this.scene.restart()
     })
+  }
+
+  // ========== MULTIPLAYER NETWORKING METHODS ==========
+
+  private async connectToMultiplayer() {
+    try {
+      this.networkManager = new NetworkManager({
+        serverUrl: 'ws://localhost:3000',
+        roomName: 'match'
+      })
+      await this.networkManager.connect()
+      this.mySessionId = this.networkManager.getMySessionId()
+      this.isMultiplayer = true
+
+      console.log('🎮 Multiplayer mode enabled')
+      console.log('📡 Session ID:', this.mySessionId)
+
+      this.setupNetworkListeners()
+
+      // Stop local timer if it was started (shouldn't be, but safety check)
+      if (this.timerEvent) {
+        this.timerEvent.remove()
+      }
+    } catch (error) {
+      console.warn('⚠️ Multiplayer unavailable, running single-player', error)
+      this.isMultiplayer = false
+      // Start local timer for single-player
+      this.startMatchTimer()
+    }
+  }
+
+  private setupNetworkListeners() {
+    if (!this.networkManager) return
+
+    try {
+      // Player joined event
+      this.networkManager.on('playerJoin', (player: any) => {
+        try {
+          console.log('👤 Remote player joined:', player.id, player.team)
+          if (player.id !== this.mySessionId) {
+            this.createRemotePlayer(player.id, player)
+          }
+        } catch (error) {
+          console.error('[GameScene] Error handling playerJoin:', error)
+        }
+      })
+
+      // Player left event
+      this.networkManager.on('playerLeave', (playerId: string) => {
+        try {
+          console.log('👋 Remote player left:', playerId)
+          this.removeRemotePlayer(playerId)
+        } catch (error) {
+          console.error('[GameScene] Error handling playerLeave:', error)
+        }
+      })
+
+      // State change event
+      this.networkManager.on('stateChange', (state: any) => {
+        try {
+          this.updateFromServerState(state)
+        } catch (error) {
+          console.error('[GameScene] Error handling stateChange:', error)
+        }
+      })
+
+      // Goal scored event
+      this.networkManager.on('goalScored', (data: any) => {
+        try {
+          console.log('⚽ Goal scored by', data.team)
+          if (!this.goalScored) {
+            this.onGoalScored(data.team)
+          }
+        } catch (error) {
+          console.error('[GameScene] Error handling goalScored:', error)
+        }
+      })
+
+      // Match end event
+      this.networkManager.on('matchEnd', (data: any) => {
+        try {
+          console.log('🏁 Match ended, winner:', data.winner)
+          if (!this.matchEnded) {
+            this.onMatchEnd()
+          }
+        } catch (error) {
+          console.error('[GameScene] Error handling matchEnd:', error)
+        }
+      })
+
+      console.log('✅ Network listeners set up successfully')
+    } catch (error) {
+      console.error('[GameScene] Error setting up network listeners:', error)
+    }
+  }
+
+  private createRemotePlayer(sessionId: string, playerState: any) {
+    console.log('🎭 Creating remote player:', sessionId, playerState.team)
+
+    // Determine color based on team
+    const color = playerState.team === 'blue' ? 0x0066ff : 0xff4444
+
+    // Create player sprite
+    const remotePlayer = this.add.rectangle(
+      playerState.x,
+      playerState.y,
+      30,
+      40,
+      color
+    )
+    remotePlayer.setStrokeStyle(2, 0xffffff)
+    remotePlayer.setDepth(10)
+
+    // Create indicator circle above player
+    const indicator = this.add.circle(
+      playerState.x,
+      playerState.y - 25,
+      8,
+      0xffff00
+    )
+    indicator.setDepth(11)
+
+    // Store references
+    this.remotePlayers.set(sessionId, remotePlayer)
+    this.remotePlayerIndicators.set(sessionId, indicator)
+
+    console.log('✅ Remote player created:', sessionId)
+  }
+
+  private removeRemotePlayer(sessionId: string) {
+    const sprite = this.remotePlayers.get(sessionId)
+    const indicator = this.remotePlayerIndicators.get(sessionId)
+
+    if (sprite) {
+      sprite.destroy()
+      this.remotePlayers.delete(sessionId)
+    }
+
+    if (indicator) {
+      indicator.destroy()
+      this.remotePlayerIndicators.delete(sessionId)
+    }
+
+    console.log('🗑️ Remote player removed:', sessionId)
+  }
+
+  private updateRemotePlayer(sessionId: string, playerState: any) {
+    const sprite = this.remotePlayers.get(sessionId)
+    const indicator = this.remotePlayerIndicators.get(sessionId)
+
+    if (sprite && indicator) {
+      // Direct position update (interpolation in Phase 3)
+      sprite.x = playerState.x
+      sprite.y = playerState.y
+      indicator.x = playerState.x
+      indicator.y = playerState.y - 25
+    }
+  }
+
+  private updateBallFromServer() {
+    if (!this.isMultiplayer || !this.networkManager) return
+
+    try {
+      const state = this.networkManager.getState()
+      if (!state || !state.ball) return
+
+      // Update ball position from server (server-authoritative)
+      this.ball.x = state.ball.x || 0
+      this.ball.y = state.ball.y || 0
+
+      // Store velocity for visual reference (not physics)
+      this.ballVelocity.x = state.ball.velocityX || 0
+      this.ballVelocity.y = state.ball.velocityY || 0
+    } catch (error) {
+      console.error('[GameScene] Error updating ball from server:', error)
+    }
+  }
+
+  private updateFromServerState(state: any) {
+    if (!state) return
+
+    // Update score display
+    this.scoreText.setText(`${state.scoreBlue || 0} - ${state.scoreRed || 0}`)
+
+    // Update timer display
+    const matchTime = state.matchTime || 0
+    const minutes = Math.floor(matchTime / 60)
+    const seconds = Math.floor(matchTime % 60)
+    this.timerText.setText(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+
+    // Update timer color (warning when < 30 seconds)
+    if (matchTime <= 30 && matchTime > 0) {
+      this.timerText.setColor('#ff4444')
+    } else {
+      this.timerText.setColor('#ffffff')
+    }
+
+    // Check if match ended (phase === 'ended')
+    if (state.phase === 'ended' && !this.matchEnded) {
+      this.matchEnded = true
+      // Determine winner from score
+      const winner = state.scoreBlue > state.scoreRed ? 'blue' : 'red'
+      this.showMatchEndScreen(winner)
+    }
   }
 }

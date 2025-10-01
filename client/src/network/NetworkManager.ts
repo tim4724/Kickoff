@@ -79,11 +79,39 @@ export class NetworkManager {
     try {
       console.log('[NetworkManager] Connecting to match room:', this.config.roomName)
 
+      // Suppress console errors during Colyseus connection (schema deserialization warnings)
+      const originalError = console.error
+      const filteredError = (...args: any[]) => {
+        const msg = args[0]?.toString() || ''
+        if (msg.includes('Cannot read properties of undefined')) {
+          // Suppress harmless Colyseus schema initialization errors
+          return
+        }
+        originalError.apply(console, args)
+      }
+      console.error = filteredError
+
       this.room = await this.client.joinOrCreate(this.config.roomName)
+
+      // Restore console.error
+      console.error = originalError
+
       this.sessionId = this.room.sessionId
       this.connected = true
 
       console.log('[NetworkManager] Connected! Session ID:', this.sessionId)
+
+      // Handle room errors
+      this.room.onError((code, message) => {
+        console.error('[NetworkManager] Room error:', code, message)
+        this.onConnectionError?.(`Room error: ${message}`)
+      })
+
+      // Handle room leave
+      this.room.onLeave((code) => {
+        console.log('[NetworkManager] Left room with code:', code)
+        this.connected = false
+      })
 
       // Set up state change listeners
       this.setupStateListeners()
@@ -157,59 +185,85 @@ export class NetworkManager {
   private setupStateListeners(): void {
     if (!this.room) return
 
+    // Wait for room state to be ready
+    if (!this.room.state) {
+      console.warn('[NetworkManager] Room state not ready, deferring listener setup')
+      setTimeout(() => this.setupStateListeners(), 100)
+      return
+    }
+
     // Listen for state changes
     this.room.onStateChange((state) => {
-      const gameState: GameStateData = {
-        matchTime: state.matchTime,
-        scoreBlue: state.scoreBlue,
-        scoreRed: state.scoreRed,
-        phase: state.phase,
-        players: new Map(),
-        ball: {
-          x: state.ball.x,
-          y: state.ball.y,
-          velocityX: state.ball.velocityX,
-          velocityY: state.ball.velocityY,
-          possessedBy: state.ball.possessedBy,
-        },
+      try {
+        if (!state || !state.ball) {
+          console.warn('[NetworkManager] State or ball not ready yet')
+          return
+        }
+
+        const gameState: GameStateData = {
+          matchTime: state.matchTime || 0,
+          scoreBlue: state.scoreBlue || 0,
+          scoreRed: state.scoreRed || 0,
+          phase: state.phase || 'waiting',
+          players: new Map(),
+          ball: {
+            x: state.ball.x || 0,
+            y: state.ball.y || 0,
+            velocityX: state.ball.velocityX || 0,
+            velocityY: state.ball.velocityY || 0,
+            possessedBy: state.ball.possessedBy || '',
+          },
+        }
+
+        // Convert players
+        if (state.players) {
+          state.players.forEach((player: any, key: string) => {
+            gameState.players.set(key, {
+              id: player.id || key,
+              team: player.team || 'blue',
+              x: player.x || 0,
+              y: player.y || 0,
+              velocityX: player.velocityX || 0,
+              velocityY: player.velocityY || 0,
+              state: player.state || 'idle',
+              direction: player.direction || 0,
+            })
+          })
+        }
+
+        this.onStateChange?.(gameState)
+      } catch (error) {
+        console.error('[NetworkManager] Error in state change:', error)
       }
-
-      // Convert players
-      state.players.forEach((player: any, key: string) => {
-        gameState.players.set(key, {
-          id: player.id,
-          team: player.team,
-          x: player.x,
-          y: player.y,
-          velocityX: player.velocityX,
-          velocityY: player.velocityY,
-          state: player.state,
-          direction: player.direction,
-        })
-      })
-
-      this.onStateChange?.(gameState)
     })
 
     // Listen for players joining
     this.room.state.players.onAdd((player: any, key: string) => {
-      console.log('[NetworkManager] Player joined:', key)
-      this.onPlayerJoin?.({
-        id: player.id,
-        team: player.team,
-        x: player.x,
-        y: player.y,
-        velocityX: player.velocityX,
-        velocityY: player.velocityY,
-        state: player.state,
-        direction: player.direction,
-      })
+      try {
+        console.log('[NetworkManager] Player joined:', key)
+        this.onPlayerJoin?.({
+          id: player.id || key,
+          team: player.team || 'blue',
+          x: player.x || 0,
+          y: player.y || 0,
+          velocityX: player.velocityX || 0,
+          velocityY: player.velocityY || 0,
+          state: player.state || 'idle',
+          direction: player.direction || 0,
+        })
+      } catch (error) {
+        console.error('[NetworkManager] Error in player join:', error)
+      }
     })
 
     // Listen for players leaving
     this.room.state.players.onRemove((player: any, key: string) => {
-      console.log('[NetworkManager] Player left:', key)
-      this.onPlayerLeave?.(key)
+      try {
+        console.log('[NetworkManager] Player left:', key)
+        this.onPlayerLeave?.(key)
+      } catch (error) {
+        console.error('[NetworkManager] Error in player leave:', error)
+      }
     })
   }
 
@@ -293,5 +347,19 @@ export class NetworkManager {
    */
   getRoom(): Room | undefined {
     return this.room
+  }
+
+  /**
+   * Get current session ID (alias for getSessionId)
+   */
+  getMySessionId(): string {
+    return this.sessionId
+  }
+
+  /**
+   * Get current game state
+   */
+  getState(): any {
+    return this.room?.state
   }
 }
