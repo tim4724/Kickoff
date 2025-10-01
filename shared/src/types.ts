@@ -52,11 +52,11 @@ export interface GameStateData {
 export const GAME_CONFIG = {
   FIELD_WIDTH: 800,
   FIELD_HEIGHT: 600,
-  PLAYER_SPEED: 200, // pixels per second
+  PLAYER_SPEED: 600, // pixels per second (increased from 200 for playable movement)
   BALL_FRICTION: 0.98,
   SHOOT_SPEED: 400,
   PASS_SPEED: 300,
-  POSSESSION_RADIUS: 30,
+  POSSESSION_RADIUS: 50, // increased from 30 for easier possession gain
   TICK_RATE: 30, // server updates per second
   MATCH_DURATION: 120, // seconds (2 minutes)
 } as const

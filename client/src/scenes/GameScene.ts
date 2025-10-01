@@ -10,7 +10,7 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private scoreText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
-  private possessionIndicator!: Phaser.GameObjects.Circle
+  private possessionIndicator!: Phaser.GameObjects.Arc
 
   // Mobile controls
   private joystick!: VirtualJoystick
@@ -25,7 +25,7 @@ export class GameScene extends Phaser.Scene {
   private mySessionId?: string
   private isMultiplayer: boolean = false
   private remotePlayers: Map<string, Phaser.GameObjects.Rectangle> = new Map()
-  private remotePlayerIndicators: Map<string, Phaser.GameObjects.Circle> = new Map()
+  private remotePlayerIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
 
   // Goal zones and scoring
   private leftGoal = { x: 10, yMin: 0, yMax: 0, width: 20 }
@@ -35,10 +35,21 @@ export class GameScene extends Phaser.Scene {
   private goalScored: boolean = false
 
   // Match timer
-  private matchDuration: number = 120 // 2 minutes in seconds
   private timeRemaining: number = 120
   private timerEvent?: Phaser.Time.TimerEvent
   private matchEnded: boolean = false
+
+  // DEBUG: State update tracking
+  private stateUpdateCount: number = 0
+
+  // Player team color (set after connecting to multiplayer)
+  private playerTeamColor: number = 0x0066ff // Default blue, updated from server
+  private colorInitialized: boolean = false // Track if color has been set from server
+  private positionInitialized: boolean = false // Track if position has been synced from server
+
+  // Input throttling for multiplayer (prevent flooding server with 60fps inputs)
+  private lastInputSentTime: number = 0
+  private readonly INPUT_SEND_INTERVAL = 33 // Send inputs at ~30Hz (33ms) to match server tick rate
 
   constructor() {
     super({ key: 'GameScene' })
@@ -241,19 +252,24 @@ export class GameScene extends Phaser.Scene {
     this.updatePlayerMovement(dt)
 
     // Update from server state first if multiplayer
-    if (this.isMultiplayer) {
-      this.updateBallFromServer()
+    if (this.isMultiplayer && this.networkManager) {
+      const state = this.networkManager.getState()
+      if (state) {
+        // Update game state (score, timer, phase)
+        this.updateFromServerState(state)
 
-      // Update remote players from server state
-      if (this.networkManager) {
-        const state = this.networkManager.getState()
-        if (state) {
-          state.players.forEach((player: any, sessionId: string) => {
-            if (sessionId !== this.mySessionId) {
-              this.updateRemotePlayer(sessionId, player)
-            }
-          })
-        }
+        // Update ball position from server
+        this.updateBallFromServer()
+
+        // Update all players from server state (including local player for reconciliation)
+        state.players.forEach((player: any, sessionId: string) => {
+          if (sessionId === this.mySessionId) {
+            // Server reconciliation for local player
+            this.reconcileLocalPlayer(player)
+          } else {
+            this.updateRemotePlayer(sessionId, player)
+          }
+        })
       }
     } else {
       // Single-player: run local physics
@@ -267,16 +283,29 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Update possession indicator
-    const dx = this.ball.x - this.player.x
-    const dy = this.ball.y - this.player.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
+    // Update possession indicator - use server possession state
+    if (this.isMultiplayer && this.networkManager) {
+      const state = this.networkManager.getState()
+      const hasPossession = state?.ball?.possessedBy === this.mySessionId
 
-    if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
-      this.possessionIndicator.setPosition(this.player.x, this.player.y)
-      this.possessionIndicator.setAlpha(0.6)
+      if (hasPossession) {
+        this.possessionIndicator.setPosition(this.player.x, this.player.y)
+        this.possessionIndicator.setAlpha(0.6)
+      } else {
+        this.possessionIndicator.setAlpha(0)
+      }
     } else {
-      this.possessionIndicator.setAlpha(0)
+      // Single player: use distance-based calculation
+      const dx = this.ball.x - this.player.x
+      const dy = this.ball.y - this.player.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
+        this.possessionIndicator.setPosition(this.player.x, this.player.y)
+        this.possessionIndicator.setAlpha(0.6)
+      } else {
+        this.possessionIndicator.setAlpha(0)
+      }
     }
 
     // Update mobile controls
@@ -328,13 +357,22 @@ export class GameScene extends Phaser.Scene {
       this.playerVelocity.y * this.playerVelocity.y
     )
 
-    // Send input to server if multiplayer
+    // Send input to server if multiplayer (throttled to prevent flooding)
+    // Only send if there's actual movement to avoid zero-spam
     if (this.isMultiplayer && this.networkManager) {
-      const movement = {
-        x: this.playerVelocity.x,
-        y: this.playerVelocity.y
+      const hasMovement = Math.abs(this.playerVelocity.x) > 0.01 || Math.abs(this.playerVelocity.y) > 0.01
+
+      if (hasMovement) {
+        const now = Date.now()
+        if (now - this.lastInputSentTime >= this.INPUT_SEND_INTERVAL) {
+          const movement = {
+            x: this.playerVelocity.x,
+            y: this.playerVelocity.y
+          }
+          this.networkManager.sendInput(movement, false) // false = not action button
+          this.lastInputSentTime = now
+        }
       }
-      this.networkManager.sendInput(movement, false) // false = not action button
     }
 
     // Apply velocity (local prediction)
@@ -345,11 +383,13 @@ export class GameScene extends Phaser.Scene {
     this.player.x = Phaser.Math.Clamp(this.player.x, 30, this.scale.width - 30)
     this.player.y = Phaser.Math.Clamp(this.player.y, 30, this.scale.height - 30)
 
-    // Visual feedback: Tint when moving
+    // Visual feedback: Tint when moving (use team color)
     if (velocityMagnitude > 0) {
-      this.player.setFillStyle(0x0088ff)
+      // Lighten color when moving
+      const movingColor = this.playerTeamColor === 0x0066ff ? 0x0088ff : 0xff6666
+      this.player.setFillStyle(movingColor)
     } else {
-      this.player.setFillStyle(0x0066ff)
+      this.player.setFillStyle(this.playerTeamColor)
     }
   }
 
@@ -648,6 +688,8 @@ export class GameScene extends Phaser.Scene {
 
       this.setupNetworkListeners()
 
+      // Color will be set via stateChange event when player appears in server state
+
       // Stop local timer if it was started (shouldn't be, but safety check)
       if (this.timerEvent) {
         this.timerEvent.remove()
@@ -689,6 +731,19 @@ export class GameScene extends Phaser.Scene {
       // State change event
       this.networkManager.on('stateChange', (state: any) => {
         try {
+          // Initialize player color and position on first state update when player exists
+          if (!this.colorInitialized && state?.players?.has(this.mySessionId)) {
+            this.updateLocalPlayerColor()
+
+            // Sync initial position from server
+            if (!this.positionInitialized) {
+              this.syncLocalPlayerPosition()
+              this.positionInitialized = true
+            }
+
+            this.colorInitialized = true
+          }
+
           this.updateFromServerState(state)
         } catch (error) {
           console.error('[GameScene] Error handling stateChange:', error)
@@ -775,16 +830,73 @@ export class GameScene extends Phaser.Scene {
     console.log('🗑️ Remote player removed:', sessionId)
   }
 
+  private reconcileLocalPlayer(playerState: any) {
+    // Adaptive server reconciliation for local player
+    // Blends client prediction toward server authoritative position
+
+    const serverX = playerState.x
+    const serverY = playerState.y
+    const deltaX = Math.abs(this.player.x - serverX)
+    const deltaY = Math.abs(this.player.y - serverY)
+
+    // Adaptive reconciliation factor based on error magnitude
+    let reconcileFactor = 0.15 // Gentle baseline for responsive feel
+
+    if (deltaX > 50 || deltaY > 50) {
+      // Large error: strong correction (likely lag spike or bounds collision mismatch)
+      reconcileFactor = 0.6
+    } else if (deltaX > 25 || deltaY > 25) {
+      // Moderate error: moderate correction
+      reconcileFactor = 0.3
+    }
+
+    // Store old position for logging
+    const oldX = this.player.x
+    const oldY = this.player.y
+
+    // Blend toward server position
+    this.player.x += (serverX - this.player.x) * reconcileFactor
+    this.player.y += (serverY - this.player.y) * reconcileFactor
+
+    // DEBUG: Log reconciliation (only if correction >2 pixels)
+    const correctionX = Math.abs(this.player.x - oldX)
+    const correctionY = Math.abs(this.player.y - oldY)
+    if (correctionX > 2 || correctionY > 2) {
+      console.log(
+        `🔄 [Client] Local player reconciled: ` +
+        `(${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${this.player.x.toFixed(1)}, ${this.player.y.toFixed(1)}), ` +
+        `server: (${serverX.toFixed(1)}, ${serverY.toFixed(1)}), ` +
+        `delta: (${deltaX.toFixed(1)}, ${deltaY.toFixed(1)}), ` +
+        `factor: ${reconcileFactor}`
+      )
+    }
+  }
+
   private updateRemotePlayer(sessionId: string, playerState: any) {
     const sprite = this.remotePlayers.get(sessionId)
     const indicator = this.remotePlayerIndicators.get(sessionId)
 
     if (sprite && indicator) {
-      // Direct position update (interpolation in Phase 3)
-      sprite.x = playerState.x
-      sprite.y = playerState.y
-      indicator.x = playerState.x
-      indicator.y = playerState.y - 25
+      // Store old position for delta logging
+      const oldX = sprite.x
+      const oldY = sprite.y
+
+      // Interpolate toward server position for smooth rendering (same as ball)
+      const serverX = playerState.x
+      const serverY = playerState.y
+      const lerpFactor = 0.3
+
+      sprite.x += (serverX - sprite.x) * lerpFactor
+      sprite.y += (serverY - sprite.y) * lerpFactor
+
+      indicator.x = sprite.x
+      indicator.y = sprite.y - 25
+
+      // DEBUG: Log player movement (only if moved >1 pixel)
+      const moved = Math.abs(sprite.x - oldX) > 1 || Math.abs(sprite.y - oldY) > 1
+      if (moved) {
+        console.log(`🎭 [Client] Remote player ${sessionId} updated: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${sprite.x.toFixed(1)}, ${sprite.y.toFixed(1)})`)
+      }
     }
   }
 
@@ -795,13 +907,32 @@ export class GameScene extends Phaser.Scene {
       const state = this.networkManager.getState()
       if (!state || !state.ball) return
 
-      // Update ball position from server (server-authoritative)
-      this.ball.x = state.ball.x || 0
-      this.ball.y = state.ball.y || 0
+      // Store old position for delta logging
+      const oldX = this.ball.x
+      const oldY = this.ball.y
+
+      const serverBallX = state.ball.x || 0
+      const serverBallY = state.ball.y || 0
+
+      // Use interpolation for smooth ball movement (hides network latency)
+      // Higher lerp factor = more responsive but less smooth
+      // Lower lerp factor = smoother but more latency
+      const lerpFactor = 0.3
+
+      // Interpolate ball position toward server position
+      this.ball.x += (serverBallX - this.ball.x) * lerpFactor
+      this.ball.y += (serverBallY - this.ball.y) * lerpFactor
 
       // Store velocity for visual reference (not physics)
       this.ballVelocity.x = state.ball.velocityX || 0
       this.ballVelocity.y = state.ball.velocityY || 0
+
+      // DEBUG: Log ball position changes (only if moved >0.5 pixels)
+      const moved = Math.abs(this.ball.x - oldX) > 0.5 || Math.abs(this.ball.y - oldY) > 0.5
+      if (moved) {
+        console.log(`⚽ [Client] Ball updated from server: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${this.ball.x.toFixed(1)}, ${this.ball.y.toFixed(1)})`)
+        console.log(`   Server: (${serverBallX.toFixed(1)}, ${serverBallY.toFixed(1)}) | Velocity: (${this.ballVelocity.x.toFixed(1)}, ${this.ballVelocity.y.toFixed(1)})`)
+      }
     } catch (error) {
       console.error('[GameScene] Error updating ball from server:', error)
     }
@@ -809,6 +940,16 @@ export class GameScene extends Phaser.Scene {
 
   private updateFromServerState(state: any) {
     if (!state) return
+
+    // DEBUG: Log state updates (only every 60th call ~2 seconds at 30fps)
+    if (!this.stateUpdateCount) this.stateUpdateCount = 0
+    this.stateUpdateCount++
+    if (this.stateUpdateCount % 60 === 0) {
+      console.log(`📥 [Client] State update #${this.stateUpdateCount}`)
+      console.log(`   Score: ${state.scoreBlue || 0} - ${state.scoreRed || 0}`)
+      console.log(`   Time: ${state.matchTime?.toFixed(1) || 0}s`)
+      console.log(`   Phase: ${state.phase}`)
+    }
 
     // Update score display
     this.scoreText.setText(`${state.scoreBlue || 0} - ${state.scoreRed || 0}`)
@@ -832,6 +973,56 @@ export class GameScene extends Phaser.Scene {
       // Determine winner from score
       const winner = state.scoreBlue > state.scoreRed ? 'blue' : 'red'
       this.showMatchEndScreen(winner)
+    }
+  }
+
+  private updateLocalPlayerColor() {
+    if (!this.isMultiplayer || !this.networkManager || !this.mySessionId) return
+
+    try {
+      const state = this.networkManager.getState()
+      if (!state || !state.players) return
+
+      // Get local player's team from server state
+      const localPlayer = state.players.get(this.mySessionId)
+      if (!localPlayer) {
+        console.warn('⚠️ Local player not found in server state')
+        return
+      }
+
+      // Set color based on team and store it
+      this.playerTeamColor = localPlayer.team === 'blue' ? 0x0066ff : 0xff4444
+      this.player.setFillStyle(this.playerTeamColor)
+
+      console.log(`🎨 [Client] Local player color set to ${localPlayer.team} (${this.playerTeamColor.toString(16)})`)
+    } catch (error) {
+      console.error('[GameScene] Error updating local player color:', error)
+    }
+  }
+
+  private syncLocalPlayerPosition() {
+    if (!this.isMultiplayer || !this.networkManager || !this.mySessionId) return
+
+    try {
+      const state = this.networkManager.getState()
+      if (!state || !state.players) return
+
+      // Get local player's position from server state
+      const localPlayer = state.players.get(this.mySessionId)
+      if (!localPlayer) {
+        console.warn('⚠️ Local player not found in server state for position sync')
+        return
+      }
+
+      // Sync local sprite with server position
+      this.player.setPosition(localPlayer.x, localPlayer.y)
+
+      console.log(
+        `📍 [Client] Synced local player position: (${localPlayer.x}, ${localPlayer.y}) ` +
+        `Team: ${localPlayer.team}`
+      )
+    } catch (error) {
+      console.error('[GameScene] Error syncing local player position:', error)
     }
   }
 }

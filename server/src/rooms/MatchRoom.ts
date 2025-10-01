@@ -11,6 +11,7 @@ const GAME_CONFIG = {
 
 export class MatchRoom extends Room<GameState> {
   maxClients = 2 // Start with 2 humans only (will add AI later)
+  private frameCount = 0 // DEBUG: Track update cycles
 
   onCreate(options: any) {
     console.log('Match room created:', this.roomId, options)
@@ -34,8 +35,8 @@ export class MatchRoom extends Room<GameState> {
     // Add player to game state
     this.state.addPlayer(client.sessionId)
 
-    // Start match when 2 players joined
-    if (this.state.players.size === 2) {
+    // Start match when FIRST player joins (enables single-player and testing)
+    if (this.state.players.size === 1) {
       this.startMatch()
     }
   }
@@ -54,6 +55,12 @@ export class MatchRoom extends Room<GameState> {
   }
 
   private onPlayerInput(client: Client, input: any) {
+    // DEBUG: Log all input messages received
+    console.log(`📥 [MatchRoom] Input received from ${client.sessionId}:`, {
+      movement: input.movement,
+      action: input.action,
+      timestamp: input.timestamp,
+    })
     this.state.queueInput(client.sessionId, input)
   }
 
@@ -65,6 +72,12 @@ export class MatchRoom extends Room<GameState> {
 
   private update(deltaTime: number) {
     const dt = deltaTime / 1000 // Convert to seconds
+
+    // DEBUG: Log update cycle every 60 frames (2 seconds at 30Hz)
+    this.frameCount++
+    if (this.frameCount % 60 === 0) {
+      console.log(`[MatchRoom] Update tick #${this.frameCount}, dt: ${dt.toFixed(3)}s, phase: ${this.state.phase}`)
+    }
 
     if (this.state.phase === 'playing') {
       // Process queued inputs
