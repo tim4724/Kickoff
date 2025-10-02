@@ -240,9 +240,13 @@ export class GameScene extends Phaser.Scene {
     const width = GAME_CONFIG.FIELD_WIDTH
     const height = GAME_CONFIG.FIELD_HEIGHT
 
-    // Ball (white circle with shadow)
+    // Ball (white circle with dark stroke and shadow)
     const ballShadow = this.add.ellipse(width / 2 + 2, height / 2 + 3, 20, 16, 0x000000, 0.3)
+    ballShadow.setDepth(15)
+
     this.ball = this.add.ellipse(width / 2, height / 2, 20, 20, 0xffffff)
+    this.ball.setStrokeStyle(2, 0x000000, 1) // Black stroke for better visibility
+    this.ball.setDepth(15) // Render above players
 
     this.gameObjects.push(ballShadow, this.ball)
     this.uiCamera.ignore([ballShadow, this.ball])
@@ -430,9 +434,9 @@ export class GameScene extends Phaser.Scene {
     const possessorTeam = possessor.team
     const pressureLevel = state.ball.pressureLevel || 0
 
-    // Team colors
-    const blueColor = 0x0066ff
-    const redColor = 0xff4444
+    // Team colors - darker for better visibility
+    const blueColor = 0x0044cc  // Darker blue
+    const redColor = 0xcc2222   // Darker red
 
     if (pressureLevel === 0) {
       // No pressure - pure team color
