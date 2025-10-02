@@ -74,7 +74,6 @@ export class GameState extends Schema {
   @type({ map: Player }) players = new MapSchema<Player>()
   @type(Ball) ball = new Ball()
 
-  private playerCount = 0
   private goalScored: boolean = false // Prevent duplicate goal detection
 
   // Possession lockout tracking
@@ -88,9 +87,15 @@ export class GameState extends Schema {
       return
     }
 
-    // Assign team based on current player count (alternate between blue and red)
-    const currentPlayerCount = this.players.size
-    const team: Team = currentPlayerCount % 2 === 0 ? 'blue' : 'red'
+    // Assign team based on team balance (assign to team with fewer players)
+    let blueCount = 0
+    let redCount = 0
+    this.players.forEach((player) => {
+      if (player.team === 'blue') blueCount++
+      else redCount++
+    })
+
+    const team: Team = blueCount <= redCount ? 'blue' : 'red'
 
     // Starting positions (proportional to 1920x1080)
     const x = team === 'blue' ? 360 : GAME_CONFIG.FIELD_WIDTH - 360
@@ -99,7 +104,6 @@ export class GameState extends Schema {
     const player = new Player(sessionId, team, x, y)
     this.players.set(sessionId, player)
 
-    this.playerCount++
     console.log(`Added player ${sessionId} to team ${team} (current players: ${this.players.size})`)
   }
 

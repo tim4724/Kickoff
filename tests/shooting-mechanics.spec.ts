@@ -405,12 +405,19 @@ test.describe('Shooting Mechanics', () => {
     console.log(`✅ Client 1: ${session1}`)
     console.log(`✅ Client 2: ${session2}`)
 
+    // Move Client 2 away from ball to prevent interference
+    console.log('\n📤 Step 1: Moving Client 2 away from ball...')
+    await client2.keyboard.down('ArrowUp')
+    await client2.waitForTimeout(1000)
+    await client2.keyboard.up('ArrowUp')
+    await client2.waitForTimeout(200)
+
     // Client 1 gains possession and shoots
-    console.log('\n📤 Step 1: Client 1 gaining possession...')
+    console.log('\n📤 Step 2: Client 1 gaining possession...')
     const hasPossession = await gainPossession(client1)
     expect(hasPossession).toBe(true)
 
-    console.log('\n⚽ Step 2: Client 1 shooting...')
+    console.log('\n⚽ Step 3: Client 1 shooting...')
     await shootBall(client1)
 
     // Wait for ball to be released and gain velocity
@@ -440,24 +447,19 @@ test.describe('Shooting Mechanics', () => {
     console.log(`  Velocity magnitude: ${velocity2.toFixed(1)} px/s`)
     console.log(`  Possessed by: ${ball2.possessedBy || 'none'}`)
 
-    // Assertions: Ball should either be moving OR captured by other player
-    // Note: In multiplayer, ball can be quickly re-captured by opponent
+    // Assertions: Since Client 2 was moved away, ball should be moving (not captured)
+    expect(ball1.possessedBy).toBe('')
+    expect(ball2.possessedBy).toBe('')
+
     const ballIsMoving = velocity1 > MIN_SHOOT_SPEED - 100 || velocity2 > MIN_SHOOT_SPEED - 100
-    const ballWasCaptured = ball1.possessedBy !== '' || ball2.possessedBy !== ''
+    expect(ballIsMoving).toBe(true)
 
-    // At least one of these should be true
-    expect(ballIsMoving || ballWasCaptured).toBe(true)
-
-    // Check velocity sync only if ball is moving (not captured)
-    if (ballIsMoving && !ballWasCaptured) {
-      const velocityDiff = Math.abs(velocity1 - velocity2)
-      const velocityDiffPercent = velocity1 > 0 ? (velocityDiff / velocity1) * 100 : 0
-      console.log(`\n📊 Synchronization:`)
-      console.log(`  Velocity difference: ${velocityDiff.toFixed(1)} px/s (${velocityDiffPercent.toFixed(1)}%)`)
-      expect(velocityDiffPercent).toBeLessThan(10)
-    } else {
-      console.log(`\n📊 Ball was captured by opponent - synchronization test skipped`)
-    }
+    // Check velocity synchronization between clients
+    const velocityDiff = Math.abs(velocity1 - velocity2)
+    const velocityDiffPercent = velocity1 > 0 ? (velocityDiff / velocity1) * 100 : 0
+    console.log(`\n📊 Synchronization:`)
+    console.log(`  Velocity difference: ${velocityDiff.toFixed(1)} px/s (${velocityDiffPercent.toFixed(1)}%)`)
+    expect(velocityDiffPercent).toBeLessThan(10)
 
     await client1.close()
     await client2.close()
