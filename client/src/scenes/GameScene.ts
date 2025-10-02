@@ -356,6 +356,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  shutdown() {
+    // Disconnect NetworkManager to prevent stale connections
+    if (this.networkManager) {
+      console.log('🔌 Disconnecting NetworkManager in shutdown()')
+      this.networkManager.disconnect()
+      this.networkManager = null
+    }
+  }
+
   update(_time: number, delta: number) {
     const dt = delta / 1000 // Convert to seconds
 

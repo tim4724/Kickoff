@@ -82,6 +82,12 @@ export class GameState extends Schema {
   private lastPossessionLossTime = new Map<string, number>() // when each player last lost possession
 
   addPlayer(sessionId: string) {
+    // Defensive check: prevent duplicate player additions
+    if (this.players.has(sessionId)) {
+      console.warn(`⚠️ Player ${sessionId} already exists, skipping add`)
+      return
+    }
+
     // Assign team based on current player count (alternate between blue and red)
     const currentPlayerCount = this.players.size
     const team: Team = currentPlayerCount % 2 === 0 ? 'blue' : 'red'
