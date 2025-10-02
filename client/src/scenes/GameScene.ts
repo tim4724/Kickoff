@@ -11,7 +11,6 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private scoreText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
-  private possessionIndicator!: Phaser.GameObjects.Arc
 
   // Dual camera system
   private gameCamera!: Phaser.Cameras.Scene2D.Camera
@@ -33,7 +32,6 @@ export class GameScene extends Phaser.Scene {
   private isMultiplayer: boolean = false
   private remotePlayers: Map<string, Phaser.GameObjects.Arc> = new Map()
   private remotePlayerIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
-  private pressureIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
 
   // Goal zones and scoring (using shared GAME_CONFIG)
   private leftGoal = {
@@ -259,13 +257,8 @@ export class GameScene extends Phaser.Scene {
     this.player = this.add.circle(width / 2 - 240, height / 2, 20, 0x0066ff)
     this.player.setStrokeStyle(4, 0xffffff)
 
-    // Possession indicator (yellow circle glow)
-    this.possessionIndicator = this.add.circle(0, 0, 40, 0xffff00, 0)
-    this.possessionIndicator.setStrokeStyle(3, 0xffff00, 0.6)
-    this.possessionIndicator.setDepth(999)
-
-    this.gameObjects.push(this.player, this.possessionIndicator)
-    this.uiCamera.ignore([this.player, this.possessionIndicator])
+    this.gameObjects.push(this.player)
+    this.uiCamera.ignore([this.player])
   }
 
   private createUI() {
@@ -396,44 +389,76 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Update possession indicator - use server possession state
+    // Update ball color based on possession - use server possession state
     if (this.isMultiplayer && this.networkManager) {
       const state = this.networkManager.getState()
-      const hasPossession = state?.ball?.possessedBy === this.mySessionId
-
-      if (hasPossession) {
-        this.possessionIndicator.setPosition(this.player.x, this.player.y)
-
-        // Fade possession indicator based on pressure level
-        // Full brightness (0.6) at 0 pressure, fades to dim (0.2) at max pressure
-        const pressureLevel = state?.ball?.pressureLevel || 0
-        const baseAlpha = 0.6
-        const minAlpha = 0.2
-        const alpha = baseAlpha - (pressureLevel * (baseAlpha - minAlpha))
-        this.possessionIndicator.setAlpha(alpha)
-
-        // Show pressure indicators around nearby opponents
-        this.updatePressureIndicators(state)
-      } else {
-        this.possessionIndicator.setAlpha(0)
-        // Hide all pressure indicators when not in possession
-        this.pressureIndicators.forEach(indicator => indicator.setAlpha(0))
-      }
-    } else {
-      // Single player: use distance-based calculation
-      const dist = GeometryUtils.distance(this.player, this.ball)
-
-      if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
-        this.possessionIndicator.setPosition(this.player.x, this.player.y)
-        this.possessionIndicator.setAlpha(0.6)
-      } else {
-        this.possessionIndicator.setAlpha(0)
-      }
+      this.updateBallColor(state)
     }
 
     // Update mobile controls
     if (this.actionButton) {
       this.actionButton.update()
+    }
+  }
+
+  /**
+   * Update ball color based on possession and pressure level
+   * - Ball shows team color of possessor
+   * - During contesting (pressure > 0), color fades toward opponent's color
+   */
+  private updateBallColor(state: any) {
+    if (!state || !state.ball) {
+      // No state - keep ball white
+      this.ball.setFillStyle(0xffffff)
+      return
+    }
+
+    const possessorId = state.ball.possessedBy
+    if (!possessorId) {
+      // No possessor - ball is white
+      this.ball.setFillStyle(0xffffff)
+      return
+    }
+
+    // Get possessor's team
+    const possessor = state.players.get(possessorId)
+    if (!possessor) {
+      this.ball.setFillStyle(0xffffff)
+      return
+    }
+
+    const possessorTeam = possessor.team
+    const pressureLevel = state.ball.pressureLevel || 0
+
+    // Team colors
+    const blueColor = 0x0066ff
+    const redColor = 0xff4444
+
+    if (pressureLevel === 0) {
+      // No pressure - pure team color
+      const teamColor = possessorTeam === 'blue' ? blueColor : redColor
+      this.ball.setFillStyle(teamColor)
+    } else {
+      // Under pressure - interpolate toward opponent's color
+      // pressureLevel goes from 0 to 1 (1 = about to lose possession)
+      const startColor = possessorTeam === 'blue' ? blueColor : redColor
+      const endColor = possessorTeam === 'blue' ? redColor : blueColor
+
+      // Interpolate RGB channels
+      const startR = (startColor >> 16) & 0xff
+      const startG = (startColor >> 8) & 0xff
+      const startB = startColor & 0xff
+
+      const endR = (endColor >> 16) & 0xff
+      const endG = (endColor >> 8) & 0xff
+      const endB = endColor & 0xff
+
+      const r = Math.round(startR + (endR - startR) * pressureLevel)
+      const g = Math.round(startG + (endG - startG) * pressureLevel)
+      const b = Math.round(startB + (endB - startB) * pressureLevel)
+
+      const interpolatedColor = (r << 16) | (g << 8) | b
+      this.ball.setFillStyle(interpolatedColor)
     }
   }
 
@@ -939,40 +964,22 @@ export class GameScene extends Phaser.Scene {
     remotePlayer.setStrokeStyle(2, 0xffffff)
     remotePlayer.setDepth(10)
 
-    // Create pressure indicator (red circle around opponent when applying pressure)
-    const pressureIndicator = this.add.circle(
-      playerState.x,
-      playerState.y,
-      45, // Slightly larger than PRESSURE_RADIUS (40px)
-      0xff0000, // Red
-      0 // Start invisible
-    )
-    pressureIndicator.setStrokeStyle(2, 0xff0000, 0.6)
-    pressureIndicator.setDepth(9) // Below player
-
     // Add to game objects and ignore on UI camera
-    this.gameObjects.push(remotePlayer, pressureIndicator)
-    this.uiCamera.ignore([remotePlayer, pressureIndicator])
+    this.gameObjects.push(remotePlayer)
+    this.uiCamera.ignore([remotePlayer])
 
     // Store references
     this.remotePlayers.set(sessionId, remotePlayer)
-    this.pressureIndicators.set(sessionId, pressureIndicator)
 
     console.log('✅ Remote player created:', sessionId)
   }
 
   private removeRemotePlayer(sessionId: string) {
     const sprite = this.remotePlayers.get(sessionId)
-    const pressureIndicator = this.pressureIndicators.get(sessionId)
 
     if (sprite) {
       sprite.destroy()
       this.remotePlayers.delete(sessionId)
-    }
-
-    if (pressureIndicator) {
-      pressureIndicator.destroy()
-      this.pressureIndicators.delete(sessionId)
     }
 
     console.log('🗑️ Remote player removed:', sessionId)
@@ -1022,7 +1029,6 @@ export class GameScene extends Phaser.Scene {
 
   private updateRemotePlayer(sessionId: string, playerState: any) {
     const sprite = this.remotePlayers.get(sessionId)
-    const pressureIndicator = this.pressureIndicators.get(sessionId)
 
     if (sprite) {
       // Store old position for delta logging
@@ -1036,12 +1042,6 @@ export class GameScene extends Phaser.Scene {
 
       sprite.x += (serverX - sprite.x) * lerpFactor
       sprite.y += (serverY - sprite.y) * lerpFactor
-
-      // Update pressure indicator position
-      if (pressureIndicator) {
-        pressureIndicator.x = sprite.x
-        pressureIndicator.y = sprite.y
-      }
 
       // DEBUG: Log player movement (only if moved >1 pixel)
       const moved = Math.abs(sprite.x - oldX) > 1 || Math.abs(sprite.y - oldY) > 1
@@ -1089,33 +1089,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private updatePressureIndicators(state: any) {
-    // Show pressure indicators on opponents who are within pressure radius
-    const PRESSURE_RADIUS = 40
-    const myTeam = state.players.get(this.mySessionId)?.team
-
-    state.players.forEach((player: any, sessionId: string) => {
-      if (sessionId === this.mySessionId) return // Skip local player
-
-      const pressureIndicator = this.pressureIndicators.get(sessionId)
-      if (!pressureIndicator) return
-
-      // Only show if opponent is applying pressure (within radius and opposing team)
-      const distance = GeometryUtils.distance(this.player, player)
-
-      const isOpponent = player.team !== myTeam
-      const isWithinRadius = distance < PRESSURE_RADIUS
-
-      if (isOpponent && isWithinRadius) {
-        // Show indicator with pulsing animation based on proximity
-        const proximityFactor = 1 - (distance / PRESSURE_RADIUS) // 1.0 at 0px, 0.0 at 40px
-        const alpha = 0.3 + (proximityFactor * 0.4) // 0.3 to 0.7 alpha
-        pressureIndicator.setAlpha(alpha)
-      } else {
-        pressureIndicator.setAlpha(0)
-      }
-    })
-  }
 
   private updateFromServerState(state: any) {
     if (!state) return
