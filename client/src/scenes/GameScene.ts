@@ -31,7 +31,6 @@ export class GameScene extends Phaser.Scene {
   private mySessionId?: string
   private isMultiplayer: boolean = false
   private remotePlayers: Map<string, Phaser.GameObjects.Arc> = new Map()
-  private remotePlayerIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
 
   // Goal zones and scoring (using shared GAME_CONFIG)
   private leftGoal = {
