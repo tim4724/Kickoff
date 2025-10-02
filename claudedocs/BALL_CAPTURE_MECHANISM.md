@@ -58,13 +58,14 @@ updateBallPossession() {
 **Calculation Formula:**
 ```
 pressure = opponentsNearby  // Simple count
+// Distance measured from opponent to BALL, not to possessor player
 ```
 
 **Pressure Dynamics:**
 
 | Condition | Rate | Formula |
 |-----------|------|---------|
-| **Buildup** (opponents nearby) | +1.0/sec per opponent | `pressure += 1.0 × dt × opponentsNearby` |
+| **Buildup** (opponents near ball) | +1.0/sec per opponent | `pressure += 1.0 × dt × opponentsNearby` |
 | **Decay** (no opponents) | -1.2/sec | `pressure -= 1.2 × dt` |
 
 **Release Threshold:**
@@ -75,7 +76,9 @@ if (pressureLevel >= 1.0) {
 }
 ```
 
-**Pressure Radius:** 40px (slightly smaller than possession radius)
+**Pressure Radius:** 40px from ball position (not from player position)
+
+**Important:** Since the ball is positioned 25px in front of the player (magnetism), opponents can be closer to the ball than to the possessor player. Pressure is based on proximity to the ball itself.
 
 **Examples:**
 

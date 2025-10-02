@@ -221,14 +221,15 @@ export class GameState extends Schema {
       return
     }
 
-    // Count opponents within pressure radius
+    // Count opponents within pressure radius of the BALL (not the player)
     let opponentsNearby = 0
 
     this.players.forEach((player) => {
       if (player.id === possessor.id) return // Skip possessor
 
-      const dx = player.x - possessor.x
-      const dy = player.y - possessor.y
+      // Calculate distance from opponent to BALL
+      const dx = player.x - this.ball.x
+      const dy = player.y - this.ball.y
       const dist = Math.sqrt(dx * dx + dy * dy)
 
       if (dist < GAME_CONFIG.PRESSURE_RADIUS && player.team !== possessor.team) {
