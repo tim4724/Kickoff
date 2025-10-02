@@ -19,6 +19,10 @@ export class ActionButton {
   private pressStartTime: number = 0
   private holdDuration: number = 0
 
+  // Team color for button styling
+  private teamColor: number = 0xff4444 // Default red, updated via setTeamColor()
+  private teamColorLight: number = 0xff6666 // Lighter variant
+
   // Callbacks
   private onPressCallback?: () => void
   private onReleaseCallback?: (power: number) => void
@@ -34,20 +38,35 @@ export class ActionButton {
   }
 
   private createButton() {
-    // Button circle
+    // Button circle - color will be set to team color via setTeamColor()
     this.button = this.scene.add.circle(this.x, this.y, this.radius, 0xff4444, 0.4)
     this.button.setStrokeStyle(3, 0xff6666, 0.7)
     this.button.setDepth(1000)
     this.button.setScrollFactor(0)
 
-    // Label
-    this.label = this.scene.add.text(this.x, this.y, '⚽', {
+    // Label - removed football icon per user request
+    this.label = this.scene.add.text(this.x, this.y, '', {
       fontSize: '32px',
       color: '#ffffff',
     })
     this.label.setOrigin(0.5, 0.5)
     this.label.setDepth(1001)
     this.label.setScrollFactor(0)
+  }
+
+  /**
+   * Update button colors to match team color
+   * @param color - Team color (hex)
+   */
+  public setTeamColor(color: number) {
+    this.teamColor = color
+
+    // Calculate lighter stroke color (add 0x222222 to make it brighter)
+    this.teamColorLight = Math.min(color + 0x222222, 0xffffff)
+
+    // Update button to use team color
+    this.button.setFillStyle(this.teamColor, 0.4)
+    this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
   }
 
   private setupInput() {
@@ -73,8 +92,8 @@ export class ActionButton {
     this.isPressed = true
     this.pressStartTime = Date.now()
 
-    // Visual feedback
-    this.button.setFillStyle(0xff6666, 0.7)
+    // Visual feedback - use lighter team color when pressed
+    this.button.setFillStyle(this.teamColorLight, 0.7)
     this.button.setScale(0.9)
 
     // Callback
@@ -90,8 +109,8 @@ export class ActionButton {
     // Calculate power (0 to 1) based on hold duration (max 1.5 seconds)
     const power = Math.min(this.holdDuration / 1.5, 1)
 
-    // Reset visual
-    this.button.setFillStyle(0xff4444, 0.4)
+    // Reset visual - use team color
+    this.button.setFillStyle(this.teamColor, 0.4)
     this.button.setScale(1)
 
     // Callback
@@ -191,8 +210,8 @@ export class ActionButton {
     this.holdDuration = holdDurationMs / 1000
     const power = Math.min(this.holdDuration / 1.5, 1)
 
-    // Reset visual
-    this.button.setFillStyle(0xff4444, 0.4)
+    // Reset visual - use team color
+    this.button.setFillStyle(this.teamColor, 0.4)
     this.button.setScale(1)
 
     // Trigger callback

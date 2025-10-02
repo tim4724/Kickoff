@@ -325,8 +325,8 @@ export class GameScene extends Phaser.Scene {
     // Virtual joystick (spawns dynamically on left half)
     this.joystick = new VirtualJoystick(this)
 
-    // Action button (bottom-right, activates only in right half)
-    this.actionButton = new ActionButton(this, width - 80, height - 100)
+    // Action button (bottom-right, positioned further from edges)
+    this.actionButton = new ActionButton(this, width - 120, height - 120)
 
     // Set up action button callback
     this.actionButton.setOnReleaseCallback((power) => {
@@ -1172,6 +1172,14 @@ export class GameScene extends Phaser.Scene {
       // Set color based on team and store it
       this.playerTeamColor = localPlayer.team === 'blue' ? 0x0066ff : 0xff4444
       this.player.setFillStyle(this.playerTeamColor)
+
+      // Update mobile control colors to match team color
+      if (this.joystick) {
+        this.joystick.setTeamColor(this.playerTeamColor)
+      }
+      if (this.actionButton) {
+        this.actionButton.setTeamColor(this.playerTeamColor)
+      }
 
       console.log(`🎨 [Client] Local player color set to ${localPlayer.team} (${this.playerTeamColor.toString(16)})`)
     } catch (error) {

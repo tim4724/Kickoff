@@ -27,12 +27,14 @@ export class VirtualJoystick {
 
   private createJoystick() {
     // Base circle (outer ring) - initially at (0, 0), will be repositioned on touch
+    // Color will be set to team color via setTeamColor()
     this.base = this.scene.add.circle(0, 0, this.maxRadius, 0x333333, 0.3)
     this.base.setStrokeStyle(3, 0x666666, 0.5)
     this.base.setDepth(1000)
     this.base.setScrollFactor(0) // Fixed to camera
 
     // Stick circle (inner control)
+    // Color will be set to team color via setTeamColor()
     this.stick = this.scene.add.circle(0, 0, 30, 0x0066ff, 0.6)
     this.stick.setStrokeStyle(2, 0xffffff, 0.8)
     this.stick.setDepth(1001)
@@ -40,6 +42,22 @@ export class VirtualJoystick {
 
     // Hide by default
     this.setVisible(false)
+  }
+
+  /**
+   * Update joystick colors to match team color
+   * @param color - Team color (hex)
+   */
+  public setTeamColor(color: number) {
+    // Update base to use team color with lower opacity
+    this.base.setFillStyle(color, 0.3)
+
+    // Calculate lighter stroke color (add 0x222222 to make it brighter)
+    const lighterColor = Math.min(color + 0x222222, 0xffffff)
+    this.base.setStrokeStyle(3, lighterColor, 0.5)
+
+    // Update stick to use team color
+    this.stick.setFillStyle(color, 0.6)
   }
 
   private setupInput() {
