@@ -57,13 +57,9 @@ export class ActionButton {
         return // Left half = joystick territory
       }
 
-      // Check distance from button center
-      const distance = Phaser.Math.Distance.Between(pointer.x, pointer.y, this.x, this.y)
-
-      if (distance < this.radius + 20) {
-        this.pointer = pointer
-        this.onPress()
-      }
+      // Activate on any touch in right half (entire right side is action button)
+      this.pointer = pointer
+      this.onPress()
     })
 
     this.scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
