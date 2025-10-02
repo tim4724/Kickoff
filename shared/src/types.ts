@@ -59,7 +59,7 @@ export const GAME_CONFIG = {
   BALL_FRICTION: 0.98,
   SHOOT_SPEED: 400,
   PASS_SPEED: 300,
-  POSSESSION_RADIUS: 50, // increased from 30 for easier possession gain
+  POSSESSION_RADIUS: 70, // increased from 50 for easier ball capture
 
   // Field boundaries and goals
   FIELD_MARGIN: 40, // px from edge
