@@ -115,6 +115,84 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     await page.waitForTimeout(300) // Settle time
   }
 
+  // Helper: Move player away from ball (for test isolation)
+  async function movePlayerAwayFromBall(page: Page) {
+    // Get player and ball positions
+    const positions = await page.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      return {
+        player: { x: scene.player.x, y: scene.player.y },
+        ball: { x: scene.ball.x, y: scene.ball.y }
+      }
+    })
+
+    // Calculate direction AWAY from ball (opposite direction)
+    const dx = positions.player.x - positions.ball.x
+    const dy = positions.player.y - positions.ball.y
+
+    // Determine primary direction to press (away from ball)
+    const horizontal = Math.abs(dx) > Math.abs(dy)
+    const key = horizontal
+      ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft')
+      : (dy > 0 ? 'ArrowDown' : 'ArrowUp')
+
+    // Move away from ball for 1 second (should get far enough)
+    await page.keyboard.down(key)
+    await page.waitForTimeout(1000)
+    await page.keyboard.up(key)
+    await page.waitForTimeout(300) // Settle time
+  }
+
+  // Helper: Move one player toward another player (for pressure testing)
+  async function movePlayerTowardOpponent(sourcePage: Page, targetPage: Page) {
+    // Get both players' positions
+    const positions = await sourcePage.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      const state = scene?.networkManager?.getState()
+      const myPlayer = scene.player
+      const players = Array.from(state?.players?.entries() || [])
+      const opponent = players.find(([id]: [string, any]) => id !== scene.mySessionId)?.[1]
+
+      return {
+        source: { x: myPlayer.x, y: myPlayer.y },
+        target: opponent ? { x: opponent.x, y: opponent.y } : null
+      }
+    })
+
+    if (!positions.target) {
+      console.log('⚠️  No opponent found, skipping movement')
+      return
+    }
+
+    const dx = positions.target.x - positions.source.x
+    const dy = positions.target.y - positions.source.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    // Move until within 30px of opponent (inside 40px pressure radius)
+    const targetDistance = 30
+    const moveDistance = distance - targetDistance
+
+    if (moveDistance <= 0) {
+      console.log('  Already within pressure radius')
+      return
+    }
+
+    const effectiveSpeed = 400 // px/s
+    const timeMs = Math.ceil((moveDistance / effectiveSpeed) * 1000 * 1.5) // 50% buffer
+
+    // Determine primary direction to press
+    const horizontal = Math.abs(dx) > Math.abs(dy)
+    const key = horizontal
+      ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft')
+      : (dy > 0 ? 'ArrowDown' : 'ArrowUp')
+
+    // Move toward opponent
+    await sourcePage.keyboard.down(key)
+    await sourcePage.waitForTimeout(timeMs)
+    await sourcePage.keyboard.up(key)
+    await sourcePage.waitForTimeout(300) // Settle time
+  }
+
   // Helper: Wait for condition
   async function waitForCondition(
     page: Page,
@@ -196,7 +274,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     console.log('\n📤 Step 3: Move opponent toward ball carrier to create pressure...')
     // Move client2's player toward client1's player (who has the ball)
-    await movePlayerTowardBall(client2)
+    await movePlayerTowardOpponent(client2, client1)
     await client2.waitForTimeout(500)
 
     // Check positions after movement
@@ -266,7 +344,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     await client1.waitForTimeout(500)
 
     console.log('\n📤 Step 2: Move opponent toward ball carrier...')
-    await movePlayerTowardBall(client2)
+    await movePlayerTowardOpponent(client2, client1)
     await client2.waitForTimeout(500)
 
     console.log('\n📤 Step 3: Monitoring for ball release events...')
@@ -308,10 +386,14 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     await movePlayerTowardBall(client1)
     await client1.waitForTimeout(500)
 
-    console.log('\n📤 Step 2: Checking possession indicator alpha values...')
+    console.log('\n📤 Step 2: Move opponent toward ball carrier to create pressure...')
+    await movePlayerTowardOpponent(client2, client1)
+    await client2.waitForTimeout(1000) // Wait for pressure to stabilize
 
+    console.log('\n📤 Step 3: Recording alpha values over pressure oscillation...')
     const alphaReadings: { pressure: number; alpha: number }[] = []
 
+    // Record readings over time as pressure oscillates
     for (let i = 0; i < 10; i++) {
       await client1.waitForTimeout(500)
 
