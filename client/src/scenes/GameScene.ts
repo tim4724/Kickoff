@@ -682,8 +682,12 @@ export class GameScene extends Phaser.Scene {
 
   private async connectToMultiplayer() {
     try {
+      // Use current hostname for server connection (works on localhost and network)
+      const hostname = window.location.hostname
+      const serverUrl = `ws://${hostname}:3000`
+
       this.networkManager = new NetworkManager({
-        serverUrl: 'ws://localhost:3000',
+        serverUrl,
         roomName: 'match'
       })
       await this.networkManager.connect()
