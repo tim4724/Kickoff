@@ -1,5 +1,5 @@
 {
-  "name": "@socca2/client",
+  "name": "@kickoff/client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "test:network": "tsx src/test/network-test.ts"
   },
   "dependencies": {
-    "@socca2/shared": "*",
+    "@kickoff/shared": "*",
     "colyseus.js": "^0.15.11",
     "phaser": "^3.70.0"
   },
