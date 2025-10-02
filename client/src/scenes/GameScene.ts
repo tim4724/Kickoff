@@ -1,11 +1,12 @@
 import Phaser from 'phaser'
 import { GAME_CONFIG } from '@shared/types'
+import { GeometryUtils } from '@shared/utils/geometry'
 import { VirtualJoystick } from '../controls/VirtualJoystick'
 import { ActionButton } from '../controls/ActionButton'
 import { NetworkManager } from '../network/NetworkManager'
 
 export class GameScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Rectangle
+  private player!: Phaser.GameObjects.Arc
   private ball!: Phaser.GameObjects.Ellipse
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private scoreText!: Phaser.GameObjects.Text
@@ -30,7 +31,7 @@ export class GameScene extends Phaser.Scene {
   private networkManager?: NetworkManager
   private mySessionId?: string
   private isMultiplayer: boolean = false
-  private remotePlayers: Map<string, Phaser.GameObjects.Rectangle> = new Map()
+  private remotePlayers: Map<string, Phaser.GameObjects.Arc> = new Map()
   private remotePlayerIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
   private pressureIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
 
@@ -349,9 +350,9 @@ export class GameScene extends Phaser.Scene {
       console.log('📤 Shoot action sent to server, power:', power.toFixed(2))
     } else {
       // Single-player: apply local physics
+      const dist = GeometryUtils.distance(this.player, this.ball)
       const dx = this.ball.x - this.player.x
       const dy = this.ball.y - this.player.y
-      const dist = Math.sqrt(dx * dx + dy * dy)
 
       if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
         this.ballVelocity.x = (dx / dist) * GAME_CONFIG.SHOOT_SPEED * power
@@ -423,9 +424,7 @@ export class GameScene extends Phaser.Scene {
       }
     } else {
       // Single player: use distance-based calculation
-      const dx = this.ball.x - this.player.x
-      const dy = this.ball.y - this.player.y
-      const dist = Math.sqrt(dx * dx + dy * dy)
+      const dist = GeometryUtils.distance(this.player, this.ball)
 
       if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
         this.possessionIndicator.setPosition(this.player.x, this.player.y)
@@ -556,9 +555,9 @@ export class GameScene extends Phaser.Scene {
 
   private checkCollisions() {
     // Simple collision: player kicks ball when close
+    const dist = GeometryUtils.distance(this.player, this.ball)
     const dx = this.ball.x - this.player.x
     const dy = this.ball.y - this.player.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
 
     if (dist < GAME_CONFIG.POSSESSION_RADIUS && dist > 0) {
       // Ball "magnetism" - stick to player slightly
@@ -1125,9 +1124,7 @@ export class GameScene extends Phaser.Scene {
       if (!pressureIndicator) return
 
       // Only show if opponent is applying pressure (within radius and opposing team)
-      const dx = player.x - this.player.x
-      const dy = player.y - this.player.y
-      const distance = Math.sqrt(dx * dx + dy * dy)
+      const distance = GeometryUtils.distance(this.player, player)
 
       const isOpponent = player.team !== myTeam
       const isWithinRadius = distance < PRESSURE_RADIUS
