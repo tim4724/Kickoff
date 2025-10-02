@@ -224,14 +224,15 @@ test.describe('Core Features Regression Suite', () => {
   })
 
   test('9. Field boundaries prevent out-of-bounds movement', async ({ page }) => {
+    test.setTimeout(15000) // Increase timeout for this test
     await page.goto(CLIENT_URL)
     await page.waitForTimeout(2000)
 
     // Try to move far left (should be clamped)
     await page.keyboard.down('ArrowLeft')
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(3000) // Increase wait time for movement
     await page.keyboard.up('ArrowLeft')
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(500)
 
     const position = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -288,15 +289,23 @@ test.describe('Core Features Regression Suite', () => {
       client2.goto(CLIENT_URL)
     ])
 
+    // Wait for both clients to be connected
     await Promise.all([
-      client1.waitForTimeout(3000), // Extra time for sync
-      client2.waitForTimeout(3000)
+      client1.waitForTimeout(2000),
+      client2.waitForTimeout(2000)
     ])
 
     const [session1, session2] = await Promise.all([
       client1.evaluate(() => (window as any).__gameControls?.scene?.mySessionId),
       client2.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
     ])
+
+    // Wait for client1 to see client2 as remote player
+    await client1.waitForFunction((remoteId) => {
+      const scene = (window as any).__gameControls?.scene
+      const remotePlayer = scene?.remotePlayers?.get(remoteId)
+      return !!remotePlayer
+    }, session2, { timeout: 5000 })
 
     // Client 1 should see Client 2 as remote player
     const client1SeesRemote = await client1.evaluate((remoteId) => {

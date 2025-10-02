@@ -407,6 +407,34 @@ test.describe('Multiplayer Network Synchronization', () => {
     console.log(`Pre-shoot ball position: (${initialBallState.x}, ${initialBallState.y})`)
     console.log(`Pre-shoot ball velocity: (${initialBallState.velocityX}, ${initialBallState.velocityY})`)
 
+    // First, move player to ball to gain possession
+    console.log('\n📤 Moving player to ball to gain possession...')
+    const client1SessionId = await client1.evaluate(() => {
+      return (window as any).__gameControls?.scene?.mySessionId
+    })
+    const playerState = await getServerPlayerState(client1, client1SessionId)
+
+    // Determine direction to ball (client1 starts on left at x=360, ball at x=960)
+    const directionX = playerState.x < initialBallState.x ? 1 : -1
+    await sendMovementInput(client1, directionX, 0, 2000) // Move toward ball for 2 seconds
+
+    // Make sure we're close enough - add extra movement if needed
+    await sendMovementInput(client1, directionX, 0, 500) // Extra 0.5s to get within possession radius
+
+    // Wait for possession to be established
+    await client1.waitForTimeout(500)
+
+    const afterMoveBallState = await getServerBallState(client1)
+    const afterMovePlayerState = await getServerPlayerState(client1, client1SessionId)
+    const distanceToBall = Math.sqrt(
+      Math.pow(afterMoveBallState.x - afterMovePlayerState.x, 2) +
+      Math.pow(afterMoveBallState.y - afterMovePlayerState.y, 2)
+    )
+    console.log(`Player at: (${afterMovePlayerState.x}, ${afterMovePlayerState.y})`)
+    console.log(`Ball at: (${afterMoveBallState.x}, ${afterMoveBallState.y})`)
+    console.log(`Distance to ball: ${distanceToBall.toFixed(1)}px`)
+    console.log(`Ball possession after move: "${afterMoveBallState.possessedBy}"`)
+
     // Send shoot action
     console.log('\n📤 Sending SHOOT action...')
     await sendActionInput(client1)

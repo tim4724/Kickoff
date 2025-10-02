@@ -82,8 +82,9 @@ export class GameState extends Schema {
   private lastPossessionLossTime = new Map<string, number>() // when each player last lost possession
 
   addPlayer(sessionId: string) {
-    // Assign team (alternate between blue and red)
-    const team: Team = this.playerCount % 2 === 0 ? 'blue' : 'red'
+    // Assign team based on current player count (alternate between blue and red)
+    const currentPlayerCount = this.players.size
+    const team: Team = currentPlayerCount % 2 === 0 ? 'blue' : 'red'
 
     // Starting positions (proportional to 1920x1080)
     const x = team === 'blue' ? 360 : GAME_CONFIG.FIELD_WIDTH - 360
@@ -93,7 +94,7 @@ export class GameState extends Schema {
     this.players.set(sessionId, player)
 
     this.playerCount++
-    console.log(`Added player ${sessionId} to team ${team}`)
+    console.log(`Added player ${sessionId} to team ${team} (current players: ${this.players.size})`)
   }
 
   removePlayer(sessionId: string) {
