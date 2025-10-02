@@ -286,12 +286,16 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
     await client1.waitForTimeout(1000)
 
-    // Check if possession indicator is visible
+    // Check if player has possession
     const possessionActive = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      if (!scene) return false
+      if (!scene || !scene.networkManager) return false
 
-      return scene.possessionIndicator.alpha > 0
+      const state = scene.networkManager.getState()
+      if (!state || !state.ball) return false
+
+      const mySessionId = scene.mySessionId
+      return state.ball.possessedBy === mySessionId
     })
 
     // Take screenshot of possession
@@ -300,12 +304,12 @@ test.describe('Socca2 Multiplayer Tests', () => {
       fullPage: true
     })
 
-    console.log('Possession indicator active:', possessionActive)
+    console.log('Player has possession:', possessionActive)
 
     if (possessionActive) {
-      console.log('✅ Ball magnetism/possession indicator working')
+      console.log('✅ Ball magnetism/possession working')
     } else {
-      console.warn('⚠️ Possession indicator not visible (check server logs for magnetism)')
+      console.warn('⚠️ Player does not have possession (check server logs for magnetism)')
     }
   })
 

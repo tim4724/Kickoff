@@ -1,5 +1,5 @@
 import { Schema, type, MapSchema } from '@colyseus/schema'
-import { GAME_CONFIG } from '@socca2/shared'
+import { GAME_CONFIG } from '@shared/types'
 
 // Shared types
 type Team = 'blue' | 'red'
@@ -29,6 +29,7 @@ export class Player extends Schema {
 
   // Server-side only
   inputQueue: PlayerInput[] = []
+  kickingUntil: number = 0 // Timestamp when kicking state should end
 
   constructor(id: string, team: Team, x: number, y: number) {
     super()
@@ -140,12 +141,23 @@ export class GameState extends Schema {
           console.log(`🏃 [Server] Player ${player.id} moved: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${player.x.toFixed(1)}, ${player.y.toFixed(1)})`)
         }
 
-        // Update state
-        const moving = Math.abs(input.movement.x) > 0.1 || Math.abs(input.movement.y) > 0.1
-        player.state = moving ? 'running' : 'idle'
+        // Update state (but preserve 'kicking' state if still active)
+        const now = Date.now()
+        if (now < player.kickingUntil) {
+          // Keep kicking state until timer expires
+          // Still update direction for movement
+          const moving = Math.abs(input.movement.x) > 0.1 || Math.abs(input.movement.y) > 0.1
+          if (moving) {
+            player.direction = Math.atan2(input.movement.y, input.movement.x)
+          }
+        } else {
+          // Normal state update
+          const moving = Math.abs(input.movement.x) > 0.1 || Math.abs(input.movement.y) > 0.1
+          player.state = moving ? 'running' : 'idle'
 
-        if (moving) {
-          player.direction = Math.atan2(input.movement.y, input.movement.x)
+          if (moving) {
+            player.direction = Math.atan2(input.movement.y, input.movement.x)
+          }
         }
 
         // Handle action (shoot/pass)
@@ -415,7 +427,9 @@ export class GameState extends Schema {
       // Record loss time for loss lockout (shooting counts as losing possession)
       this.lastPossessionLossTime.set(player.id, Date.now())
 
+      // Set kicking state for 300ms
       player.state = 'kicking'
+      player.kickingUntil = Date.now() + 300
 
       // DEBUG: Log ball physics update
       console.log(`⚽ [Server] Ball kicked by ${player.id}!`)
