@@ -241,10 +241,10 @@ export class GameScene extends Phaser.Scene {
     const height = GAME_CONFIG.FIELD_HEIGHT
 
     // Ball (white circle with shadow)
-    const ballShadow = this.add.ellipse(width / 2 + 2, height / 2 + 3, 20, 16, 0x000000, 0.3)
+    const ballShadow = this.add.ellipse(width / 2 + 2, height / 2 + 3, 30, 24, 0x000000, 0.3)
     ballShadow.setDepth(15)
 
-    this.ball = this.add.ellipse(width / 2, height / 2, 20, 20, 0xffffff)
+    this.ball = this.add.ellipse(width / 2, height / 2, 30, 30, 0xffffff)
     this.ball.setDepth(15) // Render above players
 
     this.gameObjects.push(ballShadow, this.ball)
@@ -257,7 +257,7 @@ export class GameScene extends Phaser.Scene {
 
     // Player (blue circle) - will be positioned by server in multiplayer
     // Use thicker white border to indicate user-controlled player
-    this.player = this.add.circle(width / 2 - 240, height / 2, 20, 0x0066ff)
+    this.player = this.add.circle(width / 2 - 240, height / 2, 30, 0x0066ff)
     this.player.setStrokeStyle(4, 0xffffff)
 
     this.gameObjects.push(this.player)
@@ -348,9 +348,11 @@ export class GameScene extends Phaser.Scene {
       const dy = this.ball.y - this.player.y
 
       if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
-        this.ballVelocity.x = (dx / dist) * GAME_CONFIG.SHOOT_SPEED * power
-        this.ballVelocity.y = (dy / dist) * GAME_CONFIG.SHOOT_SPEED * power
-        console.log('⚽ Shot! Power:', power.toFixed(2))
+        // Interpolate between min and max shoot speed based on power
+        const speed = GAME_CONFIG.MIN_SHOOT_SPEED + (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * power
+        this.ballVelocity.x = (dx / dist) * speed
+        this.ballVelocity.y = (dy / dist) * speed
+        console.log('⚽ Shot! Power:', power.toFixed(2), 'Speed:', speed.toFixed(0))
       }
     }
   }
@@ -961,7 +963,7 @@ export class GameScene extends Phaser.Scene {
     const remotePlayer = this.add.circle(
       playerState.x,
       playerState.y,
-      20,
+      30,
       color
     )
     remotePlayer.setStrokeStyle(2, 0xffffff)

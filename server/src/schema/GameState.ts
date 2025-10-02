@@ -76,6 +76,10 @@ export class GameState extends Schema {
   private playerCount = 0
   private goalScored: boolean = false // Prevent duplicate goal detection
 
+  // Possession lockout tracking
+  private lastPossessionGainTime = new Map<string, number>() // when each player last gained possession
+  private lastPossessionLossTime = new Map<string, number>() // when each player last lost possession
+
   addPlayer(sessionId: string) {
     // Assign team (alternate between blue and red)
     const team: Team = this.playerCount % 2 === 0 ? 'blue' : 'red'
@@ -223,6 +227,8 @@ export class GameState extends Schema {
 
     // Count opponents within pressure radius of the BALL (not the player)
     let opponentsNearby = 0
+    let nearestOpponent: Player | null = null
+    let nearestOpponentDist = Infinity
 
     this.players.forEach((player) => {
       if (player.id === possessor.id) return // Skip possessor
@@ -234,6 +240,11 @@ export class GameState extends Schema {
 
       if (dist < GAME_CONFIG.PRESSURE_RADIUS && player.team !== possessor.team) {
         opponentsNearby++
+        // Track nearest pressuring opponent for ball transfer
+        if (dist < nearestOpponentDist) {
+          nearestOpponent = player
+          nearestOpponentDist = dist
+        }
       }
     })
 
@@ -244,27 +255,59 @@ export class GameState extends Schema {
     if (opponentsNearby > 0) {
       // Build up pressure
       const pressureIncrease = GAME_CONFIG.PRESSURE_BUILDUP_RATE * dt * opponentsNearby
-      this.ball.pressureLevel = Math.min(
+      const newPressure = Math.min(
         GAME_CONFIG.PRESSURE_RELEASE_THRESHOLD,
         this.ball.pressureLevel + pressureIncrease
       )
+
+      console.log(`📈 [Pressure] Building:`)
+      console.log(`   Previous: ${previousPressure.toFixed(4)} | New: ${newPressure.toFixed(4)} | Increase: ${pressureIncrease.toFixed(4)}`)
+      console.log(`   Buildup Rate: ${GAME_CONFIG.PRESSURE_BUILDUP_RATE} | dt: ${dt.toFixed(4)}s | Opponents: ${opponentsNearby}`)
+      console.log(`   Calculation: ${GAME_CONFIG.PRESSURE_BUILDUP_RATE} × ${dt.toFixed(4)} × ${opponentsNearby} = ${pressureIncrease.toFixed(4)}`)
+
+      this.ball.pressureLevel = newPressure
     } else {
       // Decay pressure when no opponents nearby
       const pressureDecrease = GAME_CONFIG.PRESSURE_DECAY_RATE * dt
-      this.ball.pressureLevel = Math.max(0, this.ball.pressureLevel - pressureDecrease)
+      const newPressure = Math.max(0, this.ball.pressureLevel - pressureDecrease)
+
+      if (previousPressure > 0) {
+        console.log(`📉 [Pressure] Decaying:`)
+        console.log(`   Previous: ${previousPressure.toFixed(4)} | New: ${newPressure.toFixed(4)} | Decrease: ${pressureDecrease.toFixed(4)}`)
+        console.log(`   Decay Rate: ${GAME_CONFIG.PRESSURE_DECAY_RATE} | dt: ${dt.toFixed(4)}s`)
+      }
+
+      this.ball.pressureLevel = newPressure
     }
 
-    // Log pressure changes (every 0.1 change or when opponents change)
-    const pressureChanged = Math.abs(this.ball.pressureLevel - previousPressure) > 0.05
-    if (pressureChanged) {
-      console.log(`📊 [Pressure] Player ${possessor.id}: ${(this.ball.pressureLevel * 100).toFixed(0)}% (${opponentsNearby} opponents nearby)`)
-    }
-
-    // Check if pressure threshold reached - release possession
+    // Check if pressure threshold reached - transfer possession
     if (this.ball.pressureLevel >= GAME_CONFIG.PRESSURE_RELEASE_THRESHOLD) {
-      console.log(`⚡ [Pressure] Ball released from ${possessor.id} due to pressure threshold (${opponentsNearby} opponents nearby)`)
-      this.ball.possessedBy = ''
-      this.ball.pressureLevel = 0
+      // Check capture lockout - can't lose possession within 300ms of gaining it
+      const timeSinceCapture = Date.now() - (this.lastPossessionGainTime.get(possessor.id) || 0)
+      if (timeSinceCapture < GAME_CONFIG.CAPTURE_LOCKOUT_MS) {
+        console.log(`🛡️ [Lockout] Player ${possessor.id} protected by capture lockout (${(GAME_CONFIG.CAPTURE_LOCKOUT_MS - timeSinceCapture).toFixed(0)}ms remaining)`)
+        return // Don't release possession during lockout
+      }
+
+      // Transfer possession to nearest pressuring opponent
+      if (nearestOpponent !== null) {
+        const opponent: Player = nearestOpponent
+        console.log(`⚡ [Pressure] Ball transferred from ${possessor.id} to ${opponent.id} (dist: ${nearestOpponentDist.toFixed(1)}px, ${opponentsNearby} opponents nearby)`)
+
+        // Record loss time for old possessor
+        this.lastPossessionLossTime.set(possessor.id, Date.now())
+
+        // Transfer to new possessor
+        this.ball.possessedBy = opponent.id
+        this.lastPossessionGainTime.set(opponent.id, Date.now())
+        this.ball.pressureLevel = 0
+      } else {
+        // Fallback: release if no opponent nearby (shouldn't happen)
+        console.log(`⚡ [Pressure] Ball released from ${possessor.id} (no opponent to transfer to)`)
+        this.ball.possessedBy = ''
+        this.ball.pressureLevel = 0
+        this.lastPossessionLossTime.set(possessor.id, Date.now())
+      }
     }
   }
 
@@ -278,9 +321,13 @@ export class GameState extends Schema {
         const dist = Math.sqrt(dx * dx + dy * dy)
 
         // Release possession if player moves too far from ball
-        if (dist > 50) {
-          console.log(`⚠️ [Server] Possession released - too far (${dist.toFixed(1)}px)`)
+        // Use slightly larger threshold than capture radius to prevent oscillation
+        const releaseThreshold = GAME_CONFIG.POSSESSION_RADIUS + 10
+        if (dist > releaseThreshold) {
+          console.log(`⚠️ [Server] Possession released - too far (${dist.toFixed(1)}px > ${releaseThreshold}px)`)
           this.ball.possessedBy = ''
+          // Record loss time for loss lockout
+          this.lastPossessionLossTime.set(possessor.id, Date.now())
         } else {
           // Apply continuous magnetism - ball sticks in front of player
           // Position ball 25px in front of player in the direction they're facing
@@ -329,8 +376,16 @@ export class GameState extends Schema {
         const dist = Math.sqrt(dx * dx + dy * dy)
 
         if (dist < GAME_CONFIG.POSSESSION_RADIUS) {
+          // Check loss lockout - can't capture within 300ms of losing possession
+          const timeSinceLoss = Date.now() - (this.lastPossessionLossTime.get(player.id) || 0)
+          if (timeSinceLoss < GAME_CONFIG.LOSS_LOCKOUT_MS) {
+            console.log(`🚫 [Lockout] Player ${player.id} blocked by loss lockout (${(GAME_CONFIG.LOSS_LOCKOUT_MS - timeSinceLoss).toFixed(0)}ms remaining)`)
+            return
+          }
+
           // Player gains possession
           this.ball.possessedBy = player.id
+          this.lastPossessionGainTime.set(player.id, Date.now())
           console.log(`✅ [Server] Player ${player.id} GAINED possession at dist=${dist.toFixed(1)}px`)
         }
       })
@@ -346,13 +401,19 @@ export class GameState extends Schema {
       const dx = Math.cos(player.direction)
       const dy = Math.sin(player.direction)
 
-      this.ball.velocityX = dx * GAME_CONFIG.SHOOT_SPEED * power
-      this.ball.velocityY = dy * GAME_CONFIG.SHOOT_SPEED * power
+      // Interpolate between min and max shoot speed based on power
+      const speed = GAME_CONFIG.MIN_SHOOT_SPEED + (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * power
+
+      this.ball.velocityX = dx * speed
+      this.ball.velocityY = dy * speed
       this.ball.possessedBy = ''
 
       // Set shoot immunity to prevent immediate re-possession
       this.ball.lastShotTime = Date.now()
       this.ball.lastShooter = player.id
+
+      // Record loss time for loss lockout (shooting counts as losing possession)
+      this.lastPossessionLossTime.set(player.id, Date.now())
 
       player.state = 'kicking'
 
@@ -374,8 +435,16 @@ export class GameState extends Schema {
       const isShooter = player.id === this.ball.lastShooter
 
       if (dist < GAME_CONFIG.POSSESSION_RADIUS && this.ball.possessedBy === '' && !(hasImmunity && isShooter)) {
+        // Check loss lockout - can't capture within 300ms of losing possession
+        const timeSinceLoss = Date.now() - (this.lastPossessionLossTime.get(player.id) || 0)
+        if (timeSinceLoss < GAME_CONFIG.LOSS_LOCKOUT_MS) {
+          console.log(`🚫 [Lockout] Player ${player.id} blocked by loss lockout via action (${(GAME_CONFIG.LOSS_LOCKOUT_MS - timeSinceLoss).toFixed(0)}ms remaining)`)
+          return
+        }
+
         // Gain possession
         this.ball.possessedBy = player.id
+        this.lastPossessionGainTime.set(player.id, Date.now())
         console.log(`🏀 [Server] Player ${player.id} gained possession via action (dist: ${dist.toFixed(1)}px)`)
       } else {
         if (hasImmunity && isShooter) {
@@ -429,6 +498,10 @@ export class GameState extends Schema {
     setTimeout(() => {
       this.ball.reset()
       this.goalScored = false
+      // Clear possession lockout timers for fresh kickoff
+      this.lastPossessionGainTime.clear()
+      this.lastPossessionLossTime.clear()
+      console.log('🔄 Possession lockouts cleared for kickoff')
     }, 1000)
   }
 

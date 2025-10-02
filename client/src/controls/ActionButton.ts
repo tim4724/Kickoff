@@ -106,8 +106,8 @@ export class ActionButton {
     this.isPressed = false
     this.holdDuration = (Date.now() - this.pressStartTime) / 1000 // Convert to seconds
 
-    // Calculate power (0 to 1) based on hold duration (max 1.5 seconds)
-    const power = Math.min(this.holdDuration / 1.5, 1)
+    // Calculate power (0 to 1) based on hold duration (max 1 second)
+    const power = Math.min(this.holdDuration / 1.0, 1)
 
     // Reset visual - use team color
     this.button.setFillStyle(this.teamColor, 0.4)
@@ -144,7 +144,7 @@ export class ActionButton {
     if (!this.isPressed) return 0
 
     const duration = (Date.now() - this.pressStartTime) / 1000
-    return Math.min(duration / 1.5, 1)
+    return Math.min(duration / 1.0, 1)
   }
 
   /**
@@ -208,7 +208,7 @@ export class ActionButton {
 
     // Manually set hold duration for testing
     this.holdDuration = holdDurationMs / 1000
-    const power = Math.min(this.holdDuration / 1.5, 1)
+    const power = Math.min(this.holdDuration / 1.0, 1)
 
     // Reset visual - use team color
     this.button.setFillStyle(this.teamColor, 0.4)
