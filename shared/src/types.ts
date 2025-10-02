@@ -74,8 +74,7 @@ export const GAME_CONFIG = {
 
   // Ball capture / pressure system
   PRESSURE_RADIUS: 40, // distance at which opponent applies pressure
-  PRESSURE_BUILDUP_RATE: 1.0, // pressure per second (1 second to full pressure)
+  PRESSURE_BUILDUP_RATE: 1.0, // pressure per second per opponent
   PRESSURE_DECAY_RATE: 1.2, // pressure decay per second when no opponents near
-  PRESSURE_RELEASE_THRESHOLD: 1.0, // pressure level that causes ball release
-  TEAMMATE_PRESSURE_REDUCTION: 0.5, // teammates reduce pressure by 50% per player
+  PRESSURE_RELEASE_THRESHOLD: 1.0, // pressure level that causes ball release (100%)
 } as const

@@ -221,9 +221,8 @@ export class GameState extends Schema {
       return
     }
 
-    // Count opponents and teammates within pressure radius
+    // Count opponents within pressure radius
     let opponentsNearby = 0
-    let teammatesNearby = 0
 
     this.players.forEach((player) => {
       if (player.id === possessor.id) return // Skip possessor
@@ -232,24 +231,18 @@ export class GameState extends Schema {
       const dy = player.y - possessor.y
       const dist = Math.sqrt(dx * dx + dy * dy)
 
-      if (dist < GAME_CONFIG.PRESSURE_RADIUS) {
-        if (player.team === possessor.team) {
-          teammatesNearby++
-        } else {
-          opponentsNearby++
-        }
+      if (dist < GAME_CONFIG.PRESSURE_RADIUS && player.team !== possessor.team) {
+        opponentsNearby++
       }
     })
 
-    // Calculate effective pressure
-    // Each opponent adds pressure, teammates reduce it
-    const rawPressure = opponentsNearby - (teammatesNearby * GAME_CONFIG.TEAMMATE_PRESSURE_REDUCTION)
-    const effectivePressure = Math.max(0, rawPressure)
+    // Store previous pressure for change detection
+    const previousPressure = this.ball.pressureLevel
 
-    // Update pressure level based on effective pressure
-    if (effectivePressure > 0) {
+    // Update pressure level based on opponents nearby
+    if (opponentsNearby > 0) {
       // Build up pressure
-      const pressureIncrease = GAME_CONFIG.PRESSURE_BUILDUP_RATE * dt * effectivePressure
+      const pressureIncrease = GAME_CONFIG.PRESSURE_BUILDUP_RATE * dt * opponentsNearby
       this.ball.pressureLevel = Math.min(
         GAME_CONFIG.PRESSURE_RELEASE_THRESHOLD,
         this.ball.pressureLevel + pressureIncrease
@@ -260,9 +253,15 @@ export class GameState extends Schema {
       this.ball.pressureLevel = Math.max(0, this.ball.pressureLevel - pressureDecrease)
     }
 
+    // Log pressure changes (every 0.1 change or when opponents change)
+    const pressureChanged = Math.abs(this.ball.pressureLevel - previousPressure) > 0.05
+    if (pressureChanged) {
+      console.log(`📊 [Pressure] Player ${possessor.id}: ${(this.ball.pressureLevel * 100).toFixed(0)}% (${opponentsNearby} opponents nearby)`)
+    }
+
     // Check if pressure threshold reached - release possession
     if (this.ball.pressureLevel >= GAME_CONFIG.PRESSURE_RELEASE_THRESHOLD) {
-      console.log(`⚡ [Pressure] Ball released from ${possessor.id} due to pressure (${opponentsNearby} opponents nearby)`)
+      console.log(`⚡ [Pressure] Ball released from ${possessor.id} due to pressure threshold (${opponentsNearby} opponents nearby)`)
       this.ball.possessedBy = ''
       this.ball.pressureLevel = 0
     }
