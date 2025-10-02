@@ -20,7 +20,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "test:network": "playwright test tests/multiplayer-network-sync.spec.ts",
-    "test:network:ui": "playwright test tests/multiplayer-network-sync.spec.ts --ui"
+    "test:network:ui": "playwright test tests/multiplayer-network-sync.spec.ts --ui",
+    "clean:test": "rm -rf test-results playwright-report .playwright-mcp"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
