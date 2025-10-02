@@ -367,12 +367,22 @@ export class GameState extends Schema {
       const dy = this.ball.y - player.y
       const dist = Math.sqrt(dx * dx + dy * dy)
 
-      if (dist < GAME_CONFIG.POSSESSION_RADIUS && this.ball.possessedBy === '') {
+      // Check immunity period (same as updateBallPossession)
+      const SHOT_IMMUNITY_MS = 300
+      const timeSinceShot = Date.now() - this.ball.lastShotTime
+      const hasImmunity = timeSinceShot < SHOT_IMMUNITY_MS
+      const isShooter = player.id === this.ball.lastShooter
+
+      if (dist < GAME_CONFIG.POSSESSION_RADIUS && this.ball.possessedBy === '' && !(hasImmunity && isShooter)) {
         // Gain possession
         this.ball.possessedBy = player.id
         console.log(`🏀 [Server] Player ${player.id} gained possession via action (dist: ${dist.toFixed(1)}px)`)
       } else {
-        console.log(`⚠️ [Server] Player ${player.id} tried to shoot but doesn't have possession (dist: ${dist.toFixed(1)}px, possessed by: ${this.ball.possessedBy || 'none'})`)
+        if (hasImmunity && isShooter) {
+          console.log(`⚠️ [Server] Player ${player.id} blocked by shoot immunity (${(SHOT_IMMUNITY_MS - timeSinceShot).toFixed(0)}ms remaining)`)
+        } else {
+          console.log(`⚠️ [Server] Player ${player.id} tried to shoot but doesn't have possession (dist: ${dist.toFixed(1)}px, possessed by: ${this.ball.possessedBy || 'none'})`)
+        }
       }
     }
   }
