@@ -7,7 +7,6 @@ const config: Phaser.Types.Core.GameConfig = {
   backgroundColor: '#1a1a1a',
   scale: {
     mode: Phaser.Scale.RESIZE,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
     width: window.innerWidth,
     height: window.innerHeight,
     fullscreenTarget: 'game-container',
@@ -51,10 +50,7 @@ if ('ontouchstart' in window) {
 // Prevent context menu on right click (mobile)
 window.addEventListener('contextmenu', (e) => e.preventDefault())
 
-// Handle window resize
-window.addEventListener('resize', () => {
-  game.scale.resize(window.innerWidth, window.innerHeight)
-})
+// RESIZE mode with dual camera setup in GameScene handles viewport management
 
 // Export for debugging
 ;(window as any).game = game

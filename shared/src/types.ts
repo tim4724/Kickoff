@@ -50,13 +50,32 @@ export interface GameStateData {
 }
 
 export const GAME_CONFIG = {
-  FIELD_WIDTH: 800,
-  FIELD_HEIGHT: 600,
+  // Fixed coordinate system for client, server, and physics
+  FIELD_WIDTH: 1920,
+  FIELD_HEIGHT: 1080,
+
+  // Physics
   PLAYER_SPEED: 600, // pixels per second (increased from 200 for playable movement)
   BALL_FRICTION: 0.98,
   SHOOT_SPEED: 400,
   PASS_SPEED: 300,
   POSSESSION_RADIUS: 50, // increased from 30 for easier possession gain
+
+  // Field boundaries and goals
+  FIELD_MARGIN: 40, // px from edge
+  PLAYER_MARGIN: 60, // px from edge for player bounds
+  GOAL_WIDTH: 40,
+  GOAL_Y_MIN: 360, // 1080/2 - 180 (33% of height, centered)
+  GOAL_Y_MAX: 720, // 1080/2 + 180
+
+  // Game timing
   TICK_RATE: 30, // server updates per second
   MATCH_DURATION: 120, // seconds (2 minutes)
+
+  // Ball capture / pressure system
+  PRESSURE_RADIUS: 40, // distance at which opponent applies pressure
+  PRESSURE_BUILDUP_RATE: 1.0, // pressure per second (1 second to full pressure)
+  PRESSURE_DECAY_RATE: 1.2, // pressure decay per second when no opponents near
+  PRESSURE_RELEASE_THRESHOLD: 1.0, // pressure level that causes ball release
+  TEAMMATE_PRESSURE_REDUCTION: 0.5, // teammates reduce pressure by 50% per player
 } as const

@@ -163,6 +163,13 @@ export class VirtualJoystick {
   }
 
   /**
+   * Get all game objects for camera ignore lists
+   */
+  public getGameObjects(): Phaser.GameObjects.GameObject[] {
+    return [this.base, this.stick]
+  }
+
+  /**
    * Clean up resources
    */
   public destroy() {

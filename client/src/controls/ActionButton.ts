@@ -136,6 +136,13 @@ export class ActionButton {
   }
 
   /**
+   * Get all game objects for camera ignore lists
+   */
+  public getGameObjects(): Phaser.GameObjects.GameObject[] {
+    return [this.button, this.label]
+  }
+
+  /**
    * Update power indicator visual (called every frame)
    */
   public update() {

@@ -1,4 +1,5 @@
 import { Schema, type, MapSchema } from '@colyseus/schema'
+import { GAME_CONFIG } from '@socca2/shared'
 
 // Shared types
 type Team = 'blue' | 'red'
@@ -11,29 +12,6 @@ interface PlayerInput {
   actionPower?: number // 0.0-1.0, power for shooting (optional, defaults to 0.8)
   timestamp: number
 }
-
-// Game configuration (synced with shared/src/types.ts)
-const GAME_CONFIG = {
-  FIELD_WIDTH: 800,
-  FIELD_HEIGHT: 600,
-  PLAYER_SPEED: 600, // pixels per second (increased from 200 for playable movement)
-  BALL_FRICTION: 0.98,
-  SHOOT_SPEED: 400,
-  PASS_SPEED: 300,
-  POSSESSION_RADIUS: 50, // increased from 30 for easier possession gain
-  TICK_RATE: 30, // server updates per second
-  MATCH_DURATION: 120, // seconds (2 minutes)
-  // Goal zones (match client implementation)
-  GOAL_WIDTH: 20,
-  GOAL_Y_MIN: 200,
-  GOAL_Y_MAX: 400,
-  // Ball capture / pressure system
-  PRESSURE_RADIUS: 40, // distance at which opponent applies pressure
-  PRESSURE_BUILDUP_RATE: 1.0, // pressure per second (1 second to full pressure)
-  PRESSURE_DECAY_RATE: 1.2, // pressure decay per second when no opponents near
-  PRESSURE_RELEASE_THRESHOLD: 1.0, // pressure level that causes ball release
-  TEAMMATE_PRESSURE_REDUCTION: 0.5, // teammates reduce pressure by 50% per player
-} as const
 
 export class Player extends Schema {
   @type('string') id: string = ''
@@ -102,8 +80,8 @@ export class GameState extends Schema {
     // Assign team (alternate between blue and red)
     const team: Team = this.playerCount % 2 === 0 ? 'blue' : 'red'
 
-    // Starting positions
-    const x = team === 'blue' ? 150 : GAME_CONFIG.FIELD_WIDTH - 150
+    // Starting positions (proportional to 1920x1080)
+    const x = team === 'blue' ? 360 : GAME_CONFIG.FIELD_WIDTH - 360
     const y = GAME_CONFIG.FIELD_HEIGHT / 2
 
     const player = new Player(sessionId, team, x, y)
@@ -149,8 +127,8 @@ export class GameState extends Schema {
         player.y += player.velocityY * dt
 
         // Clamp to field bounds
-        player.x = Math.max(30, Math.min(GAME_CONFIG.FIELD_WIDTH - 30, player.x))
-        player.y = Math.max(30, Math.min(GAME_CONFIG.FIELD_HEIGHT - 30, player.y))
+        player.x = Math.max(GAME_CONFIG.PLAYER_MARGIN, Math.min(GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.PLAYER_MARGIN, player.x))
+        player.y = Math.max(GAME_CONFIG.PLAYER_MARGIN, Math.min(GAME_CONFIG.FIELD_HEIGHT - GAME_CONFIG.PLAYER_MARGIN, player.y))
 
         // DEBUG: Log significant movement (moved >1 pixel)
         const moved = Math.abs(player.x - oldX) > 1 || Math.abs(player.y - oldY) > 1
@@ -206,15 +184,14 @@ export class GameState extends Schema {
       }
 
       // Bounce off boundaries (exclude goal zones)
-      const margin = 20
-      const goalY = { min: 200, max: 400 }
+      const margin = GAME_CONFIG.FIELD_MARGIN
 
       // Left/right boundaries (exclude goal zones where y is in goal range)
-      if (this.ball.x <= margin && (this.ball.y < goalY.min || this.ball.y > goalY.max)) {
+      if (this.ball.x <= margin && (this.ball.y < GAME_CONFIG.GOAL_Y_MIN || this.ball.y > GAME_CONFIG.GOAL_Y_MAX)) {
         this.ball.velocityX *= -0.8
         this.ball.x = margin
       }
-      if (this.ball.x >= GAME_CONFIG.FIELD_WIDTH - margin && (this.ball.y < goalY.min || this.ball.y > goalY.max)) {
+      if (this.ball.x >= GAME_CONFIG.FIELD_WIDTH - margin && (this.ball.y < GAME_CONFIG.GOAL_Y_MIN || this.ball.y > GAME_CONFIG.GOAL_Y_MAX)) {
         this.ball.velocityX *= -0.8
         this.ball.x = GAME_CONFIG.FIELD_WIDTH - margin
       }
@@ -408,7 +385,7 @@ export class GameState extends Schema {
 
     // Left goal (red scores when ball enters left goal)
     if (
-      this.ball.x <= 10 + GAME_CONFIG.GOAL_WIDTH &&
+      this.ball.x <= GAME_CONFIG.FIELD_MARGIN + GAME_CONFIG.GOAL_WIDTH &&
       this.ball.y >= GAME_CONFIG.GOAL_Y_MIN &&
       this.ball.y <= GAME_CONFIG.GOAL_Y_MAX
     ) {
@@ -418,7 +395,7 @@ export class GameState extends Schema {
 
     // Right goal (blue scores when ball enters right goal)
     if (
-      this.ball.x >= GAME_CONFIG.FIELD_WIDTH - 10 - GAME_CONFIG.GOAL_WIDTH &&
+      this.ball.x >= GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.FIELD_MARGIN - GAME_CONFIG.GOAL_WIDTH &&
       this.ball.y >= GAME_CONFIG.GOAL_Y_MIN &&
       this.ball.y <= GAME_CONFIG.GOAL_Y_MAX
     ) {

@@ -12,6 +12,12 @@ export class GameScene extends Phaser.Scene {
   private timerText!: Phaser.GameObjects.Text
   private possessionIndicator!: Phaser.GameObjects.Arc
 
+  // Dual camera system
+  private gameCamera!: Phaser.Cameras.Scene2D.Camera
+  private uiCamera!: Phaser.Cameras.Scene2D.Camera
+  private gameObjects: Phaser.GameObjects.GameObject[] = []
+  private uiObjects: Phaser.GameObjects.GameObject[] = []
+
   // Mobile controls
   private joystick!: VirtualJoystick
   private actionButton!: ActionButton
@@ -28,9 +34,19 @@ export class GameScene extends Phaser.Scene {
   private remotePlayerIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
   private pressureIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
 
-  // Goal zones and scoring
-  private leftGoal = { x: 10, yMin: 0, yMax: 0, width: 20 }
-  private rightGoal = { x: 0, yMin: 0, yMax: 0, width: 20 }
+  // Goal zones and scoring (using shared GAME_CONFIG)
+  private leftGoal = {
+    x: GAME_CONFIG.FIELD_MARGIN,
+    yMin: GAME_CONFIG.GOAL_Y_MIN,
+    yMax: GAME_CONFIG.GOAL_Y_MAX,
+    width: GAME_CONFIG.GOAL_WIDTH
+  }
+  private rightGoal = {
+    x: GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.FIELD_MARGIN,
+    yMin: GAME_CONFIG.GOAL_Y_MIN,
+    yMax: GAME_CONFIG.GOAL_Y_MAX,
+    width: GAME_CONFIG.GOAL_WIDTH
+  }
   private scoreBlue: number = 0
   private scoreRed: number = 0
   private goalScored: boolean = false
@@ -59,13 +75,10 @@ export class GameScene extends Phaser.Scene {
     this.isMobile = this.sys.game.device.os.android || this.sys.game.device.os.iOS ||
                     this.sys.game.device.os.iPad || this.sys.game.device.os.iPhone
 
-    // Initialize goal zones based on screen size
-    const { height } = this.scale
-    this.leftGoal.yMin = height / 2 - 60
-    this.leftGoal.yMax = height / 2 + 60
-    this.rightGoal.x = this.scale.width - 10
-    this.rightGoal.yMin = height / 2 - 60
-    this.rightGoal.yMax = height / 2 + 60
+    // Setup dual camera system FIRST
+    this.setupCameras()
+
+    // Goal zones already initialized with GAME_CONFIG constants
 
     // Create particle texture for goal celebrations
     this.createParticleTexture()
@@ -117,51 +130,131 @@ export class GameScene extends Phaser.Scene {
     console.log('⚽ Game scene ready! Mobile:', this.isMobile)
   }
 
+  private setupCameras() {
+    // Use main camera as game camera: Fixed 1920x1080 bounds, centered viewport
+    this.gameCamera = this.cameras.main
+    this.gameCamera.setBounds(0, 0, GAME_CONFIG.FIELD_WIDTH, GAME_CONFIG.FIELD_HEIGHT)
+
+    // Create UI camera: Full screen bounds and viewport
+    this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height)
+
+    // Calculate and set initial viewport for game camera
+    this.updateGameCameraViewport()
+
+    // Listen for resize events
+    this.scale.on('resize', this.onResize, this)
+
+    console.log('📷 Dual camera system initialized')
+  }
+
+  private updateGameCameraViewport() {
+    const screenWidth = this.scale.width
+    const screenHeight = this.scale.height
+    const targetAspect = GAME_CONFIG.FIELD_WIDTH / GAME_CONFIG.FIELD_HEIGHT // 16:9
+
+    let viewportX = 0
+    let viewportY = 0
+    let viewportWidth = screenWidth
+    let viewportHeight = screenHeight
+
+    if (screenWidth / screenHeight > targetAspect) {
+      // Screen wider than 16:9 - vertical letterboxing
+      viewportHeight = screenHeight
+      viewportWidth = screenHeight * targetAspect
+      viewportX = (screenWidth - viewportWidth) / 2
+      viewportY = 0
+    } else {
+      // Screen taller than 16:9 - horizontal letterboxing
+      viewportWidth = screenWidth
+      viewportHeight = screenWidth / targetAspect
+      viewportX = 0
+      viewportY = (screenHeight - viewportHeight) / 2
+    }
+
+    this.gameCamera.setViewport(viewportX, viewportY, viewportWidth, viewportHeight)
+
+    // Calculate zoom to fit 1920x1080 game world into viewport
+    const zoomX = viewportWidth / GAME_CONFIG.FIELD_WIDTH
+    const zoomY = viewportHeight / GAME_CONFIG.FIELD_HEIGHT
+    const zoom = Math.min(zoomX, zoomY)
+
+    this.gameCamera.setZoom(zoom)
+
+    console.log(`📐 Game camera viewport: ${viewportX}, ${viewportY}, ${viewportWidth}x${viewportHeight}, zoom: ${zoom}`)
+  }
+
+  private onResize(gameSize: Phaser.Structs.Size) {
+    // Update UI camera bounds to match new screen size
+    this.uiCamera.setSize(gameSize.width, gameSize.height)
+
+    // Recalculate game camera viewport
+    this.updateGameCameraViewport()
+
+    console.log(`🔄 Resize: ${gameSize.width}x${gameSize.height}`)
+  }
+
   private createField() {
-    const { width, height } = this.scale
+    const width = GAME_CONFIG.FIELD_WIDTH
+    const height = GAME_CONFIG.FIELD_HEIGHT
+    const margin = GAME_CONFIG.FIELD_MARGIN
 
     // Field background (green)
-    this.add.rectangle(width / 2, height / 2, width, height, 0x2d5016)
+    const fieldBg = this.add.rectangle(width / 2, height / 2, width, height, 0x2d5016)
+    this.gameObjects.push(fieldBg)
 
     // Field border
     const borderGraphics = this.add.graphics()
     borderGraphics.lineStyle(4, 0xffffff, 1)
-    borderGraphics.strokeRect(10, 10, width - 20, height - 20)
+    borderGraphics.strokeRect(margin, margin, width - margin * 2, height - margin * 2)
 
     // Center circle
     borderGraphics.lineStyle(2, 0xffffff, 0.5)
-    borderGraphics.strokeCircle(width / 2, height / 2, 60)
+    borderGraphics.strokeCircle(width / 2, height / 2, 120)
 
     // Center line
-    borderGraphics.lineBetween(width / 2, 10, width / 2, height - 10)
+    borderGraphics.lineBetween(width / 2, margin, width / 2, height - margin)
+    this.gameObjects.push(borderGraphics)
 
     // Goals (white rectangles)
+    const goalHeight = GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN
+
     // Left goal (blue side)
-    this.add.rectangle(10, height / 2, 20, 120, 0xffffff).setOrigin(0, 0.5)
+    const leftGoal = this.add.rectangle(margin, height / 2, GAME_CONFIG.GOAL_WIDTH, goalHeight, 0xffffff).setOrigin(0, 0.5)
+    this.gameObjects.push(leftGoal)
 
     // Right goal (red side)
-    this.add.rectangle(width - 10, height / 2, 20, 120, 0xffffff).setOrigin(1, 0.5)
+    const rightGoal = this.add.rectangle(width - margin, height / 2, GAME_CONFIG.GOAL_WIDTH, goalHeight, 0xffffff).setOrigin(1, 0.5)
+    this.gameObjects.push(rightGoal)
 
     // Goal posts
-    this.add.circle(10, height / 2 - 60, 5, 0xffffff)
-    this.add.circle(10, height / 2 + 60, 5, 0xffffff)
-    this.add.circle(width - 10, height / 2 - 60, 5, 0xffffff)
-    this.add.circle(width - 10, height / 2 + 60, 5, 0xffffff)
+    const post1 = this.add.circle(margin, GAME_CONFIG.GOAL_Y_MIN, 10, 0xffffff)
+    const post2 = this.add.circle(margin, GAME_CONFIG.GOAL_Y_MAX, 10, 0xffffff)
+    const post3 = this.add.circle(width - margin, GAME_CONFIG.GOAL_Y_MIN, 10, 0xffffff)
+    const post4 = this.add.circle(width - margin, GAME_CONFIG.GOAL_Y_MAX, 10, 0xffffff)
+    this.gameObjects.push(post1, post2, post3, post4)
+
+    // Make UI camera ignore all game objects
+    this.gameObjects.forEach(obj => this.uiCamera.ignore(obj))
   }
 
   private createBall() {
-    const { width, height } = this.scale
+    const width = GAME_CONFIG.FIELD_WIDTH
+    const height = GAME_CONFIG.FIELD_HEIGHT
 
     // Ball (white circle with shadow)
-    this.add.ellipse(width / 2 + 2, height / 2 + 3, 20, 16, 0x000000, 0.3) // Shadow
+    const ballShadow = this.add.ellipse(width / 2 + 2, height / 2 + 3, 20, 16, 0x000000, 0.3)
     this.ball = this.add.ellipse(width / 2, height / 2, 20, 20, 0xffffff)
+
+    this.gameObjects.push(ballShadow, this.ball)
+    this.uiCamera.ignore([ballShadow, this.ball])
   }
 
   private createPlayer() {
-    const { width, height } = this.scale
+    const width = GAME_CONFIG.FIELD_WIDTH
+    const height = GAME_CONFIG.FIELD_HEIGHT
 
-    // Player (blue circle)
-    this.player = this.add.circle(width / 2 - 100, height / 2, 20, 0x0066ff)
+    // Player (blue circle) - will be positioned by server in multiplayer
+    this.player = this.add.circle(width / 2 - 240, height / 2, 20, 0x0066ff)
     this.player.setStrokeStyle(2, 0xffffff)
 
     // Possession indicator (yellow circle glow)
@@ -171,34 +264,49 @@ export class GameScene extends Phaser.Scene {
 
     // Player indicator (small circle on top)
     const indicator = this.add.circle(0, -25, 8, 0xffff00)
-    this.add.container(this.player.x, this.player.y, [indicator])
+    const playerContainer = this.add.container(this.player.x, this.player.y, [indicator])
+
+    this.gameObjects.push(this.player, this.possessionIndicator, playerContainer)
+    this.uiCamera.ignore([this.player, this.possessionIndicator, playerContainer])
   }
 
   private createUI() {
+    // UI uses viewport coordinates (actual screen size)
+    const width = this.scale.width
+    const height = this.scale.height
+
     // Score display
-    this.scoreText = this.add.text(this.scale.width / 2, 30, '0 - 0', {
+    this.scoreText = this.add.text(width / 2, 30, '0 - 0', {
       fontSize: '32px',
       color: '#ffffff',
       fontStyle: 'bold',
     })
     this.scoreText.setOrigin(0.5, 0)
+    this.scoreText.setScrollFactor(0)
 
     // Timer display
-    this.timerText = this.add.text(this.scale.width / 2, 70, '2:00', {
+    this.timerText = this.add.text(width / 2, 70, '2:00', {
       fontSize: '24px',
       color: '#ffffff',
     })
     this.timerText.setOrigin(0.5, 0)
+    this.timerText.setScrollFactor(0)
 
     // Controls hint (dynamic based on device)
     const controlsText = this.isMobile
       ? 'Touch Joystick to Move • Tap Button to Shoot'
       : 'Arrow Keys to Move • Space to Shoot/Pass'
 
-    this.add.text(this.scale.width / 2, this.scale.height - 30, controlsText, {
+    const hint = this.add.text(width / 2, height - 30, controlsText, {
       fontSize: '16px',
       color: '#aaaaaa',
-    }).setOrigin(0.5, 0)
+    })
+    hint.setOrigin(0.5, 0)
+    hint.setScrollFactor(0)
+
+    // Add UI objects and make game camera ignore them
+    this.uiObjects.push(this.scoreText, this.timerText, hint)
+    this.gameCamera.ignore(this.uiObjects)
   }
 
   private setupInput() {
@@ -212,7 +320,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createMobileControls() {
-    const { width, height } = this.scale
+    // Mobile controls use viewport coordinates (actual screen size)
+    const width = this.scale.width
+    const height = this.scale.height
 
     // Virtual joystick (spawns dynamically on left half)
     this.joystick = new VirtualJoystick(this)
@@ -224,6 +334,12 @@ export class GameScene extends Phaser.Scene {
     this.actionButton.setOnReleaseCallback((power) => {
       this.shootBall(power)
     })
+
+    // Make game camera ignore mobile controls (they're UI elements)
+    const joystickObjects = this.joystick.getGameObjects()
+    const buttonObjects = this.actionButton.getGameObjects()
+    this.gameCamera.ignore([...joystickObjects, ...buttonObjects])
+    this.uiObjects.push(...joystickObjects, ...buttonObjects)
   }
 
   private shootBall(power: number = 0.8) {
@@ -387,8 +503,8 @@ export class GameScene extends Phaser.Scene {
     this.player.y += this.playerVelocity.y * GAME_CONFIG.PLAYER_SPEED * dt
 
     // Clamp to field bounds
-    this.player.x = Phaser.Math.Clamp(this.player.x, 30, this.scale.width - 30)
-    this.player.y = Phaser.Math.Clamp(this.player.y, 30, this.scale.height - 30)
+    this.player.x = Phaser.Math.Clamp(this.player.x, GAME_CONFIG.PLAYER_MARGIN, GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.PLAYER_MARGIN)
+    this.player.y = Phaser.Math.Clamp(this.player.y, GAME_CONFIG.PLAYER_MARGIN, GAME_CONFIG.FIELD_HEIGHT - GAME_CONFIG.PLAYER_MARGIN)
 
     // Visual feedback: Tint when moving (use team color)
     if (velocityMagnitude > 0) {
@@ -419,22 +535,22 @@ export class GameScene extends Phaser.Scene {
     this.ball.y += this.ballVelocity.y * dt
 
     // Bounce off field boundaries (but allow goal zones)
-    const margin = 20
+    const margin = GAME_CONFIG.FIELD_MARGIN
 
     // Left/right boundaries (exclude goal zones)
     if (this.ball.x <= margin && (this.ball.y < this.leftGoal.yMin || this.ball.y > this.leftGoal.yMax)) {
       this.ballVelocity.x *= -0.8
       this.ball.x = margin
     }
-    if (this.ball.x >= this.scale.width - margin && (this.ball.y < this.rightGoal.yMin || this.ball.y > this.rightGoal.yMax)) {
+    if (this.ball.x >= GAME_CONFIG.FIELD_WIDTH - margin && (this.ball.y < this.rightGoal.yMin || this.ball.y > this.rightGoal.yMax)) {
       this.ballVelocity.x *= -0.8
-      this.ball.x = this.scale.width - margin
+      this.ball.x = GAME_CONFIG.FIELD_WIDTH - margin
     }
 
     // Top/bottom boundaries
-    if (this.ball.y <= margin || this.ball.y >= this.scale.height - margin) {
+    if (this.ball.y <= margin || this.ball.y >= GAME_CONFIG.FIELD_HEIGHT - margin) {
       this.ballVelocity.y *= -0.8
-      this.ball.y = Phaser.Math.Clamp(this.ball.y, margin, this.scale.height - margin)
+      this.ball.y = Phaser.Math.Clamp(this.ball.y, margin, GAME_CONFIG.FIELD_HEIGHT - margin)
     }
   }
 
@@ -515,8 +631,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private resetBall() {
-    this.ball.x = this.scale.width / 2
-    this.ball.y = this.scale.height / 2
+    this.ball.x = GAME_CONFIG.FIELD_WIDTH / 2
+    this.ball.y = GAME_CONFIG.FIELD_HEIGHT / 2
     this.ballVelocity.x = 0
     this.ballVelocity.y = 0
   }
@@ -537,7 +653,7 @@ export class GameScene extends Phaser.Scene {
 
     // Particle explosion at goal position
     const particles = this.add.particles(x, y, 'spark', {
-      speed: { min: -200, max: 200 },
+      speed: { min: -400, max: 400 },
       angle: { min: 0, max: 360 },
       scale: { start: 1, end: 0 },
       blendMode: 'ADD',
@@ -547,6 +663,9 @@ export class GameScene extends Phaser.Scene {
       tint: particleColor
     })
 
+    // Particles are game effects - ignore on UI camera
+    this.uiCamera.ignore(particles)
+
     // Auto-destroy after animation
     this.time.delayedCall(1000, () => {
       particles.destroy()
@@ -554,15 +673,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   private flashScreen(color: number = 0xffffff) {
+    const width = GAME_CONFIG.FIELD_WIDTH
+    const height = GAME_CONFIG.FIELD_HEIGHT
+
     const flash = this.add.rectangle(
-      this.scale.width / 2,
-      this.scale.height / 2,
-      this.scale.width,
-      this.scale.height,
+      width / 2,
+      height / 2,
+      width,
+      height,
       color,
       0.5
     )
     flash.setDepth(1500)
+
+    // Flash is a game effect, not UI - ignore on UI camera
+    this.uiCamera.ignore(flash)
 
     this.tweens.add({
       targets: flash,
@@ -573,7 +698,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shakeScreen() {
-    this.cameras.main.shake(200, 0.01)
+    this.gameCamera.shake(200, 0.01)
   }
 
   // Match timer system
@@ -631,46 +756,57 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showMatchEndScreen(winner: string) {
+    // Match end screen is UI overlay - use viewport coordinates
+    const width = this.scale.width
+    const height = this.scale.height
+
     // Dark overlay
     const overlay = this.add.rectangle(
-      this.scale.width / 2,
-      this.scale.height / 2,
-      this.scale.width,
-      this.scale.height,
+      width / 2,
+      height / 2,
+      width,
+      height,
       0x000000,
       0.7
     )
     overlay.setDepth(2000)
+    overlay.setScrollFactor(0)
 
     // Winner text
     const resultText = this.add.text(
-      this.scale.width / 2,
-      this.scale.height / 2 - 50,
+      width / 2,
+      height / 2 - 50,
       winner === 'Draw' ? 'Match Draw!' : `${winner} Team Wins!`,
       { fontSize: '48px', color: '#ffffff', fontStyle: 'bold' }
     )
     resultText.setOrigin(0.5)
     resultText.setDepth(2001)
+    resultText.setScrollFactor(0)
 
     // Final score
     const scoreText = this.add.text(
-      this.scale.width / 2,
-      this.scale.height / 2 + 20,
+      width / 2,
+      height / 2 + 20,
       `${this.scoreBlue} - ${this.scoreRed}`,
       { fontSize: '36px', color: '#ffffff' }
     )
     scoreText.setOrigin(0.5)
     scoreText.setDepth(2001)
+    scoreText.setScrollFactor(0)
 
     // Restart hint
     const restartText = this.add.text(
-      this.scale.width / 2,
-      this.scale.height / 2 + 80,
+      width / 2,
+      height / 2 + 80,
       'Tap to restart',
       { fontSize: '24px', color: '#aaaaaa' }
     )
     restartText.setOrigin(0.5)
     restartText.setDepth(2001)
+    restartText.setScrollFactor(0)
+
+    // Make game camera ignore UI overlay elements
+    this.gameCamera.ignore([overlay, resultText, scoreText, restartText])
 
     // Handle restart
     this.input.once('pointerdown', () => {
@@ -826,6 +962,10 @@ export class GameScene extends Phaser.Scene {
     )
     pressureIndicator.setStrokeStyle(2, 0xff0000, 0.6)
     pressureIndicator.setDepth(9) // Below player
+
+    // Add to game objects and ignore on UI camera
+    this.gameObjects.push(remotePlayer, indicator, pressureIndicator)
+    this.uiCamera.ignore([remotePlayer, indicator, pressureIndicator])
 
     // Store references
     this.remotePlayers.set(sessionId, remotePlayer)
