@@ -1,205 +1,130 @@
-# 🚀 Socca2 Quick Start Guide
+# 🚀 Kickoff Quick Start
 
-## ✅ Installation Complete!
+Fast-paced multiplayer arcade soccer game with real-time physics and pressure-based possession mechanics.
 
-Your project is ready to run. All dependencies have been installed.
+## Getting Started
 
-## 🎮 Running the Game
-
-### Option 1: Run Both Client + Server (Recommended)
+### Run the Game
 
 ```bash
 npm run dev
 ```
 
 This starts:
-- **Client** at http://localhost:5173
-- **Server** at http://localhost:3000
+- **Client** → http://localhost:5173
+- **Server** → http://localhost:3000
 
-### Option 2: Run Separately
+### Play
 
-**Terminal 1 - Client:**
-```bash
-npm run dev:client
+**Desktop:**
+- Arrow Keys → Move
+- Space → Shoot/Pass
+
+**Mobile:**
+- Left joystick → Move
+- Right button → Shoot/Pass (hold for power)
+
+## Features
+
+✅ **Multiplayer** - Real-time 2v2 matches via Colyseus
+✅ **Ball Physics** - Realistic friction, bouncing, momentum
+✅ **Smart Possession** - Proximity-based with pressure dynamics
+✅ **Shooting** - Variable power, direction control
+✅ **Mobile Controls** - Touch joystick + action button
+✅ **Goal Scoring** - Match timer, celebrations, reset
+
+## Architecture
+
+```
+kickoff/
+├── client/          # Phaser 3.80 + TypeScript + Vite
+│   ├── src/scenes/GameScene.ts     # Main game logic
+│   └── src/controls/               # Virtual joystick & button
+├── server/          # Colyseus 0.16 multiplayer server
+│   ├── src/rooms/MatchRoom.ts      # Game room logic
+│   └── src/schema/GameState.ts     # Authoritative state
+├── shared/          # Shared types & constants
+└── tests/           # Playwright E2E tests
 ```
 
-**Terminal 2 - Server:**
+## Testing
+
 ```bash
-npm run dev:server
+npm run test:e2e           # Run all E2E tests
+npm run test:e2e:ui        # Run with Playwright UI
+npm run clean:test         # Clean test artifacts
 ```
 
-## 🎯 What You Can Do Right Now
+**Test Coverage:**
+- Core gameplay regression (movement, shooting, scoring)
+- Multiplayer synchronization (position, ball state)
+- Ball possession mechanics (capture, pressure, release)
+- Client-server speed matching
+- Shooting mechanics (direction, power, multiplayer sync)
 
-### Single Player Test (Week 1 Milestone)
+## Development Tools
 
-1. Open http://localhost:5173 in your browser
-2. **Controls:**
-   - **Arrow Keys** → Move player
-   - **Space Bar** → Shoot/Pass ball
-3. You'll see:
-   - Green soccer field with goals
-   - Blue player (you)
-   - White ball in center
-   - Score display (0-0)
-
-### Test Features
-
-✅ **Player Movement** - Arrow keys move blue rectangle
-✅ **Ball Physics** - Ball bounces off walls with friction
-✅ **Shooting** - Get close to ball, press Space to kick
-✅ **Ball Magnetism** - Ball sticks to player when close
-✅ **Field Boundaries** - Player and ball stay in bounds
-
-## 🔧 Development Tools
-
-### Colyseus Monitor (Server Dashboard)
-
+### Server Monitor
 http://localhost:3000/colyseus
-
-View:
-- Active rooms
-- Connected clients
-- Server statistics
+- Active rooms, connected clients, server stats
 
 ### Health Check
-
 http://localhost:3000/health
+- Server status JSON
 
-Returns server status JSON
+## Configuration
 
-## 📁 Project Structure
+### Game Constants
+`shared/src/types.ts` - Physics, field dimensions, gameplay tuning
 
-```
-socca2/
-├── client/              # Phaser game (Vite + TypeScript)
-│   ├── src/
-│   │   ├── main.ts             # Entry point
-│   │   └── scenes/
-│   │       └── GameScene.ts    # Main game scene
-│   ├── index.html
-│   └── package.json
-│
-├── server/              # Colyseus server
-│   ├── src/
-│   │   ├── index.ts            # Server entry
-│   │   ├── rooms/
-│   │   │   └── MatchRoom.ts    # Game room logic
-│   │   └── schema/
-│   │       └── GameState.ts    # Shared state
-│   └── package.json
-│
-├── shared/              # Shared TypeScript types
-│   └── src/
-│       └── types.ts            # Game constants & types
-│
-└── package.json         # Root workspace config
-```
+**Key Parameters:**
+- `PLAYER_SPEED: 250` - Movement speed (px/s)
+- `SHOOT_SPEED: 400` - Ball shot velocity (px/s)
+- `POSSESSION_RADIUS: 50` - Capture distance (px)
+- `PRESSURE_RADIUS: 120` - Contesting range (px)
+- `BALL_FRICTION: 0.98` - Ball slowdown per frame
 
-## 🎨 Current Visual Design
+## Troubleshooting
 
-**Field:**
-- Green background (#2d5016)
-- White boundary lines
-- Center circle and line
-- Goals on left/right sides
-
-**Player:**
-- Blue rectangle (30×40px)
-- White border
-- Yellow indicator dot above
-
-**Ball:**
-- White circle (20px diameter)
-- Black shadow for depth
-
-## 🐛 Troubleshooting
-
-### Port Already in Use
-
-**Error:** `EADDRINUSE: address already in use :::3000`
-
-**Fix:**
+**Port in use:**
 ```bash
-# Kill process on port 3000
-npx kill-port 3000
-
-# Or use different port
-PORT=3001 npm run dev:server
+npx kill-port 3000    # Server
+npx kill-port 5173    # Client
 ```
 
-### Client Can't Connect to Server
+**Connection issues:**
+- Check http://localhost:3000/health
+- Verify both client & server running
+- Check browser console for errors
 
-**Check:**
-1. Is server running? (http://localhost:3000/health should respond)
-2. CORS enabled? (Already configured in server)
-3. Browser console errors? (Open DevTools → Console)
-
-### TypeScript Errors
-
-**Fix:**
+**TypeScript errors:**
 ```bash
-# Rebuild shared types
 cd shared && npm run build
 ```
 
-## 📋 Next Steps (Week 1-2 Roadmap)
+## Project Documentation
 
-Current: **Day 1-4 Complete** ✅
+- `claudedocs/BALL_CAPTURE_MECHANISM.md` - Possession system details
+- `claudedocs/SHOOTING_IMPLEMENTATION_RESULTS.md` - Shooting mechanics
+- `claudedocs/INPUT_LAG_OPTIMIZATION_WORKFLOW.md` - Performance work
+- `tests/*.spec.ts` - Test specifications
 
-**Remaining Week 1-2 Tasks:**
-
-### Day 5-7: Virtual Joystick
-- [ ] Add touch controls (virtual joystick)
-- [ ] Position joystick in bottom-left
-- [ ] Add action button in bottom-right
-- [ ] Test on mobile device
-
-### Day 8-10: Movement Polish
-- [ ] Add player sprite animations (if assets ready)
-- [ ] Smooth camera follow
-- [ ] Optimize for 60 FPS
-
-**Check:** [MVP_ROADMAP.md](MVP_ROADMAP.md) for complete timeline
-
-## 🔥 Quick Commands Reference
+## Quick Commands
 
 ```bash
 # Development
-npm run dev              # Run client + server
-npm run dev:client       # Client only
-npm run dev:server       # Server only
+npm run dev               # Run all (client + server + shared watch)
+npm run dev:client        # Client only
+npm run dev:server        # Server only
+npm run dev:shared        # Shared types watch mode
 
 # Build
-npm run build            # Build both
-npm run build:client     # Build client only
-npm run build:server     # Build server only
+npm run build             # Build both client & server
+npm run build:client      # Client production build
+npm run build:server      # Server production build
 
-# Utilities
-npx kill-port 3000       # Kill server port
-npx kill-port 5173       # Kill client port
+# Testing
+npm run test:e2e          # Run E2E tests
+npm run test:e2e:ui       # Playwright UI mode
+npm run clean:test        # Remove test artifacts
 ```
-
-## 🎯 Success Indicators
-
-You're on track if you can:
-
-✅ Open client in browser (http://localhost:5173)
-✅ See green field with goals
-✅ Move blue player with arrow keys
-✅ Kick ball with space bar
-✅ Ball bounces off walls realistically
-✅ Server runs without errors (check terminal)
-
-## 📖 Documentation
-
-- [SPECIFICATION.md](SPECIFICATION.md) - Full product spec
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Technical details
-- [MVP_ROADMAP.md](MVP_ROADMAP.md) - Development plan
-
-## 🚀 Ready to Code!
-
-You've completed **Week 1 Days 1-4**!
-
-**Next milestone:** Virtual joystick for mobile (Days 5-7)
-
-Start coding! 🎮⚽
