@@ -1,8 +1,8 @@
 # Socca2 - System Architecture
 ## Technical Design Document
 
-**Version:** 1.0
-**Last Updated:** 2025-10-01
+**Version:** 1.1
+**Last Updated:** 2025-10-02
 
 ---
 
@@ -75,20 +75,84 @@
 
 ### Client Layer Components
 
-#### 1. Phaser 3 Renderer
-**Responsibility:** Visual presentation and animation
+#### 1. Phaser 3 Dual Camera Renderer
+**Responsibility:** Visual presentation with unified coordinate system and responsive rendering
+
+**Coordinate System:**
+- Unified 1920x1080 coordinate space across client, server, and physics
+- Game world uses fixed 1920x1080 coordinates (GAME_CONFIG.FIELD_WIDTH/HEIGHT)
+- UI layer adapts to actual screen size with fullscreen rendering
+
+**Rendering Architecture:**
+- **Scale Mode:** RESIZE (fullscreen with dynamic viewport)
+- **Dual Camera System:**
+  - `gameCamera`: Fixed 1920x1080 bounds, centered viewport with letterboxing, dynamic zoom
+  - `uiCamera`: Full screen coverage for controls and HUD
+- **Letterboxing:** Automatic horizontal/vertical bars for non-16:9 aspect ratios
+- **Touch Support:** UI elements (joystick, buttons) work in letterbox areas via uiCamera
 
 **Key Classes:**
 ```typescript
 class GameScene extends Phaser.Scene {
-  // Main game scene
+  // Dual camera properties
+  private gameCamera: Phaser.Cameras.Scene2D.Camera  // Game world (1920x1080)
+  private uiCamera: Phaser.Cameras.Scene2D.Camera    // UI layer (fullscreen)
+  private gameObjects: Phaser.GameObjects.GameObject[] = []
+  private uiObjects: Phaser.GameObjects.GameObject[] = []
+
+  // Game entities
   players: Map<string, PlayerSprite>
   ball: BallSprite
   field: FieldBackground
 
+  private setupCameras() {
+    // Reuse main camera as game camera
+    this.gameCamera = this.cameras.main
+    this.gameCamera.setBounds(0, 0, GAME_CONFIG.FIELD_WIDTH, GAME_CONFIG.FIELD_HEIGHT)
+
+    // Create UI camera for fullscreen
+    this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height)
+
+    // Configure camera ignore lists
+    this.gameCamera.ignore(this.uiObjects)
+    this.uiCamera.ignore(this.gameObjects)
+
+    this.updateGameCameraViewport()
+    this.scale.on('resize', this.onResize, this)
+  }
+
+  private updateGameCameraViewport() {
+    const screenWidth = this.scale.width
+    const screenHeight = this.scale.height
+    const targetAspect = GAME_CONFIG.FIELD_WIDTH / GAME_CONFIG.FIELD_HEIGHT // 16:9
+
+    let viewportX = 0, viewportY = 0
+    let viewportWidth = screenWidth, viewportHeight = screenHeight
+
+    if (screenWidth / screenHeight > targetAspect) {
+      // Screen wider than 16:9 → vertical letterboxing
+      viewportHeight = screenHeight
+      viewportWidth = screenHeight * targetAspect
+      viewportX = (screenWidth - viewportWidth) / 2
+    } else {
+      // Screen taller than 16:9 → horizontal letterboxing
+      viewportWidth = screenWidth
+      viewportHeight = screenWidth / targetAspect
+      viewportY = (screenHeight - viewportHeight) / 2
+    }
+
+    this.gameCamera.setViewport(viewportX, viewportY, viewportWidth, viewportHeight)
+
+    // Calculate zoom to fit game world into viewport
+    const zoomX = viewportWidth / GAME_CONFIG.FIELD_WIDTH
+    const zoomY = viewportHeight / GAME_CONFIG.FIELD_HEIGHT
+    const zoom = Math.min(zoomX, zoomY)
+    this.gameCamera.setZoom(zoom)
+  }
+
   update(delta: number) {
     // Interpolate positions from network state
-    // Render sprites at interpolated positions
+    // Render sprites at interpolated positions (in 1920x1080 coordinates)
   }
 }
 

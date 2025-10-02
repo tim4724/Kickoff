@@ -1,9 +1,10 @@
 # Socca2 - Arcade Soccer Game
-## Technical Specification v1.0
+## Technical Specification v1.1
 
 **Project Type:** Fast-paced multiplayer arcade soccer for mobile web
 **Strategy:** Agile MVP → Iterative enhancement
 **Timeline:** 3-4 months to production-ready MVP
+**Last Updated:** 2025-10-02
 
 ---
 
@@ -39,8 +40,10 @@
 ### Match Structure
 - **Format:** 1 human + 4 AI bots vs 1 human + 4 AI bots
 - **Duration:** 2-4 minutes per match
-- **Camera:** Top-down orthographic view
-- **Field:** Simplified soccer pitch (single screen or scrolling TBD)
+- **Camera:** Dual camera system with unified 1920x1080 coordinate space
+  - Game camera: Centered viewport with letterboxing for non-16:9 screens
+  - UI camera: Fullscreen for controls and HUD
+- **Field:** Simplified soccer pitch (1920x1080 game world)
 - **Scoring:** Traditional goals, tiebreaker by sudden death or penalties
 
 ### AI Teammate Behavior

@@ -67,6 +67,13 @@ socca2/
 - Ball physics and movement
 - Player-ball interactions
 - Field boundaries and collision
+- Unified 1920x1080 coordinate system across client/server
+
+**Rendering System:**
+- Dual camera architecture (game + UI)
+- Responsive fullscreen with letterboxing
+- Touch controls work in letterbox areas
+- Tested on 5 viewport sizes (16:9, ultrawide, portrait, landscape)
 
 **Testing:**
 - 20 passing E2E tests (Playwright)
