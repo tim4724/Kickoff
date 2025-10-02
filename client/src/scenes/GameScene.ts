@@ -255,20 +255,17 @@ export class GameScene extends Phaser.Scene {
     const height = GAME_CONFIG.FIELD_HEIGHT
 
     // Player (blue circle) - will be positioned by server in multiplayer
+    // Use thicker white border to indicate user-controlled player
     this.player = this.add.circle(width / 2 - 240, height / 2, 20, 0x0066ff)
-    this.player.setStrokeStyle(2, 0xffffff)
+    this.player.setStrokeStyle(4, 0xffffff)
 
     // Possession indicator (yellow circle glow)
     this.possessionIndicator = this.add.circle(0, 0, 40, 0xffff00, 0)
     this.possessionIndicator.setStrokeStyle(3, 0xffff00, 0.6)
     this.possessionIndicator.setDepth(999)
 
-    // Player indicator (small circle on top)
-    const indicator = this.add.circle(0, -25, 8, 0xffff00)
-    const playerContainer = this.add.container(this.player.x, this.player.y, [indicator])
-
-    this.gameObjects.push(this.player, this.possessionIndicator, playerContainer)
-    this.uiCamera.ignore([this.player, this.possessionIndicator, playerContainer])
+    this.gameObjects.push(this.player, this.possessionIndicator)
+    this.uiCamera.ignore([this.player, this.possessionIndicator])
   }
 
   private createUI() {
@@ -932,7 +929,7 @@ export class GameScene extends Phaser.Scene {
     // Determine color based on team
     const color = playerState.team === 'blue' ? 0x0066ff : 0xff4444
 
-    // Create player sprite (circle)
+    // Create player sprite (circle) with standard border
     const remotePlayer = this.add.circle(
       playerState.x,
       playerState.y,
@@ -941,15 +938,6 @@ export class GameScene extends Phaser.Scene {
     )
     remotePlayer.setStrokeStyle(2, 0xffffff)
     remotePlayer.setDepth(10)
-
-    // Create indicator circle above player
-    const indicator = this.add.circle(
-      playerState.x,
-      playerState.y - 25,
-      8,
-      0xffff00
-    )
-    indicator.setDepth(11)
 
     // Create pressure indicator (red circle around opponent when applying pressure)
     const pressureIndicator = this.add.circle(
@@ -963,12 +951,11 @@ export class GameScene extends Phaser.Scene {
     pressureIndicator.setDepth(9) // Below player
 
     // Add to game objects and ignore on UI camera
-    this.gameObjects.push(remotePlayer, indicator, pressureIndicator)
-    this.uiCamera.ignore([remotePlayer, indicator, pressureIndicator])
+    this.gameObjects.push(remotePlayer, pressureIndicator)
+    this.uiCamera.ignore([remotePlayer, pressureIndicator])
 
     // Store references
     this.remotePlayers.set(sessionId, remotePlayer)
-    this.remotePlayerIndicators.set(sessionId, indicator)
     this.pressureIndicators.set(sessionId, pressureIndicator)
 
     console.log('✅ Remote player created:', sessionId)
@@ -976,17 +963,11 @@ export class GameScene extends Phaser.Scene {
 
   private removeRemotePlayer(sessionId: string) {
     const sprite = this.remotePlayers.get(sessionId)
-    const indicator = this.remotePlayerIndicators.get(sessionId)
     const pressureIndicator = this.pressureIndicators.get(sessionId)
 
     if (sprite) {
       sprite.destroy()
       this.remotePlayers.delete(sessionId)
-    }
-
-    if (indicator) {
-      indicator.destroy()
-      this.remotePlayerIndicators.delete(sessionId)
     }
 
     if (pressureIndicator) {
@@ -1041,10 +1022,9 @@ export class GameScene extends Phaser.Scene {
 
   private updateRemotePlayer(sessionId: string, playerState: any) {
     const sprite = this.remotePlayers.get(sessionId)
-    const indicator = this.remotePlayerIndicators.get(sessionId)
     const pressureIndicator = this.pressureIndicators.get(sessionId)
 
-    if (sprite && indicator) {
+    if (sprite) {
       // Store old position for delta logging
       const oldX = sprite.x
       const oldY = sprite.y
@@ -1056,9 +1036,6 @@ export class GameScene extends Phaser.Scene {
 
       sprite.x += (serverX - sprite.x) * lerpFactor
       sprite.y += (serverY - sprite.y) * lerpFactor
-
-      indicator.x = sprite.x
-      indicator.y = sprite.y - 25
 
       // Update pressure indicator position
       if (pressureIndicator) {
