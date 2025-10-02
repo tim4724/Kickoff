@@ -13,7 +13,7 @@ export class VirtualJoystick {
   private baseY: number = 0
   private screenWidth: number
   private maxRadius: number = 60
-  private deadZone: number = 0.2
+  private deadZone: number = 0.1
 
   private isActive: boolean = false
 
