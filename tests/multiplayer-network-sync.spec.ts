@@ -307,7 +307,7 @@ test.describe('Multiplayer Network Synchronization', () => {
     console.log('✅ TEST PASSED: Cross-client synchronization working')
   })
 
-  test.skip('3. Ball Possession Detection [FEATURE NOT IMPLEMENTED]', async () => {
+  test('3. Ball Possession Detection', async () => {
     console.log('\n🧪 TEST: Ball Possession Detection')
 
     // Get ball position
@@ -399,7 +399,7 @@ test.describe('Multiplayer Network Synchronization', () => {
     await client1.screenshot({ path: `${SCREENSHOT_DIR}/4-magnetism-c1.png` })
   })
 
-  test.skip('5. Ball Shooting Synchronization [FEATURE NOT IMPLEMENTED]', async () => {
+  test('5. Ball Shooting Synchronization', async () => {
     console.log('\n🧪 TEST: Ball Shooting')
 
     // Get initial ball state
