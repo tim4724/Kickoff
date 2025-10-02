@@ -38,7 +38,7 @@ app.get('/health', (_req, res) => {
 })
 
 // Start server
-gameServer.listen(port)
+gameServer.listen(port, '0.0.0.0')
 
-console.log(`🚀 Socca2 Server listening on http://localhost:${port}`)
-console.log(`📊 Colyseus Monitor: http://localhost:${port}/colyseus`)
+console.log(`🚀 Socca2 Server listening on http://0.0.0.0:${port}`)
+console.log(`📊 Colyseus Monitor: http://0.0.0.0:${port}/colyseus`)

@@ -35,6 +35,7 @@ export interface GameStateData {
     velocityX: number
     velocityY: number
     possessedBy: string
+    pressureLevel: number // 0.0-1.0, how much pressure on possessor
   }
 }
 
@@ -214,6 +215,7 @@ export class NetworkManager {
             velocityX: state.ball.velocityX || 0,
             velocityY: state.ball.velocityY || 0,
             possessedBy: state.ball.possessedBy || '',
+            pressureLevel: state.ball.pressureLevel || 0,
           },
         }
 

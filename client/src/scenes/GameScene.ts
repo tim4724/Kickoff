@@ -26,6 +26,7 @@ export class GameScene extends Phaser.Scene {
   private isMultiplayer: boolean = false
   private remotePlayers: Map<string, Phaser.GameObjects.Rectangle> = new Map()
   private remotePlayerIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
+  private pressureIndicators: Map<string, Phaser.GameObjects.Arc> = new Map()
 
   // Goal zones and scoring
   private leftGoal = { x: 10, yMin: 0, yMax: 0, width: 20 }
@@ -159,8 +160,8 @@ export class GameScene extends Phaser.Scene {
   private createPlayer() {
     const { width, height } = this.scale
 
-    // Player (blue rectangle with rounded corners)
-    this.player = this.add.rectangle(width / 2 - 100, height / 2, 30, 40, 0x0066ff)
+    // Player (blue circle)
+    this.player = this.add.circle(width / 2 - 100, height / 2, 20, 0x0066ff)
     this.player.setStrokeStyle(2, 0xffffff)
 
     // Possession indicator (yellow circle glow)
@@ -288,9 +289,21 @@ export class GameScene extends Phaser.Scene {
 
       if (hasPossession) {
         this.possessionIndicator.setPosition(this.player.x, this.player.y)
-        this.possessionIndicator.setAlpha(0.6)
+
+        // Fade possession indicator based on pressure level
+        // Full brightness (0.6) at 0 pressure, fades to dim (0.2) at max pressure
+        const pressureLevel = state?.ball?.pressureLevel || 0
+        const baseAlpha = 0.6
+        const minAlpha = 0.2
+        const alpha = baseAlpha - (pressureLevel * (baseAlpha - minAlpha))
+        this.possessionIndicator.setAlpha(alpha)
+
+        // Show pressure indicators around nearby opponents
+        this.updatePressureIndicators(state)
       } else {
         this.possessionIndicator.setAlpha(0)
+        // Hide all pressure indicators when not in possession
+        this.pressureIndicators.forEach(indicator => indicator.setAlpha(0))
       }
     } else {
       // Single player: use distance-based calculation
@@ -780,12 +793,11 @@ export class GameScene extends Phaser.Scene {
     // Determine color based on team
     const color = playerState.team === 'blue' ? 0x0066ff : 0xff4444
 
-    // Create player sprite
-    const remotePlayer = this.add.rectangle(
+    // Create player sprite (circle)
+    const remotePlayer = this.add.circle(
       playerState.x,
       playerState.y,
-      30,
-      40,
+      20,
       color
     )
     remotePlayer.setStrokeStyle(2, 0xffffff)
@@ -800,9 +812,21 @@ export class GameScene extends Phaser.Scene {
     )
     indicator.setDepth(11)
 
+    // Create pressure indicator (red circle around opponent when applying pressure)
+    const pressureIndicator = this.add.circle(
+      playerState.x,
+      playerState.y,
+      45, // Slightly larger than PRESSURE_RADIUS (40px)
+      0xff0000, // Red
+      0 // Start invisible
+    )
+    pressureIndicator.setStrokeStyle(2, 0xff0000, 0.6)
+    pressureIndicator.setDepth(9) // Below player
+
     // Store references
     this.remotePlayers.set(sessionId, remotePlayer)
     this.remotePlayerIndicators.set(sessionId, indicator)
+    this.pressureIndicators.set(sessionId, pressureIndicator)
 
     console.log('✅ Remote player created:', sessionId)
   }
@@ -810,6 +834,7 @@ export class GameScene extends Phaser.Scene {
   private removeRemotePlayer(sessionId: string) {
     const sprite = this.remotePlayers.get(sessionId)
     const indicator = this.remotePlayerIndicators.get(sessionId)
+    const pressureIndicator = this.pressureIndicators.get(sessionId)
 
     if (sprite) {
       sprite.destroy()
@@ -819,6 +844,11 @@ export class GameScene extends Phaser.Scene {
     if (indicator) {
       indicator.destroy()
       this.remotePlayerIndicators.delete(sessionId)
+    }
+
+    if (pressureIndicator) {
+      pressureIndicator.destroy()
+      this.pressureIndicators.delete(sessionId)
     }
 
     console.log('🗑️ Remote player removed:', sessionId)
@@ -869,6 +899,7 @@ export class GameScene extends Phaser.Scene {
   private updateRemotePlayer(sessionId: string, playerState: any) {
     const sprite = this.remotePlayers.get(sessionId)
     const indicator = this.remotePlayerIndicators.get(sessionId)
+    const pressureIndicator = this.pressureIndicators.get(sessionId)
 
     if (sprite && indicator) {
       // Store old position for delta logging
@@ -885,6 +916,12 @@ export class GameScene extends Phaser.Scene {
 
       indicator.x = sprite.x
       indicator.y = sprite.y - 25
+
+      // Update pressure indicator position
+      if (pressureIndicator) {
+        pressureIndicator.x = sprite.x
+        pressureIndicator.y = sprite.y
+      }
 
       // DEBUG: Log player movement (only if moved >1 pixel)
       const moved = Math.abs(sprite.x - oldX) > 1 || Math.abs(sprite.y - oldY) > 1
@@ -930,6 +967,36 @@ export class GameScene extends Phaser.Scene {
     } catch (error) {
       console.error('[GameScene] Error updating ball from server:', error)
     }
+  }
+
+  private updatePressureIndicators(state: any) {
+    // Show pressure indicators on opponents who are within pressure radius
+    const PRESSURE_RADIUS = 40
+    const myTeam = state.players.get(this.mySessionId)?.team
+
+    state.players.forEach((player: any, sessionId: string) => {
+      if (sessionId === this.mySessionId) return // Skip local player
+
+      const pressureIndicator = this.pressureIndicators.get(sessionId)
+      if (!pressureIndicator) return
+
+      // Only show if opponent is applying pressure (within radius and opposing team)
+      const dx = player.x - this.player.x
+      const dy = player.y - this.player.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+
+      const isOpponent = player.team !== myTeam
+      const isWithinRadius = distance < PRESSURE_RADIUS
+
+      if (isOpponent && isWithinRadius) {
+        // Show indicator with pulsing animation based on proximity
+        const proximityFactor = 1 - (distance / PRESSURE_RADIUS) // 1.0 at 0px, 0.0 at 40px
+        const alpha = 0.3 + (proximityFactor * 0.4) // 0.3 to 0.7 alpha
+        pressureIndicator.setAlpha(alpha)
+      } else {
+        pressureIndicator.setAlpha(0)
+      }
+    })
   }
 
   private updateFromServerState(state: any) {

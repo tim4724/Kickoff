@@ -27,6 +27,12 @@ const GAME_CONFIG = {
   GOAL_WIDTH: 20,
   GOAL_Y_MIN: 200,
   GOAL_Y_MAX: 400,
+  // Ball capture / pressure system
+  PRESSURE_RADIUS: 40, // distance at which opponent applies pressure
+  PRESSURE_BUILDUP_RATE: 1.0, // pressure per second (1 second to full pressure)
+  PRESSURE_DECAY_RATE: 1.2, // pressure decay per second when no opponents near
+  PRESSURE_RELEASE_THRESHOLD: 1.0, // pressure level that causes ball release
+  TEAMMATE_PRESSURE_REDUCTION: 0.5, // teammates reduce pressure by 50% per player
 } as const
 
 export class Player extends Schema {
@@ -62,6 +68,7 @@ export class Ball extends Schema {
   @type('number') velocityX: number = 0
   @type('number') velocityY: number = 0
   @type('string') possessedBy: string = ''
+  @type('number') pressureLevel: number = 0 // 0.0-1.0, how much pressure on current possessor
 
   // Server-side only: prevent immediate re-possession after shooting
   lastShotTime: number = 0
@@ -73,6 +80,7 @@ export class Ball extends Schema {
     this.velocityX = 0
     this.velocityY = 0
     this.possessedBy = ''
+    this.pressureLevel = 0
     this.lastShotTime = 0
     this.lastShooter = ''
   }
@@ -168,6 +176,7 @@ export class GameState extends Schema {
 
   updatePhysics(dt: number) {
     // Handle ball possession first (before physics)
+    this.updatePossessionPressure(dt)
     this.updateBallPossession()
 
     // Only update ball physics if NOT possessed
@@ -219,6 +228,67 @@ export class GameState extends Schema {
 
     // Check goals (even when possessed)
     this.checkGoals()
+  }
+
+  private updatePossessionPressure(dt: number) {
+    // Only apply pressure if someone has possession
+    if (this.ball.possessedBy === '') {
+      // No possession - reset pressure
+      this.ball.pressureLevel = 0
+      return
+    }
+
+    const possessor = this.players.get(this.ball.possessedBy)
+    if (!possessor) {
+      this.ball.pressureLevel = 0
+      return
+    }
+
+    // Count opponents and teammates within pressure radius
+    let opponentsNearby = 0
+    let teammatesNearby = 0
+
+    this.players.forEach((player) => {
+      if (player.id === possessor.id) return // Skip possessor
+
+      const dx = player.x - possessor.x
+      const dy = player.y - possessor.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (dist < GAME_CONFIG.PRESSURE_RADIUS) {
+        if (player.team === possessor.team) {
+          teammatesNearby++
+        } else {
+          opponentsNearby++
+        }
+      }
+    })
+
+    // Calculate effective pressure
+    // Each opponent adds pressure, teammates reduce it
+    const rawPressure = opponentsNearby - (teammatesNearby * GAME_CONFIG.TEAMMATE_PRESSURE_REDUCTION)
+    const effectivePressure = Math.max(0, rawPressure)
+
+    // Update pressure level based on effective pressure
+    if (effectivePressure > 0) {
+      // Build up pressure
+      const pressureIncrease = GAME_CONFIG.PRESSURE_BUILDUP_RATE * dt * effectivePressure
+      this.ball.pressureLevel = Math.min(
+        GAME_CONFIG.PRESSURE_RELEASE_THRESHOLD,
+        this.ball.pressureLevel + pressureIncrease
+      )
+    } else {
+      // Decay pressure when no opponents nearby
+      const pressureDecrease = GAME_CONFIG.PRESSURE_DECAY_RATE * dt
+      this.ball.pressureLevel = Math.max(0, this.ball.pressureLevel - pressureDecrease)
+    }
+
+    // Check if pressure threshold reached - release possession
+    if (this.ball.pressureLevel >= GAME_CONFIG.PRESSURE_RELEASE_THRESHOLD) {
+      console.log(`⚡ [Pressure] Ball released from ${possessor.id} due to pressure (${opponentsNearby} opponents nearby)`)
+      this.ball.possessedBy = ''
+      this.ball.pressureLevel = 0
+    }
   }
 
   private updateBallPossession() {
