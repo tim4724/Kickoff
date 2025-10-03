@@ -56,15 +56,16 @@ export const GAME_CONFIG = {
 
   // Physics
   PLAYER_SPEED: 450, // pixels per second (reduced for better control)
+  BALL_RADIUS: 15, // ball visual radius (30x30 ellipse / 2)
   BALL_FRICTION: 0.98,
   SHOOT_SPEED: 2000, // max shoot speed (at full power after 1 second)
   MIN_SHOOT_SPEED: 800, // min shoot speed (at minimum power)
   POSSESSION_RADIUS: 70, // increased from 50 for easier ball capture
 
-  // Field boundaries and goalsGameScene.tsGameScene.ts
-  FIELD_MARGIN: 40, // px from edge
+  // Field boundaries and goals
+  FIELD_MARGIN: 40, // px from edge (field line position)
   PLAYER_MARGIN: 60, // px from edge for player bounds
-  GOAL_WIDTH: 40,
+  GOAL_DEPTH: 40, // How far goal extends outside field boundary (matches FIELD_MARGIN)
   GOAL_Y_MIN: 360, // 1080/2 - 180 (33% of height, centered)
   GOAL_Y_MAX: 720, // 1080/2 + 180
 

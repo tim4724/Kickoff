@@ -52,6 +52,7 @@ export class Ball extends Schema {
   // Server-side only: prevent immediate re-possession after shooting
   lastShotTime: number = 0
   lastShooter: string = ''
+  inGoal: boolean = false // Server-side only: ball is frozen in goal net
 
   reset() {
     this.x = GAME_CONFIG.FIELD_WIDTH / 2
@@ -62,6 +63,7 @@ export class Ball extends Schema {
     this.pressureLevel = 0
     this.lastShotTime = 0
     this.lastShooter = ''
+    this.inGoal = false
   }
 }
 
@@ -183,6 +185,13 @@ export class GameState extends Schema {
     // Handle ball possession first (before physics)
     this.updatePossessionPressure(dt)
     this.updateBallPossession()
+
+    // Skip ball physics if in goal net (frozen until reset)
+    if (this.ball.inGoal) {
+      this.ball.velocityX = 0
+      this.ball.velocityY = 0
+      return
+    }
 
     // Only update ball physics if NOT possessed
     if (this.ball.possessedBy === '') {
@@ -487,24 +496,43 @@ export class GameState extends Schema {
       return
     }
 
-    // Left goal (red scores when ball enters left goal)
+    // Left goal (red scores when ENTIRE ball crosses left field boundary)
+    // Ball must be completely past the line: ball.x + radius < FIELD_MARGIN
     if (
-      this.ball.x <= GAME_CONFIG.FIELD_MARGIN + GAME_CONFIG.GOAL_WIDTH &&
+      this.ball.x + GAME_CONFIG.BALL_RADIUS < GAME_CONFIG.FIELD_MARGIN &&
       this.ball.y >= GAME_CONFIG.GOAL_Y_MIN &&
       this.ball.y <= GAME_CONFIG.GOAL_Y_MAX
     ) {
+      this.ball.inGoal = true // Freeze ball in net
       this.onGoalScored('red')
       return
     }
 
-    // Right goal (blue scores when ball enters right goal)
+    // Right goal (blue scores when ENTIRE ball crosses right field boundary)
+    // Ball must be completely past the line: ball.x - radius > FIELD_WIDTH - FIELD_MARGIN
     if (
-      this.ball.x >= GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.FIELD_MARGIN - GAME_CONFIG.GOAL_WIDTH &&
+      this.ball.x - GAME_CONFIG.BALL_RADIUS > GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.FIELD_MARGIN &&
       this.ball.y >= GAME_CONFIG.GOAL_Y_MIN &&
       this.ball.y <= GAME_CONFIG.GOAL_Y_MAX
     ) {
+      this.ball.inGoal = true // Freeze ball in net
       this.onGoalScored('blue')
     }
+  }
+
+  private resetPlayers() {
+    this.players.forEach((player, sessionId) => {
+      // Reset to starting positions based on team
+      player.x = player.team === 'blue' ? 360 : GAME_CONFIG.FIELD_WIDTH - 360
+      player.y = GAME_CONFIG.FIELD_HEIGHT / 2
+
+      // Reset velocity and state
+      player.velocityX = 0
+      player.velocityY = 0
+      player.state = 'idle'
+
+      console.log(`🔄 Reset player ${sessionId} (${player.team}) to starting position`)
+    })
   }
 
   private onGoalScored(team: Team) {
@@ -519,14 +547,17 @@ export class GameState extends Schema {
       this.scoreRed++
     }
 
-    // Reset ball to center after 1 second delay
+    // Reset players immediately
+    this.resetPlayers()
+
+    // Reset ball to center after 1 second delay (ball stays in net until then)
     setTimeout(() => {
-      this.ball.reset()
+      this.ball.reset() // This also sets inGoal = false
       this.goalScored = false
       // Clear possession lockout timers for fresh kickoff
       this.lastPossessionGainTime.clear()
       this.lastPossessionLossTime.clear()
-      console.log('🔄 Possession lockouts cleared for kickoff')
+      console.log('🔄 Ball reset to center, possession lockouts cleared for kickoff')
     }, 1000)
   }
 

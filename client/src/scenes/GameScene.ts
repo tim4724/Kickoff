@@ -229,18 +229,19 @@ export class GameScene extends Phaser.Scene {
     borderGraphics.lineBetween(width / 2, margin, width / 2, height - margin)
     this.gameObjects.push(borderGraphics)
 
-    // Goals (white rectangles)
+    // Goals (white rectangles) - OUTSIDE field boundaries
     const goalHeight = GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN
+    const goalDepth = GAME_CONFIG.GOAL_DEPTH
 
-    // Left goal (blue side)
-    const leftGoal = this.add.rectangle(margin, height / 2, GAME_CONFIG.GOAL_WIDTH, goalHeight, 0xffffff).setOrigin(0, 0.5)
+    // Left goal net (outside left field line)
+    const leftGoal = this.add.rectangle(0, height / 2, goalDepth, goalHeight, 0xffffff).setOrigin(0, 0.5)
     this.gameObjects.push(leftGoal)
 
-    // Right goal (red side)
-    const rightGoal = this.add.rectangle(width - margin, height / 2, GAME_CONFIG.GOAL_WIDTH, goalHeight, 0xffffff).setOrigin(1, 0.5)
+    // Right goal net (outside right field line)
+    const rightGoal = this.add.rectangle(width, height / 2, goalDepth, goalHeight, 0xffffff).setOrigin(1, 0.5)
     this.gameObjects.push(rightGoal)
 
-    // Goal posts
+    // Goal posts (at field line boundaries)
     const post1 = this.add.circle(margin, GAME_CONFIG.GOAL_Y_MIN, 10, 0xffffff)
     const post2 = this.add.circle(margin, GAME_CONFIG.GOAL_Y_MAX, 10, 0xffffff)
     const post3 = this.add.circle(width - margin, GAME_CONFIG.GOAL_Y_MIN, 10, 0xffffff)
@@ -403,6 +404,7 @@ export class GameScene extends Phaser.Scene {
     console.log('🔄 [Shutdown] Resetting initialization flags')
     this.colorInitialized = false
     this.positionInitialized = false
+    this.matchEnded = false
   }
 
   update(_time: number, delta: number) {
@@ -819,17 +821,22 @@ export class GameScene extends Phaser.Scene {
       this.timerEvent.remove()
     }
 
-    // Determine winner
-    const winner = this.scoreBlue > this.scoreRed ? 'Blue' :
-                   this.scoreRed > this.scoreBlue ? 'Red' : 'Draw'
+    // Get authoritative scores from server state
+    const state = this.networkManager.getState()
+    const scoreBlue = state?.scoreBlue || 0
+    const scoreRed = state?.scoreRed || 0
 
-    console.log(`🏁 Match End! Winner: ${winner}. Final Score: ${this.scoreBlue}-${this.scoreRed}`)
+    // Determine winner from server state
+    const winner = scoreBlue > scoreRed ? 'Blue' :
+                   scoreRed > scoreBlue ? 'Red' : 'Draw'
 
-    // Show end screen
-    this.showMatchEndScreen(winner)
+    console.log(`🏁 Match End! Winner: ${winner}. Final Score: ${scoreBlue}-${scoreRed}`)
+
+    // Show end screen with server state scores
+    this.showMatchEndScreen(winner, scoreBlue, scoreRed)
   }
 
-  private showMatchEndScreen(winner: string) {
+  private showMatchEndScreen(winner: string, scoreBlue: number, scoreRed: number) {
     // Match end screen is UI overlay - use viewport coordinates
     const width = this.scale.width
     const height = this.scale.height
@@ -857,11 +864,11 @@ export class GameScene extends Phaser.Scene {
     resultText.setDepth(2001)
     resultText.setScrollFactor(0)
 
-    // Final score
+    // Final score (from server state)
     const scoreText = this.add.text(
       width / 2,
       height / 2 + 20,
-      `${this.scoreBlue} - ${this.scoreRed}`,
+      `${scoreBlue} - ${scoreRed}`,
       { fontSize: '36px', color: '#ffffff' }
     )
     scoreText.setOrigin(0.5)
@@ -1180,9 +1187,10 @@ export class GameScene extends Phaser.Scene {
     // Check if match ended (phase === 'ended')
     if (state.phase === 'ended' && !this.matchEnded) {
       this.matchEnded = true
-      // Determine winner from score
-      const winner = state.scoreBlue > state.scoreRed ? 'blue' : 'red'
-      this.showMatchEndScreen(winner)
+      // Determine winner from server state score
+      const winner = state.scoreBlue > state.scoreRed ? 'Blue' :
+                     state.scoreRed > state.scoreBlue ? 'Red' : 'Draw'
+      this.showMatchEndScreen(winner, state.scoreBlue, state.scoreRed)
     }
   }
 
