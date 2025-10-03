@@ -59,14 +59,20 @@ export class ActionButton {
    * @param color - Team color (hex)
    */
   public setTeamColor(color: number) {
+    console.log(`🎨 [ActionButton] setTeamColor called with ${color.toString(16)}`)
     this.teamColor = color
 
     // Calculate lighter stroke color (add 0x222222 to make it brighter)
     this.teamColorLight = Math.min(color + 0x222222, 0xffffff)
 
-    // Update button to use team color
-    this.button.setFillStyle(this.teamColor, 0.4)
-    this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
+    // Update button to use team color - force update with explicit fill
+    if (this.button) {
+      this.button.fillColor = this.teamColor
+      this.button.fillAlpha = 0.4
+      this.button.setFillStyle(this.teamColor, 0.4)
+      this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
+      console.log(`🎨 [ActionButton] Button color updated to ${this.button.fillColor.toString(16)}`)
+    }
   }
 
   private setupInput() {

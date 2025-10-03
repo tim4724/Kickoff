@@ -123,6 +123,46 @@ test.describe('Multiplayer Restart Color Assignment', () => {
       console.log('✅ Remote player color check passed')
     }
 
+    // CRITICAL: Verify UI controls (joystick, action button) match player color
+    console.log(`\n📱 Verifying UI control colors...`)
+    const [client1UI, client2UI] = await Promise.all([
+      client1.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const joystickObjects = scene?.joystick?.getGameObjects() || []
+        const buttonObjects = scene?.actionButton?.getGameObjects() || []
+
+        // Get stick color from joystick (second object)
+        const joystickColor = joystickObjects[1]?.fillColor
+        // Get button color from action button (first object)
+        const buttonColor = buttonObjects[0]?.fillColor
+        const playerColor = scene?.player?.fillColor
+
+        return { joystick: joystickColor, button: buttonColor, player: playerColor }
+      }),
+      client2.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const joystickObjects = scene?.joystick?.getGameObjects() || []
+        const buttonObjects = scene?.actionButton?.getGameObjects() || []
+
+        const joystickColor = joystickObjects[1]?.fillColor
+        const buttonColor = buttonObjects[0]?.fillColor
+        const playerColor = scene?.player?.fillColor
+
+        return { joystick: joystickColor, button: buttonColor, player: playerColor }
+      })
+    ])
+
+    console.log(`  Client 1 - Player: ${client1UI.player}, Joystick: ${client1UI.joystick}, Button: ${client1UI.button}`)
+    console.log(`  Client 2 - Player: ${client2UI.player}, Joystick: ${client2UI.joystick}, Button: ${client2UI.button}`)
+
+    // All UI elements should match player color
+    expect(client1UI.joystick).toBe(client1UI.player)
+    expect(client1UI.button).toBe(client1UI.player)
+    expect(client2UI.joystick).toBe(client2UI.player)
+    expect(client2UI.button).toBe(client2UI.player)
+
+    console.log('✅ UI control colors synchronized with player')
+
     await client1.close()
     await client2.close()
 

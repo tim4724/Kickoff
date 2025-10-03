@@ -69,6 +69,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    console.log('🎨 [Create] Scene create() called')
+
+    // Clean up old UI controls if they exist (from previous scene instance)
+    if (this.joystick) {
+      this.joystick.destroy()
+      this.joystick = undefined as any
+    }
+    if (this.actionButton) {
+      this.actionButton.destroy()
+      this.actionButton = undefined as any
+    }
+
+    // Reset initialization flags at start of create to ensure fresh initialization
+    this.colorInitialized = false
+    this.positionInitialized = false
+
     // Detect mobile device
     this.isMobile = this.sys.game.device.os.android || this.sys.game.device.os.iOS ||
                     this.sys.game.device.os.iPad || this.sys.game.device.os.iPhone
@@ -323,6 +339,15 @@ export class GameScene extends Phaser.Scene {
     // Action button (bottom-right, positioned further from edges)
     this.actionButton = new ActionButton(this, width - 120, height - 120)
 
+    // In multiplayer mode, immediately apply current team color to new controls
+    // This ensures controls match player color after scene restart
+    // playerTeamColor persists across restarts, so reuse it for newly created controls
+    if (this.isMultiplayer && this.playerTeamColor) {
+      this.joystick.setTeamColor(this.playerTeamColor)
+      this.actionButton.setTeamColor(this.playerTeamColor)
+      console.log(`🎨 [CreateControls] Applied persisted color ${this.playerTeamColor.toString(16)} to new controls`)
+    }
+
     // Set up action button callback
     this.actionButton.setOnReleaseCallback((power) => {
       this.shootBall(power)
@@ -357,12 +382,27 @@ export class GameScene extends Phaser.Scene {
   }
 
   shutdown() {
+    console.log('🔄 [Shutdown] Scene shutting down...')
+
+    // Destroy UI controls to prevent stale color persistence
+    if (this.joystick) {
+      this.joystick.destroy()
+    }
+    if (this.actionButton) {
+      this.actionButton.destroy()
+    }
+
     // Disconnect NetworkManager to prevent stale connections
     if (this.networkManager) {
-      console.log('🔌 Disconnecting NetworkManager in shutdown()')
+      console.log('🔌 [Shutdown] Disconnecting NetworkManager')
       this.networkManager.disconnect()
-      this.networkManager = null
+      this.networkManager = undefined
     }
+
+    // Reset initialization flags to allow proper re-initialization on restart
+    console.log('🔄 [Shutdown] Resetting initialization flags')
+    this.colorInitialized = false
+    this.positionInitialized = false
   }
 
   update(_time: number, delta: number) {
@@ -914,6 +954,7 @@ export class GameScene extends Phaser.Scene {
         try {
           // Initialize player color and position on first state update when player exists
           if (!this.colorInitialized && state?.players?.has(this.mySessionId)) {
+            console.log(`🎨 [Init] Initializing colors (colorInitialized=${this.colorInitialized})`)
             this.updateLocalPlayerColor()
 
             // Sync initial position from server
@@ -923,6 +964,7 @@ export class GameScene extends Phaser.Scene {
             }
 
             this.colorInitialized = true
+            console.log(`🎨 [Init] Color initialization complete`)
           }
 
           this.updateFromServerState(state)
@@ -1141,6 +1183,10 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Update all UI colors to match team assignment
+   * Centralizes color synchronization for player, joystick, and action button
+   */
   private updateLocalPlayerColor() {
     if (!this.isMultiplayer || !this.networkManager || !this.mySessionId) return
 
@@ -1155,19 +1201,25 @@ export class GameScene extends Phaser.Scene {
         return
       }
 
-      // Set color based on team and store it
-      this.playerTeamColor = localPlayer.team === 'blue' ? 0x0066ff : 0xff4444
+      // Calculate team color
+      const teamColor = localPlayer.team === 'blue' ? 0x0066ff : 0xff4444
+
+      // Always update colors when this method is called
+      // The caller (stateChange handler) already controls when this runs via colorInitialized flag
+      this.playerTeamColor = teamColor
+
+      // Synchronize all UI elements to team color
       this.player.setFillStyle(this.playerTeamColor)
 
-      // Update mobile control colors to match team color
       if (this.joystick) {
         this.joystick.setTeamColor(this.playerTeamColor)
       }
+
       if (this.actionButton) {
         this.actionButton.setTeamColor(this.playerTeamColor)
       }
 
-      console.log(`🎨 [Client] Local player color set to ${localPlayer.team} (${this.playerTeamColor.toString(16)})`)
+      console.log(`🎨 [Client] UI colors synchronized to ${localPlayer.team} (${this.playerTeamColor.toString(16)})`)
     } catch (error) {
       console.error('[GameScene] Error updating local player color:', error)
     }
