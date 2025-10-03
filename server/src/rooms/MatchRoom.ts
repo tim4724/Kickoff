@@ -41,8 +41,8 @@ export class MatchRoom extends Room<GameState> {
     // Add player to game state
     this.state.addPlayer(client.sessionId)
 
-    // Start match when FIRST player joins (enables single-player and testing)
-    if (this.state.players.size === 1) {
+    // Start match when 2 players join (proper multiplayer)
+    if (this.state.players.size === 2) {
       this.startMatch()
     }
   }
@@ -52,6 +52,13 @@ export class MatchRoom extends Room<GameState> {
 
     // Remove player
     this.state.removePlayer(client.sessionId)
+
+    // Return to waiting phase if only 1 player remains
+    if (this.state.players.size === 1 && this.state.phase === 'playing') {
+      console.log('Only 1 player remaining, returning to waiting phase')
+      this.state.phase = 'waiting'
+      this.state.matchTime = GAME_CONFIG.MATCH_DURATION // Reset timer
+    }
 
     // End match if no players left
     if (this.state.players.size === 0) {

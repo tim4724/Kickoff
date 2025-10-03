@@ -242,9 +242,20 @@ export class NetworkManager {
     })
 
     // Listen for players joining
+    console.log('[NetworkManager] Setting up onAdd listener for future players')
     this.room.state.players.onAdd((player: any, key: string) => {
       try {
-        console.log('[NetworkManager] Player joined:', key)
+        console.log(`[NetworkManager] 🔔 onAdd fired for player ${key}, my session: ${this.sessionId}`)
+
+        // Ignore our own player (we're not a remote player)
+        if (key === this.sessionId) {
+          console.log('[NetworkManager] Ignoring own player in onAdd:', key)
+          return
+        }
+
+        console.log('[NetworkManager] ✅ Player joined (not self):', key, 'team:', player.team)
+        console.log('[NetworkManager] playerJoin callback exists:', !!this.onPlayerJoin)
+
         this.onPlayerJoin?.({
           id: player.id || key,
           team: player.team || 'blue',
@@ -365,5 +376,32 @@ export class NetworkManager {
    */
   getState(): any {
     return this.room?.state
+  }
+
+  /**
+   * Check for existing players in the room and emit playerJoin events
+   * Call this AFTER registering event callbacks to handle players who joined before connection
+   */
+  checkExistingPlayers(): void {
+    if (!this.room || !this.room.state || !this.room.state.players) {
+      return
+    }
+
+    console.log('[NetworkManager] Checking for existing players in room')
+    this.room.state.players.forEach((player: any, key: string) => {
+      if (key !== this.sessionId) {
+        console.log('[NetworkManager] Found existing player:', key, 'team:', player.team)
+        this.onPlayerJoin?.({
+          id: player.id || key,
+          team: player.team || 'blue',
+          x: player.x || 0,
+          y: player.y || 0,
+          velocityX: player.velocityX || 0,
+          velocityY: player.velocityY || 0,
+          state: player.state || 'idle',
+          direction: player.direction || 0,
+        })
+      }
+    })
   }
 }

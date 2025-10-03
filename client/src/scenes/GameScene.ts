@@ -909,6 +909,9 @@ export class GameScene extends Phaser.Scene {
 
       this.setupNetworkListeners()
 
+      // Check for players who joined before we registered callbacks
+      this.networkManager.checkExistingPlayers()
+
       // Color will be set via stateChange event when player appears in server state
 
       // Stop local timer if it was started (shouldn't be, but safety check)

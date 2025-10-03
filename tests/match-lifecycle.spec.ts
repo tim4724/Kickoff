@@ -55,7 +55,7 @@ test.describe('Match Lifecycle', () => {
     const timer1 = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
-      return state?.matchTimer || 0
+      return state?.matchTime || 0
     })
 
     await client1.waitForTimeout(2000)
@@ -63,7 +63,7 @@ test.describe('Match Lifecycle', () => {
     const timer2 = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
-      return state?.matchTimer || 0
+      return state?.matchTime || 0
     })
 
     console.log(`\n📊 Timer check:`)

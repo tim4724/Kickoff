@@ -44,25 +44,62 @@ test.describe('Player Lifecycle Management', () => {
     console.log(`  Client 1: ${session1}`)
     console.log(`  Client 2: ${session2}`)
 
-    // Client 1 gains possession
+    // Client 1 gains possession by moving toward ball
     console.log('\n📤 Step 2: Client 1 gaining possession...')
-    await client1.keyboard.down('ArrowRight')
-    await client1.waitForTimeout(2000)
-    await client1.keyboard.up('ArrowRight')
-    await client1.waitForTimeout(500)
 
-    const ballState = await client2.evaluate(() => {
+    // Determine which direction to move based on team
+    const team1 = await client1.evaluate((sid) => {
+      const state = (window as any).__gameControls?.scene?.networkManager?.getState()
+      return state?.players?.get(sid)?.team || 'blue'
+    }, session1)
+
+    // Blue team (left side) moves right, red team (right side) moves left
+    const moveKey = team1 === 'blue' ? 'ArrowRight' : 'ArrowLeft'
+    console.log(`  Client 1 is ${team1} team, moving ${team1 === 'blue' ? 'right' : 'left'}`)
+
+    // Move in short bursts until possession is gained
+    let attempts = 0
+    let hasPossession = false
+
+    while (!hasPossession && attempts < 10) {
+      await client1.keyboard.down(moveKey)
+      await client1.waitForTimeout(200) // Move in 200ms bursts
+      await client1.keyboard.up(moveKey)
+      await client1.waitForTimeout(100)
+
+      const check = await client1.evaluate((sid) => {
+        const state = (window as any).__gameControls?.scene?.networkManager?.getState()
+        return state?.ball?.possessedBy === sid
+      }, session1)
+
+      hasPossession = check
+      attempts++
+    }
+
+    await client1.waitForTimeout(300) // Stabilize after gaining possession
+
+    const ballState = await client1.evaluate((sid) => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
+      const player = state?.players?.get(sid)
       return {
         possessedBy: state?.ball?.possessedBy || '',
-        x: state?.ball?.x || 0,
-        y: state?.ball?.y || 0
+        ballX: state?.ball?.x || 0,
+        ballY: state?.ball?.y || 0,
+        playerX: player?.x || 0,
+        playerY: player?.y || 0,
+        playerTeam: player?.team || 'unknown',
+        phase: state?.phase || 'unknown'
       }
-    })
+    }, session1)
 
-    console.log(`  Ball possessed by: ${ballState.possessedBy}`)
-    console.log(`  Ball position: (${ballState.x}, ${ballState.y})`)
+    const dist = Math.sqrt((ballState.ballX - ballState.playerX)**2 + (ballState.ballY - ballState.playerY)**2)
+    console.log(`  Match phase: ${ballState.phase}`)
+    console.log(`  Player 1 team: ${ballState.playerTeam}`)
+    console.log(`  Player 1 position: (${ballState.playerX.toFixed(0)}, ${ballState.playerY.toFixed(0)})`)
+    console.log(`  Ball position: (${ballState.ballX.toFixed(0)}, ${ballState.ballY.toFixed(0)})`)
+    console.log(`  Distance: ${dist.toFixed(1)}px (possession radius: 70px)`)
+    console.log(`  Ball possessed by: ${ballState.possessedBy || 'none'}`)
 
     // Verify Client 1 has possession
     expect(ballState.possessedBy).toBe(session1)
@@ -125,8 +162,8 @@ test.describe('Player Lifecycle Management', () => {
     // Client 1 should see Client 2 as remote player
     const remotePlayerBefore = await client1.evaluate((remoteId) => {
       const scene = (window as any).__gameControls?.scene
-      const remotePlayers = Array.from(scene?.remotePlayers?.values() || [])
-      return remotePlayers.find((p: any) => p.sessionId === remoteId) !== undefined
+      const remotePlayers = scene?.remotePlayers
+      return remotePlayers?.has(remoteId) || false
     }, session2)
 
     console.log(`  Client 1 sees Client 2: ${remotePlayerBefore}`)
@@ -142,8 +179,8 @@ test.describe('Player Lifecycle Management', () => {
     // Client 1 should no longer see Client 2
     const remotePlayerAfter = await client1.evaluate((remoteId) => {
       const scene = (window as any).__gameControls?.scene
-      const remotePlayers = Array.from(scene?.remotePlayers?.values() || [])
-      return remotePlayers.find((p: any) => p.sessionId === remoteId) !== undefined
+      const remotePlayers = scene?.remotePlayers
+      return remotePlayers?.has(remoteId) || false
     }, session2)
 
     console.log(`  Client 1 sees Client 2: ${remotePlayerAfter}`)
