@@ -188,6 +188,15 @@ export class VirtualJoystick {
   }
 
   /**
+   * Update screen width when window resizes
+   * @param newWidth - New screen width
+   */
+  public resize(newWidth: number) {
+    // Update screen width for left-half zone detection
+    this.screenWidth = newWidth
+  }
+
+  /**
    * Clean up resources
    */
   public destroy() {

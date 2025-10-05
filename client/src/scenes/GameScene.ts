@@ -11,6 +11,7 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private scoreText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
+  private controlsHint!: Phaser.GameObjects.Text
 
   // Dual camera system
   private gameCamera!: Phaser.Cameras.Scene2D.Camera
@@ -37,13 +38,13 @@ export class GameScene extends Phaser.Scene {
     x: GAME_CONFIG.FIELD_MARGIN,
     yMin: GAME_CONFIG.GOAL_Y_MIN,
     yMax: GAME_CONFIG.GOAL_Y_MAX,
-    width: GAME_CONFIG.GOAL_WIDTH
+    width: GAME_CONFIG.GOAL_DEPTH
   }
   private rightGoal = {
     x: GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.FIELD_MARGIN,
     yMin: GAME_CONFIG.GOAL_Y_MIN,
     yMax: GAME_CONFIG.GOAL_Y_MAX,
-    width: GAME_CONFIG.GOAL_WIDTH
+    width: GAME_CONFIG.GOAL_DEPTH
   }
   private scoreBlue: number = 0
   private scoreRed: number = 0
@@ -204,6 +205,25 @@ export class GameScene extends Phaser.Scene {
     // Recalculate game camera viewport
     this.updateGameCameraViewport()
 
+    // Update UI text positions
+    if (this.scoreText) {
+      this.scoreText.setPosition(gameSize.width / 2, 30)
+    }
+    if (this.timerText) {
+      this.timerText.setPosition(gameSize.width / 2, 70)
+    }
+    if (this.controlsHint) {
+      this.controlsHint.setPosition(gameSize.width / 2, gameSize.height - 30)
+    }
+
+    // Update UI controls positions
+    if (this.joystick) {
+      this.joystick.resize(gameSize.width)
+    }
+    if (this.actionButton) {
+      this.actionButton.resize(gameSize.width, gameSize.height)
+    }
+
     console.log(`🔄 Resize: ${gameSize.width}x${gameSize.height}`)
   }
 
@@ -307,15 +327,15 @@ export class GameScene extends Phaser.Scene {
       ? 'Touch Joystick to Move • Tap Button to Shoot'
       : 'Arrow Keys to Move • Space to Shoot/Pass'
 
-    const hint = this.add.text(width / 2, height - 30, controlsText, {
+    this.controlsHint = this.add.text(width / 2, height - 30, controlsText, {
       fontSize: '16px',
       color: '#aaaaaa',
     })
-    hint.setOrigin(0.5, 0)
-    hint.setScrollFactor(0)
+    this.controlsHint.setOrigin(0.5, 0)
+    this.controlsHint.setScrollFactor(0)
 
     // Add UI objects and make game camera ignore them
-    this.uiObjects.push(this.scoreText, this.timerText, hint)
+    this.uiObjects.push(this.scoreText, this.timerText, this.controlsHint)
     this.gameCamera.ignore(this.uiObjects)
   }
 
@@ -822,7 +842,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Get authoritative scores from server state
-    const state = this.networkManager.getState()
+    const state = this.networkManager?.getState()
     const scoreBlue = state?.scoreBlue || 0
     const scoreRed = state?.scoreRed || 0
 
@@ -1111,7 +1131,7 @@ export class GameScene extends Phaser.Scene {
       // DEBUG: Log player movement (only if moved >1 pixel)
       const moved = Math.abs(sprite.x - oldX) > 1 || Math.abs(sprite.y - oldY) > 1
       if (moved) {
-        console.log(`🎭 [Client] Remote player ${sessionId} updated: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${sprite.x.toFixed(1)}, ${sprite.y.toFixed(1)})`)
+//         console.log(`🎭 [Client] Remote player ${sessionId} updated: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${sprite.x.toFixed(1)}, ${sprite.y.toFixed(1)})`)
       }
     }
   }
@@ -1146,8 +1166,8 @@ export class GameScene extends Phaser.Scene {
       // DEBUG: Log ball position changes (only if moved >0.5 pixels)
       const moved = Math.abs(this.ball.x - oldX) > 0.5 || Math.abs(this.ball.y - oldY) > 0.5
       if (moved) {
-        console.log(`⚽ [Client] Ball updated from server: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${this.ball.x.toFixed(1)}, ${this.ball.y.toFixed(1)})`)
-        console.log(`   Server: (${serverBallX.toFixed(1)}, ${serverBallY.toFixed(1)}) | Velocity: (${this.ballVelocity.x.toFixed(1)}, ${this.ballVelocity.y.toFixed(1)})`)
+//         console.log(`⚽ [Client] Ball updated from server: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${this.ball.x.toFixed(1)}, ${this.ball.y.toFixed(1)})`)
+//         console.log(`   Server: (${serverBallX.toFixed(1)}, ${serverBallY.toFixed(1)}) | Velocity: (${this.ballVelocity.x.toFixed(1)}, ${this.ballVelocity.y.toFixed(1)})`)
       }
     } catch (error) {
       console.error('[GameScene] Error updating ball from server:', error)
@@ -1162,10 +1182,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.stateUpdateCount) this.stateUpdateCount = 0
     this.stateUpdateCount++
     if (this.stateUpdateCount % 60 === 0) {
-      console.log(`📥 [Client] State update #${this.stateUpdateCount}`)
-      console.log(`   Score: ${state.scoreBlue || 0} - ${state.scoreRed || 0}`)
-      console.log(`   Time: ${state.matchTime?.toFixed(1) || 0}s`)
-      console.log(`   Phase: ${state.phase}`)
+//       console.log(`📥 [Client] State update #${this.stateUpdateCount}`)
+//       console.log(`   Score: ${state.scoreBlue || 0} - ${state.scoreRed || 0}`)
+//       console.log(`   Time: ${state.matchTime?.toFixed(1) || 0}s`)
+//       console.log(`   Phase: ${state.phase}`)
     }
 
     // Update score display
@@ -1253,10 +1273,10 @@ export class GameScene extends Phaser.Scene {
       // Sync local sprite with server position
       this.player.setPosition(localPlayer.x, localPlayer.y)
 
-      console.log(
-        `📍 [Client] Synced local player position: (${localPlayer.x}, ${localPlayer.y}) ` +
-        `Team: ${localPlayer.team}`
-      )
+      // console.log(
+      //   `📍 [Client] Synced local player position: (${localPlayer.x}, ${localPlayer.y}) ` +
+      //   `Team: ${localPlayer.team}`
+      // )
     } catch (error) {
       console.error('[GameScene] Error syncing local player position:', error)
     }

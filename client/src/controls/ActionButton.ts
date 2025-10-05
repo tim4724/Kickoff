@@ -168,6 +168,24 @@ export class ActionButton {
   }
 
   /**
+   * Update button position and screen width when window resizes
+   * @param newWidth - New screen width
+   * @param newHeight - New screen height
+   */
+  public resize(newWidth: number, newHeight: number) {
+    // Update screen width for hit detection
+    this.screenWidth = newWidth
+
+    // Recalculate button position (maintain offset from bottom-right corner)
+    this.x = newWidth - 120
+    this.y = newHeight - 120
+
+    // Update button and label positions
+    this.button.setPosition(this.x, this.y)
+    this.label.setPosition(this.x, this.y)
+  }
+
+  /**
    * Update power indicator visual (called every frame)
    */
   public update() {
