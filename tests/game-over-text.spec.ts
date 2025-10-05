@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Test Suite: Game Over Text Verification
@@ -10,7 +11,7 @@ import { test, expect } from '@playwright/test'
 const CLIENT_URL = 'http://localhost:5173'
 
 test.describe('Game Over Text Display', () => {
-  test('Shows correct text format when Blue wins', async ({ browser }) => {
+  test('Shows correct text format when Blue wins', async ({ browser }, testInfo) => {
     const context = await browser.newContext()
     const page = await context.newPage()
 
@@ -50,7 +51,7 @@ test.describe('Game Over Text Display', () => {
     await context.close()
   })
 
-  test('Shows correct text when timer expires (time-based end)', async ({ browser }) => {
+  test('Shows correct text when timer expires (time-based end)', async ({ browser }, testInfo) => {
     const context = await browser.newContext()
     const page = await context.newPage()
 
@@ -107,7 +108,7 @@ test.describe('Game Over Text Display', () => {
     await context.close()
   })
 
-  test('Verifies text capitalization and format', async ({ browser }) => {
+  test('Verifies text capitalization and format', async ({ browser }, testInfo) => {
     const context = await browser.newContext()
     const page = await context.newPage()
 
@@ -195,7 +196,7 @@ test.describe('Game Over Text Display', () => {
     await context.close()
   })
 
-  test('Client and server score consistency check', async ({ browser }) => {
+  test('Client and server score consistency check', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 

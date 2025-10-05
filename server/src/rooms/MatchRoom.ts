@@ -9,16 +9,30 @@ const GAME_CONFIG = {
   MATCH_DURATION: 120,
 } as const
 
+// Fixed timestep physics configuration
+const FIXED_TIMESTEP_MS = 1000 / 60 // 16.666ms - deterministic physics step
+const FIXED_TIMESTEP_S = FIXED_TIMESTEP_MS / 1000 // 0.01666s
+const MAX_PHYSICS_STEPS = 5 // Prevent spiral of death under extreme load
+
 export class MatchRoom extends Room<GameState> {
   maxClients = 2 // Start with 2 humans only (will add AI later)
-  private frameCount = 0 // DEBUG: Track update cycles
+  private singlePlayerStartTimeout?: NodeJS.Timeout
+
+  // Fixed timestep accumulator for deterministic physics
+  private physicsAccumulator: number = 0
 
   onCreate(options: any) {
     console.log('Match room created:', this.roomId, options)
 
+    // Store room name in metadata for filtering (test isolation)
+    if (options.roomName) {
+      this.setMetadata({ roomName: options.roomName })
+      console.log('🏷️  Room name set:', options.roomName)
+    }
+
     this.setState(new GameState())
 
-    // Start game loop at 30 Hz
+    // Start game loop at 60 Hz
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / GAME_CONFIG.TICK_RATE)
 
     // Handle player input
@@ -41,9 +55,24 @@ export class MatchRoom extends Room<GameState> {
     // Add player to game state
     this.state.addPlayer(client.sessionId)
 
+    // Clear any pending single-player start timeout
+    if (this.singlePlayerStartTimeout) {
+      clearTimeout(this.singlePlayerStartTimeout)
+      this.singlePlayerStartTimeout = undefined
+    }
+
     // Start match when 2 players join (proper multiplayer)
     if (this.state.players.size === 2) {
       this.startMatch()
+    } else if (this.state.players.size === 1) {
+      // Enable single-player mode: start match after 2 seconds if no second player joins
+      console.log('⏱️ Single player detected, starting match in 2 seconds...')
+      this.singlePlayerStartTimeout = setTimeout(() => {
+        if (this.state.players.size === 1 && this.state.phase === 'waiting') {
+          console.log('🎮 Starting single-player match')
+          this.startMatch()
+        }
+      }, 2000)
     }
   }
 
@@ -68,44 +97,52 @@ export class MatchRoom extends Room<GameState> {
   }
 
   private onPlayerInput(client: Client, input: any) {
-    // DEBUG: Log all input messages received
-    console.log(`📥 [MatchRoom] Input received from ${client.sessionId}:`, {
-      movement: input.movement,
-      action: input.action,
-      timestamp: input.timestamp,
-    })
+    // Input logging disabled for performance (60+ calls/sec per player)
     this.state.queueInput(client.sessionId, input)
   }
 
   private startMatch() {
     console.log('🎮 Match starting!')
     this.state.phase = 'playing'
+
+    // Reset physics accumulator for clean deterministic start
+    this.physicsAccumulator = 0
+
     this.broadcast('match_start', { duration: GAME_CONFIG.MATCH_DURATION })
   }
 
   private update(deltaTime: number) {
-    const dt = deltaTime / 1000 // Convert to seconds
+    if (this.state.phase !== 'playing') return
 
-    // DEBUG: Log update cycle every 60 frames (2 seconds at 30Hz)
-    this.frameCount++
-    if (this.frameCount % 60 === 0) {
-      console.log(`[MatchRoom] Update tick #${this.frameCount}, dt: ${dt.toFixed(3)}s, phase: ${this.state.phase}`)
+    // Accumulate real deltaTime for physics steps
+    this.physicsAccumulator += deltaTime
+
+    // Run physics in fixed timesteps for deterministic simulation
+    let physicsSteps = 0
+    while (this.physicsAccumulator >= FIXED_TIMESTEP_MS && physicsSteps < MAX_PHYSICS_STEPS) {
+      // Process inputs with fixed timestep
+      this.state.processInputs(FIXED_TIMESTEP_S)
+
+      // Update physics with fixed timestep (always 1/60s = 0.01666s)
+      this.state.updatePhysics(FIXED_TIMESTEP_S)
+
+      this.physicsAccumulator -= FIXED_TIMESTEP_MS
+      physicsSteps++
     }
 
-    if (this.state.phase === 'playing') {
-      // Process queued inputs
-      this.state.processInputs(dt)
+    // Prevent spiral of death: if we hit max steps, discard remainder
+    if (physicsSteps >= MAX_PHYSICS_STEPS) {
+      console.warn(`⚠️ Physics running behind: ${physicsSteps} steps, discarding ${this.physicsAccumulator.toFixed(1)}ms`)
+      this.physicsAccumulator = 0
+    }
 
-      // Update physics
-      this.state.updatePhysics(dt)
+    // Update timer with actual deltaTime (smooth countdown, independent of physics)
+    const dt = deltaTime / 1000
+    this.state.updateTimer(dt)
 
-      // Update timer (countdown)
-      this.state.updateTimer(dt)
-
-      // Check for match end (timer reaches 0)
-      if (this.state.matchTime <= 0) {
-        this.endMatch()
-      }
+    // Check for match end (timer reaches 0)
+    if (this.state.matchTime <= 0) {
+      this.endMatch()
     }
   }
 
@@ -127,5 +164,11 @@ export class MatchRoom extends Room<GameState> {
 
   onDispose() {
     console.log('Match room disposed:', this.roomId)
+
+    // Clear any pending single-player start timeout
+    if (this.singlePlayerStartTimeout) {
+      clearTimeout(this.singlePlayerStartTimeout)
+      this.singlePlayerStartTimeout = undefined
+    }
   }
 }

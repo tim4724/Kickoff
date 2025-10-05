@@ -75,6 +75,30 @@ export class NetworkManager {
   }
 
   /**
+   * Get room name with support for test isolation
+   * Priority: URL param > window variable > default config
+   */
+  private getRoomName(): string {
+    // Check URL parameters for ?roomId=...
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlRoomId = urlParams.get('roomId')
+    if (urlRoomId) {
+      console.log('[NetworkManager] Using room from URL parameter:', urlRoomId)
+      return urlRoomId
+    }
+
+    // Check window variable for test isolation
+    const testRoomId = (window as any).__testRoomId
+    if (testRoomId) {
+      console.log('[NetworkManager] Using test room:', testRoomId)
+      return testRoomId
+    }
+
+    // Default to config room name
+    return this.config.roomName
+  }
+
+  /**
    * Connect to the game server and join a match room
    */
   async connect(): Promise<boolean> {
@@ -93,7 +117,14 @@ export class NetworkManager {
       }
       console.error = filteredError
 
-      this.room = await this.client.joinOrCreate(this.config.roomName)
+      // Get room name (test room ID or production room)
+      const roomName = this.getRoomName()
+
+      // ALWAYS pass roomName for filterBy to work correctly
+      // Tests: unique room ID for isolation
+      // Production: use config room name for matchmaking
+      console.log('[NetworkManager] Joining room:', roomName)
+      this.room = await this.client.joinOrCreate('match', { roomName })
 
       // Restore console.error
       console.error = originalError

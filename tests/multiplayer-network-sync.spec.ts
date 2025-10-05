@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Socca2 Multiplayer Network Synchronization Test Suite
@@ -160,39 +161,31 @@ function setupConsoleMonitor(page: Page, clientName: string, patterns: string[])
   return matchedLogs
 }
 
-test.describe('Multiplayer Network Synchronization', () => {
+test.describe.serial('Multiplayer Network Synchronization', () => {
   let client1: Page
   let client2: Page
   let client1SessionId: string
   let client2SessionId: string
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
-
     client1 = await context1.newPage()
     client2 = await context2.newPage()
 
-    // Standard console logging
     client1.on('console', msg => console.log(`[Client 1] ${msg.text()}`))
     client2.on('console', msg => console.log(`[Client 2] ${msg.text()}`))
-
     client1.on('pageerror', err => console.error('[Client 1 ERROR]:', err.message))
     client2.on('pageerror', err => console.error('[Client 2 ERROR]:', err.message))
 
-    // Navigate and connect
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Test isolated in room: ${roomId}`)
 
-    // Wait for initial page load
     await Promise.all([
       client1.waitForTimeout(2000),
       client2.waitForTimeout(2000)
     ])
 
-    // Retry logic for session ID acquisition (up to 8 seconds total)
     const MAX_RETRIES = 8
     const RETRY_INTERVAL = 1000
 
@@ -218,7 +211,6 @@ test.describe('Multiplayer Network Synchronization', () => {
       }
     }
 
-    // Validate connections
     if (!client1SessionId || !client2SessionId) {
       throw new Error(
         `Failed to establish connections after ${MAX_RETRIES}s\n` +
@@ -230,13 +222,7 @@ test.describe('Multiplayer Network Synchronization', () => {
     console.log(`✅ Client 1 Session: ${client1SessionId}`)
     console.log(`✅ Client 2 Session: ${client2SessionId}`)
 
-    // Wait for match to start (both players connected)
     await client1.waitForTimeout(1000)
-  })
-
-  test.afterAll(async () => {
-    await client1?.close()
-    await client2?.close()
   })
 
   test('1. Server-Authoritative Player Movement', async () => {
@@ -409,9 +395,6 @@ test.describe('Multiplayer Network Synchronization', () => {
 
     // First, move player to ball to gain possession
     console.log('\n📤 Moving player to ball to gain possession...')
-    const client1SessionId = await client1.evaluate(() => {
-      return (window as any).__gameControls?.scene?.mySessionId
-    })
     const playerState = await getServerPlayerState(client1, client1SessionId)
 
     // Determine direction to ball (client1 starts on left at x=360, ball at x=960)

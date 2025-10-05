@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Ball Capture E2E Tests - Proximity Pressure System
@@ -18,44 +19,6 @@ import { test, expect, Page } from '@playwright/test'
 const CLIENT_URL = 'http://localhost:5173'
 
 test.describe('Ball Capture - Proximity Pressure', () => {
-  let client1: Page
-  let client2: Page
-
-  test.beforeAll(async ({ browser }) => {
-    // Create two separate browser contexts (simulating two players)
-    const context1 = await browser.newContext()
-    const context2 = await browser.newContext()
-
-    client1 = await context1.newPage()
-    client2 = await context2.newPage()
-
-    // Connect both clients to multiplayer
-    await client1.goto(CLIENT_URL)
-    await client2.goto(CLIENT_URL)
-    await client1.waitForTimeout(2000)
-    await client2.waitForTimeout(2000)
-
-    // Wait for both clients to be fully connected
-    await client1.evaluate(() => {
-      return new Promise((resolve) => {
-        const checkConnected = () => {
-          const scene = (window as any).__gameControls?.scene
-          const state = scene?.networkManager?.getState()
-          if (state?.players && state.players.size >= 2) {
-            resolve(null)
-          } else {
-            setTimeout(checkConnected, 100)
-          }
-        }
-        checkConnected()
-      })
-    })
-  })
-
-  test.afterAll(async () => {
-    await client1?.close()
-    await client2?.close()
-  })
 
   // Helper: Get game state from page
   async function getGameState(page: Page) {
@@ -210,7 +173,18 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     return false
   }
 
-  test('Test 1: Pressure builds when opponent approaches ball carrier', async () => {
+  test('Test 1: Pressure builds when opponent approaches ball carrier', async ({ browser }, testInfo) => {
+    const context1 = await browser.newContext()
+    const context2 = await browser.newContext()
+    const client1 = await context1.newPage()
+    const client2 = await context2.newPage()
+
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
+
+    // Wait for game to load
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     console.log('\n🧪 TEST 1: Pressure Buildup from Opponent Proximity\n')
     console.log('='.repeat(70))
 
@@ -333,9 +307,23 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     // Test passes regardless of pressure (observational)
     expect(true).toBe(true)
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('Test 2: Ball releases when pressure reaches threshold', async () => {
+  test('Test 2: Ball releases when pressure reaches threshold', async ({ browser }, testInfo) => {
+    const context1 = await browser.newContext()
+    const context2 = await browser.newContext()
+    const client1 = await context1.newPage()
+    const client2 = await context2.newPage()
+
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
+
+    // Wait for game to load
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     console.log('\n🧪 TEST 2: Ball Release at Pressure Threshold\n')
     console.log('='.repeat(70))
 
@@ -376,9 +364,23 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     // Ball should eventually release in a 2-player game with pressure
     // This is more of an observational test - we're validating the mechanic works
     expect(releaseDetected || Date.now() - startTime >= maxWaitTime).toBe(true)
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('Test 3: Possession indicator fades with increasing pressure', async () => {
+  test('Test 3: Possession indicator fades with increasing pressure', async ({ browser }, testInfo) => {
+    const context1 = await browser.newContext()
+    const context2 = await browser.newContext()
+    const client1 = await context1.newPage()
+    const client2 = await context2.newPage()
+
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
+
+    // Wait for game to load
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     console.log('\n🧪 TEST 3: Possession Indicator Fade with Pressure\n')
     console.log('='.repeat(70))
 
@@ -445,14 +447,34 @@ test.describe('Ball Capture - Proximity Pressure', () => {
         expect(avgHighPressureAlpha).toBeLessThan(avgLowPressureAlpha)
       }
     }
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('Test 4: No regression - basic possession still works', async () => {
+  test('Test 4: No regression - basic possession still works', async ({ browser }, testInfo) => {
+    const context1 = await browser.newContext()
+    const context2 = await browser.newContext()
+    const client1 = await context1.newPage()
+    const client2 = await context2.newPage()
+
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
+
+    // Wait for game to load
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     console.log('\n🧪 TEST 4: No Regression - Basic Possession Mechanics\n')
     console.log('='.repeat(70))
 
     console.log('\n📤 Step 1: Move player to capture ball...')
     await movePlayerTowardBall(client1)
+    await client1.waitForTimeout(500)
+
+    // Try moving a bit more to ensure possession (in case we're at edge of possession radius)
+    await client1.keyboard.down('ArrowRight')
+    await client1.waitForTimeout(500)
+    await client1.keyboard.up('ArrowRight')
     await client1.waitForTimeout(500)
 
     console.log('\n📤 Step 2: Verifying ball was captured...')
@@ -463,9 +485,23 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     expect(stateWithPossession?.ball.possessedBy).not.toBe('')
 
     console.log('\n✅ Regression test passed: Basic possession works')
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('Test 5: No regression - shooting still works', async () => {
+  test('Test 5: No regression - shooting still works', async ({ browser }, testInfo) => {
+    const context1 = await browser.newContext()
+    const context2 = await browser.newContext()
+    const client1 = await context1.newPage()
+    const client2 = await context2.newPage()
+
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
+
+    // Wait for game to load
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     console.log('\n🧪 TEST 5: No Regression - Shooting Mechanics\n')
     console.log('='.repeat(70))
 
@@ -507,5 +543,8 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     expect(stateAfter).not.toBeNull()
 
     console.log('\n✅ Regression test passed: Shooting still works')
+
+    await client1.close()
+    await client2.close()
   })
 })

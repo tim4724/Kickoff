@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Test: Initial Player Position Synchronization
@@ -71,90 +72,44 @@ async function getRemotePlayerVisualPositions(page: Page): Promise<Map<string, {
 }
 
 test.describe('Initial Player Position Synchronization', () => {
-  let client1: Page
-  let client2: Page
-  let client1SessionId: string
-  let client2SessionId: string
-
-  test.beforeAll(async ({ browser }) => {
+  test('Initial Player Positions Match on Both Clients', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
+    const client1 = await context1.newPage()
+    const client2 = await context2.newPage()
 
-    client1 = await context1.newPage()
-    client2 = await context2.newPage()
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
-    // Console logging
-    client1.on('console', msg => console.log(`[Client 1] ${msg.text()}`))
-    client2.on('console', msg => console.log(`[Client 2] ${msg.text()}`))
-    client1.on('pageerror', err => console.error('[Client 1 ERROR]:', err.message))
-    client2.on('pageerror', err => console.error('[Client 2 ERROR]:', err.message))
+    // Wait for game to load
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
 
-    // Navigate and connect
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
-
-    // Wait for initial page load
-    await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
-    ])
-
-    // Wait for session IDs
-    const MAX_RETRIES = 8
-    const RETRY_INTERVAL = 1000
-
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      client1SessionId = await client1.evaluate(() => {
-        return (window as any).__gameControls?.scene?.mySessionId
-      })
-      client2SessionId = await client2.evaluate(() => {
-        return (window as any).__gameControls?.scene?.mySessionId
-      })
-
-      if (client1SessionId && client2SessionId) {
-        console.log(`✅ Both clients connected after ${attempt}s`)
-        console.log(`✅ Client 1 Session: ${client1SessionId}`)
-        console.log(`✅ Client 2 Session: ${client2SessionId}`)
-        break
-      }
-
-      if (attempt < MAX_RETRIES) {
-        console.log(`⏳ Attempt ${attempt}/${MAX_RETRIES}: Waiting for connections...`)
-        await Promise.all([
-          client1.waitForTimeout(RETRY_INTERVAL),
-          client2.waitForTimeout(RETRY_INTERVAL)
-        ])
-      }
-    }
+    // Get session IDs
+    const client1SessionId = await client1.evaluate(() => {
+      return (window as any).__gameControls?.scene?.mySessionId
+    })
+    const client2SessionId = await client2.evaluate(() => {
+      return (window as any).__gameControls?.scene?.mySessionId
+    })
 
     if (!client1SessionId || !client2SessionId) {
       throw new Error(
-        `Failed to establish connections after ${MAX_RETRIES}s\n` +
+        `Failed to get session IDs\n` +
         `Client 1 Session: ${client1SessionId || 'undefined'}\n` +
         `Client 2 Session: ${client2SessionId || 'undefined'}`
       )
     }
 
-    // Wait for match to start (both players need to be in)
-    await client1.waitForTimeout(2000)
-    await client2.waitForTimeout(2000)
-  })
+    console.log(`✅ Client 1 Session: ${client1SessionId}`)
+    console.log(`✅ Client 2 Session: ${client2SessionId}`)
 
-  test.afterAll(async () => {
-    await client1?.close()
-    await client2?.close()
-  })
-
-  test('Initial Player Positions Match on Both Clients', async () => {
     console.log('\n🧪 TEST: Initial Player Position Synchronization')
     console.log('=' .repeat(60))
 
-    // Wait a moment for initial positions to settle
+    // Wait for both clients to sync with each other (longer wait for network propagation)
     await Promise.all([
-      client1.waitForTimeout(1000),
-      client2.waitForTimeout(1000)
+      client1.waitForTimeout(2000),
+      client2.waitForTimeout(2000)
     ])
 
     // Get server state from both clients
@@ -255,5 +210,8 @@ test.describe('Initial Player Position Synchronization', () => {
 
     console.log('\n✅ TEST PASSED: Initial positions are synchronized across all clients')
     console.log('=' .repeat(60))
+
+    await client1.close()
+    await client2.close()
   })
 })

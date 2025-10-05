@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Test Suite: Match Lifecycle and Phase Transitions
@@ -15,7 +16,7 @@ import { test, expect } from '@playwright/test'
 const CLIENT_URL = 'http://localhost:5173'
 
 test.describe('Match Lifecycle', () => {
-  test('Match starts when two players connect', async ({ browser }) => {
+  test('Match starts when two players connect', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -82,7 +83,7 @@ test.describe('Match Lifecycle', () => {
     console.log('\n✅ TEST PASSED: Match starts correctly with 2 players')
   })
 
-  test('Match phase transitions to ended and freezes state', async ({ browser }) => {
+  test('Match phase transitions to ended and freezes state', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -174,7 +175,7 @@ test.describe('Match Lifecycle', () => {
     console.log('\n✅ TEST PASSED: Match end behavior documented')
   })
 
-  test('State resets correctly on restart', async ({ browser }) => {
+  test('State resets correctly on restart', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -287,7 +288,7 @@ test.describe('Match Lifecycle', () => {
     console.log('\n✅ TEST PASSED: State resets correctly on restart')
   })
 
-  test('Player returns to waiting phase when opponent leaves', async ({ browser }) => {
+  test('Player returns to waiting phase when opponent leaves', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 

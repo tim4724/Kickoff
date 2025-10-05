@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Test Suite: Game Over Screen Display
@@ -15,7 +16,7 @@ import { test, expect } from '@playwright/test'
 const CLIENT_URL = 'http://localhost:5173'
 
 test.describe('Game Over Screen', () => {
-  test('Shows correct winner text when Blue team wins', async ({ browser }) => {
+  test('Shows correct winner text when Blue team wins', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -94,7 +95,7 @@ test.describe('Game Over Screen', () => {
     console.log('\n✅ TEST PASSED: Blue team win displayed correctly')
   })
 
-  test('Shows correct winner text when Red team wins', async ({ browser }) => {
+  test('Shows correct winner text when Red team wins', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -158,7 +159,7 @@ test.describe('Game Over Screen', () => {
     console.log('\n✅ TEST PASSED: Red team win displayed correctly')
   })
 
-  test('Shows draw message when scores are equal', async ({ browser }) => {
+  test('Shows draw message when scores are equal', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -222,7 +223,7 @@ test.describe('Game Over Screen', () => {
     console.log('\n✅ TEST PASSED: Draw displayed correctly')
   })
 
-  test('Uses server state scores, not client state', async ({ browser }) => {
+  test('Uses server state scores, not client state', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 

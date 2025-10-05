@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import { setupIsolatedTest } from './helpers/room-utils'
 
 /**
  * Test: Real-Time Client-Server Position Delta During Movement
@@ -44,52 +45,22 @@ async function getPositionDelta(page: Page, sessionId: string) {
 }
 
 test.describe('Real-Time Position Synchronization', () => {
-  let client1: Page
-  let client1SessionId: string
+  test('Client position stays within 20px of server during continuous movement', async ({ page }, testInfo) => {
+    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Test isolated in room: ${roomId}`)
 
-  test.beforeAll(async ({ browser }) => {
-    const context1 = await browser.newContext()
-    client1 = await context1.newPage()
+    await page.waitForTimeout(2000)
 
-    client1.on('console', msg => console.log(`[Client 1] ${msg.text()}`))
+    const client1SessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
+    console.log(`  Session ID: ${client1SessionId}`)
 
-    await client1.goto(CLIENT_URL)
-    await client1.waitForTimeout(2000)
-
-    // Wait for connection
-    const MAX_RETRIES = 8
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      client1SessionId = await client1.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
-
-      if (client1SessionId) {
-        console.log(`✅ Client connected: ${client1SessionId}`)
-        break
-      }
-
-      if (attempt < MAX_RETRIES) {
-        await client1.waitForTimeout(1000)
-      }
-    }
-
-    if (!client1SessionId) {
-      throw new Error('Failed to establish connection')
-    }
-
-    await client1.waitForTimeout(2000)
-  })
-
-  test.afterAll(async () => {
-    await client1?.close()
-  })
-
-  test('Client position stays within 20px of server during continuous movement', async () => {
     console.log('\n🧪 TEST: Real-Time Position Delta During Movement')
     console.log('='.repeat(70))
 
     // Start continuous movement RIGHT
     console.log(`\n📤 MOVEMENT: Continuous RIGHT for 3 seconds with real-time sampling...`)
 
-    await client1.evaluate(() => {
+    await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.touchJoystick(150, 300)
       controls.test.dragJoystick(230, 300) // Full right
@@ -109,9 +80,9 @@ test.describe('Real-Time Position Synchronization', () => {
     const SAMPLE_COUNT = DURATION_MS / SAMPLE_INTERVAL_MS
 
     for (let i = 0; i < SAMPLE_COUNT; i++) {
-      await client1.waitForTimeout(SAMPLE_INTERVAL_MS)
+      await page.waitForTimeout(SAMPLE_INTERVAL_MS)
 
-      const pos = await getPositionDelta(client1, client1SessionId)
+      const pos = await getPositionDelta(page, client1SessionId)
       if (pos) {
         samples.push({
           time: i * SAMPLE_INTERVAL_MS,
@@ -133,13 +104,13 @@ test.describe('Real-Time Position Synchronization', () => {
     }
 
     // Release joystick
-    await client1.evaluate(() => {
+    await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.releaseJoystick()
       console.log('🕹️ Released joystick')
     })
 
-    await client1.waitForTimeout(500)
+    await page.waitForTimeout(500)
 
     // Calculate statistics
     const deltas = samples.map(s => s.delta.total)
@@ -185,7 +156,15 @@ test.describe('Real-Time Position Synchronization', () => {
     console.log('='.repeat(70))
   })
 
-  test('Position delta remains stable during rapid direction changes', async () => {
+  test('Position delta remains stable during rapid direction changes', async ({ page }, testInfo) => {
+    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Test isolated in room: ${roomId}`)
+
+    await page.waitForTimeout(2000)
+
+    const client1SessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
+    console.log(`  Session ID: ${client1SessionId}`)
+
     console.log('\n🧪 TEST: Position Delta During Rapid Direction Changes')
     console.log('='.repeat(70))
 
@@ -204,7 +183,7 @@ test.describe('Real-Time Position Synchronization', () => {
     for (const dir of directions) {
       console.log(`\n📤 Moving ${dir.name}...`)
 
-      await client1.evaluate((direction) => {
+      await page.evaluate((direction) => {
         const controls = (window as any).__gameControls
         controls.test.touchJoystick(150, 300)
         controls.test.dragJoystick(direction.x, direction.y)
@@ -212,9 +191,9 @@ test.describe('Real-Time Position Synchronization', () => {
 
       // Sample 10 times over 500ms
       for (let i = 0; i < 10; i++) {
-        await client1.waitForTimeout(50)
+        await page.waitForTimeout(50)
 
-        const pos = await getPositionDelta(client1, client1SessionId)
+        const pos = await getPositionDelta(page, client1SessionId)
         if (pos) {
           allSamples.push({
             direction: dir.name,
@@ -225,12 +204,12 @@ test.describe('Real-Time Position Synchronization', () => {
     }
 
     // Release joystick
-    await client1.evaluate(() => {
+    await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.releaseJoystick()
     })
 
-    await client1.waitForTimeout(500)
+    await page.waitForTimeout(500)
 
     // Calculate statistics
     const deltas = allSamples.map(s => s.delta)

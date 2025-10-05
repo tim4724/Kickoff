@@ -1,4 +1,5 @@
-import { test, expect, Page } from '@playwright/test'
+import { test, expect, Page, Browser } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Socca2 Multiplayer End-to-End Test Suite
@@ -17,40 +18,38 @@ const CLIENT_URL = 'http://localhost:5173'
 const SERVER_URL = 'http://localhost:3000'
 const SCREENSHOT_DIR = './test-results/multiplayer'
 
+// Helper function to setup two clients with isolated room
+async function setupTwoClients(browser: Browser, workerIndex: number) {
+  const context1 = await browser.newContext()
+  const context2 = await browser.newContext()
+
+  const client1 = await context1.newPage()
+  const client2 = await context2.newPage()
+
+  // Set up console log listeners
+  client1.on('console', msg => {
+    console.log(`[Client 1] ${msg.type()}: ${msg.text()}`)
+  })
+  client2.on('console', msg => {
+    console.log(`[Client 2] ${msg.type()}: ${msg.text()}`)
+  })
+
+  // Set up error listeners
+  client1.on('pageerror', err => {
+    console.error(`[Client 1 ERROR]:`, err.message)
+  })
+  client2.on('pageerror', err => {
+    console.error(`[Client 2 ERROR]:`, err.message)
+  })
+
+  // Setup isolated room for both clients
+  const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, workerIndex)
+  console.log(`🔒 Both clients isolated in room: ${roomId}`)
+
+  return { client1, client2, roomId }
+}
+
 test.describe('Socca2 Multiplayer Tests', () => {
-  let client1: Page
-  let client2: Page
-
-  test.beforeAll(async ({ browser }) => {
-    // Create two separate browser contexts (simulating two players)
-    const context1 = await browser.newContext()
-    const context2 = await browser.newContext()
-
-    client1 = await context1.newPage()
-    client2 = await context2.newPage()
-
-    // Set up console log listeners for both clients
-    client1.on('console', msg => {
-      console.log(`[Client 1] ${msg.type()}: ${msg.text()}`)
-    })
-    client2.on('console', msg => {
-      console.log(`[Client 2] ${msg.type()}: ${msg.text()}`)
-    })
-
-    // Set up error listeners
-    client1.on('pageerror', err => {
-      console.error(`[Client 1 ERROR]:`, err.message)
-    })
-    client2.on('pageerror', err => {
-      console.error(`[Client 2 ERROR]:`, err.message)
-    })
-  })
-
-  test.afterAll(async () => {
-    await client1?.close()
-    await client2?.close()
-  })
-
   test('1. Server Health Check', async () => {
     // Verify server is running
     try {
@@ -62,12 +61,8 @@ test.describe('Socca2 Multiplayer Tests', () => {
     }
   })
 
-  test('2. Two Clients Connect Successfully', async () => {
-    // Navigate both clients to game
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+  test('2. Two Clients Connect Successfully', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
 
     // Wait for game scene to load
     await Promise.all([
@@ -86,12 +81,19 @@ test.describe('Socca2 Multiplayer Tests', () => {
     })
 
     console.log('✅ Both clients loaded successfully')
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('3. Player Color Verification', async () => {
-    // Wait for multiplayer connection to establish
-    await client1.waitForTimeout(2000)
-    await client2.waitForTimeout(2000)
+  test('3. Player Color Verification', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
+
+    // Wait for multiplayer connection to establish and teams to be assigned
+    await Promise.all([
+      client1.waitForTimeout(5000),
+      client2.waitForTimeout(5000)
+    ])
 
     // Get game state from both clients using console evaluation
     const client1State = await client1.evaluate(() => {
@@ -182,9 +184,15 @@ test.describe('Socca2 Multiplayer Tests', () => {
     } else {
       console.warn('⚠️ Could not verify colors - game controls not exposed')
     }
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('4. Keyboard Input Test (Known Limitation)', async () => {
+  test('4. Keyboard Input Test (Known Limitation)', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
+    await client1.waitForTimeout(3000)
+
     console.log('🧪 Testing keyboard input (may not work with Phaser)...')
 
     // Get initial player position from client 1
@@ -218,9 +226,15 @@ test.describe('Socca2 Multiplayer Tests', () => {
         console.log('   Recommendation: Use manual browser testing for movement')
       }
     }
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('5. Player Position Synchronization (Programmatic Movement)', async () => {
+  test('5. Player Position Synchronization (Programmatic Movement)', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     console.log('🧪 Testing position synchronization using game internals...')
 
     // Directly manipulate player position via game scene
@@ -263,9 +277,15 @@ test.describe('Socca2 Multiplayer Tests', () => {
     } else {
       console.warn('⚠️ Remote player not found on client 2')
     }
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('6. Ball Magnetism Testing', async () => {
+  test('6. Ball Magnetism Testing', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
+    await client1.waitForTimeout(3000)
+
     console.log('🧪 Testing ball magnetism (possession system)...')
 
     // Move client 1 player close to ball programmatically
@@ -311,9 +331,15 @@ test.describe('Socca2 Multiplayer Tests', () => {
     } else {
       console.warn('⚠️ Player does not have possession (check server logs for magnetism)')
     }
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('7. Ball Shooting Testing', async () => {
+  test('7. Ball Shooting Testing', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     console.log('🧪 Testing ball shooting mechanics...')
 
     // Get initial ball position
@@ -382,9 +408,15 @@ test.describe('Socca2 Multiplayer Tests', () => {
         console.warn(`⚠️ Ball position mismatch: ${positionDiff.toFixed(2)}px difference`)
       }
     }
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('8. Network Diagnostics Summary', async () => {
+  test('8. Network Diagnostics Summary', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     console.log('\n========== NETWORK DIAGNOSTICS SUMMARY ==========\n')
 
     // Get network stats from both clients
@@ -429,9 +461,15 @@ test.describe('Socca2 Multiplayer Tests', () => {
     }
 
     console.log('\n========== END DIAGNOSTICS ==========\n')
+
+    await client1.close()
+    await client2.close()
   })
 
-  test('9. Final Screenshots and Test Summary', async () => {
+  test('9. Final Screenshots and Test Summary', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
+    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+
     // Take final screenshots
     await client1.screenshot({
       path: `${SCREENSHOT_DIR}/9-client1-final.png`,
@@ -453,5 +491,8 @@ test.describe('Socca2 Multiplayer Tests', () => {
     console.log('\n🎯 RECOMMENDATION: For full gameplay testing (keyboard + shooting),')
     console.log('   open two browser windows manually at http://localhost:5173')
     console.log('\n==================================\n')
+
+    await client1.close()
+    await client2.close()
   })
 })

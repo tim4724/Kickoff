@@ -1,4 +1,5 @@
 import { test, expect, Browser } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Test Suite: Multiplayer Color Assignment After Restart
@@ -15,7 +16,7 @@ const BLUE_COLOR = 26367      // 0x0066ff
 const RED_COLOR = 16729156    // 0xff4444
 
 test.describe('Multiplayer Restart Color Assignment', () => {
-  test('Clients have different colors after match restart', async ({ browser }) => {
+  test('Clients have different colors after match restart', async ({ browser }, testInfo) => {
     // Create two clients
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
@@ -169,7 +170,7 @@ test.describe('Multiplayer Restart Color Assignment', () => {
     console.log('\n✅ TEST PASSED: Colors remain different after restart')
   })
 
-  test('Multiple rapid restarts maintain color consistency', async ({ browser }) => {
+  test('Multiple rapid restarts maintain color consistency', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 

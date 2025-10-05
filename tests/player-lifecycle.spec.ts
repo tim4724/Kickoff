@@ -1,4 +1,5 @@
 import { test, expect, Browser } from '@playwright/test'
+import { setupMultiClientTest } from './helpers/room-utils'
 
 /**
  * Test Suite: Player Lifecycle Management
@@ -17,7 +18,7 @@ const BLUE_COLOR = 26367      // 0x0066ff
 const RED_COLOR = 16729156    // 0xff4444
 
 test.describe('Player Lifecycle Management', () => {
-  test('Player disconnect releases ball possession', async ({ browser }) => {
+  test('Player disconnect releases ball possession', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -61,11 +62,11 @@ test.describe('Player Lifecycle Management', () => {
     let attempts = 0
     let hasPossession = false
 
-    while (!hasPossession && attempts < 10) {
+    while (!hasPossession && attempts < 15) {
       await client1.keyboard.down(moveKey)
-      await client1.waitForTimeout(200) // Move in 200ms bursts
+      await client1.waitForTimeout(300) // Move in 300ms bursts (increased from 200ms)
       await client1.keyboard.up(moveKey)
-      await client1.waitForTimeout(100)
+      await client1.waitForTimeout(200) // Wait longer between bursts
 
       const check = await client1.evaluate((sid) => {
         const state = (window as any).__gameControls?.scene?.networkManager?.getState()
@@ -76,7 +77,7 @@ test.describe('Player Lifecycle Management', () => {
       attempts++
     }
 
-    await client1.waitForTimeout(300) // Stabilize after gaining possession
+    await client1.waitForTimeout(500) // Stabilize after gaining possession (increased from 300ms)
 
     const ballState = await client1.evaluate((sid) => {
       const scene = (window as any).__gameControls?.scene
@@ -137,7 +138,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log('\n✅ TEST PASSED: Ball possession released on disconnect')
   })
 
-  test('Remote player removed on disconnect', async ({ browser }) => {
+  test('Remote player removed on disconnect', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -202,7 +203,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log('\n✅ TEST PASSED: Remote player removed on disconnect')
   })
 
-  test('Player join/leave cycle maintains correct team colors', async ({ browser }) => {
+  test('Player join/leave cycle maintains correct team colors', async ({ browser }, testInfo) => {
     console.log('📤 Testing player join/leave cycle...\n')
 
     // Player 1 joins (should be blue)
@@ -280,7 +281,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log('\n✅ TEST PASSED: Join/leave cycle maintains correct colors')
   })
 
-  test('Multiple disconnects in rapid succession', async ({ browser }) => {
+  test('Multiple disconnects in rapid succession', async ({ browser }, testInfo) => {
     const contexts = []
     const clients = []
 

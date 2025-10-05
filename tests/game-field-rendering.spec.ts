@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test'
 
+const CLIENT_URL = 'http://localhost:5173'
+import { setupIsolatedTest } from './helpers/room-utils'
+
 const GAME_WIDTH = 1920
 const GAME_HEIGHT = 1080
 
 test.describe('Game Field Rendering', () => {
-  test('16:9 aspect ratio (1920x1080) - no letterboxing', async ({ page }) => {
+  test('16:9 aspect ratio (1920x1080) - no letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await page.goto('http://localhost:5173/')
 
@@ -27,7 +30,7 @@ test.describe('Game Field Rendering', () => {
     console.log('1920x1080 viewport:', box)
   })
 
-  test('Wider than 16:9 (2560x1080) - vertical letterboxing', async ({ page }) => {
+  test('Wider than 16:9 (2560x1080) - vertical letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 2560, height: 1080 })
     await page.goto('http://localhost:5173/')
 
@@ -57,7 +60,7 @@ test.describe('Game Field Rendering', () => {
       gameViewportX, 0, gameViewportWidth, gameViewportHeight)
   })
 
-  test('Taller than 16:9 (1920x1200) - horizontal letterboxing', async ({ page }) => {
+  test('Taller than 16:9 (1920x1200) - horizontal letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 1200 })
     await page.goto('http://localhost:5173/')
 
@@ -87,7 +90,7 @@ test.describe('Game Field Rendering', () => {
       0, gameViewportY, gameViewportWidth, gameViewportHeight)
   })
 
-  test('Mobile portrait (390x844) - horizontal letterboxing', async ({ page }) => {
+  test('Mobile portrait (390x844) - horizontal letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('http://localhost:5173/')
 
@@ -112,7 +115,7 @@ test.describe('Game Field Rendering', () => {
       0, gameViewportY, gameViewportWidth, gameViewportHeight)
   })
 
-  test('Mobile landscape (844x390) - vertical letterboxing', async ({ page }) => {
+  test('Mobile landscape (844x390) - vertical letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 844, height: 390 })
     await page.goto('http://localhost:5173/')
 
@@ -137,7 +140,7 @@ test.describe('Game Field Rendering', () => {
       gameViewportX, 0, gameViewportWidth, gameViewportHeight)
   })
 
-  test('Verify game field is visible in all screen sizes', async ({ page }) => {
+  test('Verify game field is visible in all screen sizes', async ({ page }, testInfo) => {
     const sizes = [
       { width: 1920, height: 1080, name: '16:9' },
       { width: 2560, height: 1080, name: 'ultrawide' },
@@ -179,7 +182,7 @@ test.describe('Game Field Rendering', () => {
     }
   })
 
-  test('Verify letterbox areas are present', async ({ page }) => {
+  test('Verify letterbox areas are present', async ({ page }, testInfo) => {
     // Test with wider screen (vertical letterboxing)
     await page.setViewportSize({ width: 2560, height: 1080 })
     await page.goto('http://localhost:5173/')
@@ -199,7 +202,7 @@ test.describe('Game Field Rendering', () => {
     expect(hasLetterbox).toBe(true)
   })
 
-  test('Verify UI elements are in viewport coordinates', async ({ page }) => {
+  test('Verify UI elements are in viewport coordinates', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await page.goto('http://localhost:5173/')
     await page.waitForTimeout(2000)

@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import { setupMultiClientTest, setupIsolatedTest } from './helpers/room-utils'
 
 /**
  * Core Features Regression Test Suite
@@ -84,7 +85,7 @@ test.describe('Core Features Regression Suite', () => {
 
   test('4. Keyboard controls work (arrow keys)', async ({ page }) => {
     await page.goto(CLIENT_URL)
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(3000) // Wait for single-player match to start (2s delay + buffer)
 
     const initialPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -109,7 +110,7 @@ test.describe('Core Features Regression Suite', () => {
 
   test('5. Touch joystick controls work', async ({ page }) => {
     await page.goto(CLIENT_URL)
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(3000) // Wait for single-player match to start (2s delay + buffer)
 
     const initialPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -223,14 +224,15 @@ test.describe('Core Features Regression Suite', () => {
     console.log(`✅ NetworkManager connected: ${networkStatus.sessionId}`)
   })
 
-  test('9. Field boundaries prevent out-of-bounds movement', async ({ page }) => {
-    test.setTimeout(15000) // Increase timeout for this test
-    await page.goto(CLIENT_URL)
-    await page.waitForTimeout(2000)
+  test('9. Field boundaries prevent out-of-bounds movement', async ({ page }, testInfo) => {
+    test.setTimeout(30000) // Increase timeout for this test
+    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Test isolated in room: ${roomId}`)
+    await page.waitForTimeout(2000) // Wait for connection
 
     // Try to move far left (should be clamped)
     await page.keyboard.down('ArrowLeft')
-    await page.waitForTimeout(3000) // Increase wait time for movement
+    await page.waitForTimeout(2000) // Wait for movement
     await page.keyboard.up('ArrowLeft')
     await page.waitForTimeout(500)
 
@@ -245,7 +247,7 @@ test.describe('Core Features Regression Suite', () => {
     console.log(`✅ Player clamped at boundary: x=${position.x.toFixed(1)}`)
   })
 
-  test('10. Two clients can connect simultaneously', async ({ browser }) => {
+  test('10. Two clients can connect simultaneously', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -277,7 +279,7 @@ test.describe('Core Features Regression Suite', () => {
     await client2.close()
   })
 
-  test('11. Remote player sprite renders for second client', async ({ browser }) => {
+  test('11. Remote player sprite renders for second client', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -330,7 +332,7 @@ test.describe('Core Features Regression Suite', () => {
     await client2.close()
   })
 
-  test('12. Server state synchronizes player positions', async ({ browser }) => {
+  test('12. Server state synchronizes player positions', async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
     const client = await context1.newPage()
 

@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import { setupIsolatedTest } from './helpers/room-utils'
 
 /**
  * Input Lag Measurement Test
@@ -102,47 +103,22 @@ async function measureNetworkRTT(page: Page): Promise<number> {
 }
 
 test.describe('Input Lag Measurement', () => {
-  let client1: Page
-  let client1SessionId: string
+  test('Measure Baseline Input Lag (10 samples)', async ({ page }, testInfo) => {
+    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Test isolated in room: ${roomId}`)
 
-  test.beforeAll(async ({ browser }) => {
-    const context1 = await browser.newContext()
-    client1 = await context1.newPage()
+    // Wait for game to load
+    await page.waitForTimeout(3000)
 
-    client1.on('console', msg => console.log(`[Client 1] ${msg.text()}`))
-    client1.on('pageerror', err => console.error('[Client 1 ERROR]:', err.message))
-
-    await client1.goto(CLIENT_URL)
-    await client1.waitForTimeout(2000)
-
-    // Wait for connection
-    const MAX_RETRIES = 8
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      client1SessionId = await client1.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
-
-      if (client1SessionId) {
-        console.log(`✅ Client connected: ${client1SessionId}`)
-        break
-      }
-
-      if (attempt < MAX_RETRIES) {
-        await client1.waitForTimeout(1000)
-      }
-    }
+    // Get session ID
+    const client1SessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
 
     if (!client1SessionId) {
-      throw new Error('Failed to establish connection')
+      throw new Error('Failed to get session ID')
     }
 
-    // Wait for match to start
-    await client1.waitForTimeout(2000)
-  })
+    console.log(`✅ Client connected: ${client1SessionId}`)
 
-  test.afterAll(async () => {
-    await client1?.close()
-  })
-
-  test('Measure Baseline Input Lag (10 samples)', async () => {
     console.log('\n🧪 MEASURING INPUT LAG (10 samples)')
     console.log('='.repeat(70))
 
@@ -152,11 +128,11 @@ test.describe('Input Lag Measurement', () => {
       console.log(`\n📊 Sample ${i + 1}/10`)
 
       // Measure input lag
-      const inputToVisual = await measureInputLag(client1, client1SessionId)
+      const inputToVisual = await measureInputLag(page, client1SessionId)
       console.log(`  Input-to-Visual: ${inputToVisual.toFixed(2)}ms`)
 
       // Measure network RTT
-      const networkRTT = await measureNetworkRTT(client1)
+      const networkRTT = await measureNetworkRTT(page)
       console.log(`  Network RTT: ${networkRTT.toFixed(2)}ms`)
 
       measurements.push({
@@ -166,7 +142,7 @@ test.describe('Input Lag Measurement', () => {
       })
 
       // Wait between samples
-      await client1.waitForTimeout(500)
+      await page.waitForTimeout(500)
     }
 
     // Calculate statistics

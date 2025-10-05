@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import { setupIsolatedTest } from './helpers/room-utils'
 
 /**
  * Test: Client-Server Speed Synchronization
@@ -48,50 +49,20 @@ async function getPositionComparison(page: Page, sessionId: string) {
 }
 
 test.describe('Client-Server Speed Synchronization', () => {
-  let client1: Page
-  let client1SessionId: string
+  test('Client prediction speed matches server physics speed', async ({ page }, testInfo) => {
+    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Test isolated in room: ${roomId}`)
 
-  test.beforeAll(async ({ browser }) => {
-    const context1 = await browser.newContext()
-    client1 = await context1.newPage()
+    await page.waitForTimeout(2000)
 
-    client1.on('console', msg => console.log(`[Client 1] ${msg.text()}`))
+    const client1SessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
+    console.log(`  Session ID: ${client1SessionId}`)
 
-    await client1.goto(CLIENT_URL)
-    await client1.waitForTimeout(2000)
-
-    // Wait for connection
-    const MAX_RETRIES = 8
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      client1SessionId = await client1.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
-
-      if (client1SessionId) {
-        console.log(`✅ Client connected: ${client1SessionId}`)
-        break
-      }
-
-      if (attempt < MAX_RETRIES) {
-        await client1.waitForTimeout(1000)
-      }
-    }
-
-    if (!client1SessionId) {
-      throw new Error('Failed to establish connection')
-    }
-
-    await client1.waitForTimeout(2000)
-  })
-
-  test.afterAll(async () => {
-    await client1?.close()
-  })
-
-  test('Client prediction speed matches server physics speed', async () => {
     console.log('\n🧪 TEST: Client-Server Speed Synchronization')
     console.log('='.repeat(70))
 
     // Get initial position
-    const initial = await getPositionComparison(client1, client1SessionId)
+    const initial = await getPositionComparison(page, client1SessionId)
     console.log(`\n📊 INITIAL STATE:`)
     console.log(`  Server: (${initial.server.x}, ${initial.server.y})`)
     console.log(`  Client: (${initial.client.x}, ${initial.client.y})`)
@@ -100,7 +71,7 @@ test.describe('Client-Server Speed Synchronization', () => {
     // Start continuous movement RIGHT for 2 seconds
     console.log(`\n📤 MOVEMENT: Continuous RIGHT for 2 seconds...`)
 
-    await client1.evaluate(() => {
+    await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.touchJoystick(150, 300)
       controls.test.dragJoystick(230, 300) // Full right
@@ -113,9 +84,9 @@ test.describe('Client-Server Speed Synchronization', () => {
     const SAMPLE_INTERVAL = 200 // ms
 
     for (let i = 0; i < SAMPLE_COUNT; i++) {
-      await client1.waitForTimeout(SAMPLE_INTERVAL)
+      await page.waitForTimeout(SAMPLE_INTERVAL)
 
-      const pos = await getPositionComparison(client1, client1SessionId)
+      const pos = await getPositionComparison(page, client1SessionId)
       const sample = {
         time: i * SAMPLE_INTERVAL,
         server: pos.server.x,
@@ -128,16 +99,16 @@ test.describe('Client-Server Speed Synchronization', () => {
     }
 
     // Release joystick
-    await client1.evaluate(() => {
+    await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.releaseJoystick()
       console.log('🕹️ Released joystick')
     })
 
-    await client1.waitForTimeout(500)
+    await page.waitForTimeout(500)
 
     // Get final position
-    const final = await getPositionComparison(client1, client1SessionId)
+    const final = await getPositionComparison(page, client1SessionId)
     console.log(`\n📊 FINAL STATE:`)
     console.log(`  Server: (${final.server.x}, ${final.server.y})`)
     console.log(`  Client: (${final.client.x}, ${final.client.y})`)

@@ -22,8 +22,8 @@ const gameServer = new Server({
   server: httpServer,
 })
 
-// Register room handlers
-gameServer.define('match', MatchRoom)
+// Register room handlers with metadata filtering for test isolation
+gameServer.define('match', MatchRoom).filterBy(['roomName'])
 
 // Colyseus monitor (dev tool)
 app.use('/colyseus', monitor())
