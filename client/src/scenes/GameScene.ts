@@ -1113,26 +1113,32 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateRemotePlayer(sessionId: string, playerState: any) {
-    const sprite = this.remotePlayers.get(sessionId)
+    let sprite = this.remotePlayers.get(sessionId)
 
-    if (sprite) {
-      // Store old position for delta logging
-      const oldX = sprite.x
-      const oldY = sprite.y
+    // Create sprite if it doesn't exist (lazy creation for AI bots)
+    if (!sprite) {
+      console.log('🎭 Creating remote player (lazy):', sessionId, playerState.team)
+      this.createRemotePlayer(sessionId, playerState)
+      sprite = this.remotePlayers.get(sessionId)
+      if (!sprite) return // Failed to create, bail out
+    }
 
-      // Interpolate toward server position for smooth rendering (same as ball)
-      const serverX = playerState.x
-      const serverY = playerState.y
-      const lerpFactor = 0.3
+    // Store old position for delta logging
+    const oldX = sprite.x
+    const oldY = sprite.y
 
-      sprite.x += (serverX - sprite.x) * lerpFactor
-      sprite.y += (serverY - sprite.y) * lerpFactor
+    // Interpolate toward server position for smooth rendering (same as ball)
+    const serverX = playerState.x
+    const serverY = playerState.y
+    const lerpFactor = 0.3
 
-      // DEBUG: Log player movement (only if moved >1 pixel)
-      const moved = Math.abs(sprite.x - oldX) > 1 || Math.abs(sprite.y - oldY) > 1
-      if (moved) {
+    sprite.x += (serverX - sprite.x) * lerpFactor
+    sprite.y += (serverY - sprite.y) * lerpFactor
+
+    // DEBUG: Log player movement (only if moved >1 pixel)
+    const moved = Math.abs(sprite.x - oldX) > 1 || Math.abs(sprite.y - oldY) > 1
+    if (moved) {
 //         console.log(`🎭 [Client] Remote player ${sessionId} updated: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${sprite.x.toFixed(1)}, ${sprite.y.toFixed(1)})`)
-      }
     }
   }
 

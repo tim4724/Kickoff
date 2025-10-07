@@ -30,7 +30,15 @@ export class MatchRoom extends Room<GameState> {
       console.log('🏷️  Room name set:', options.roomName)
     }
 
-    this.setState(new GameState())
+    const gameState = new GameState()
+
+    // Disable AI for test rooms
+    if (options.roomName && options.roomName.includes('test')) {
+      gameState.aiEnabled = false
+      console.log('🤖 AI disabled for test room')
+    }
+
+    this.setState(gameState)
 
     // Start game loop at 60 Hz
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / GAME_CONFIG.TICK_RATE)

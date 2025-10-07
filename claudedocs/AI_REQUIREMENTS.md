@@ -37,29 +37,24 @@ Add AI-controlled players to create 3v3 matches (1 human + 2 AI bots per team), 
 
 ### State Definitions
 
-Each AI bot operates in one of 5 states with clear goals:
+Each AI bot operates in one of 4 states with clear goals:
 
 #### 1. **DEFEND_GET_BALL**
-- **Goal:** Move toward loose ball to gain possession
-- **Trigger:** Ball is free (no possessor)
-- **Behavior:** Direct path to ball position, full speed
+- **Goal:** Capture ball from opponnent
+- **Trigger:** Opponent team has ball.  Player is best candidate to capture ball.
+- **Behavior:** Cut of opponent player between opponent player position and own goal. full speed
 
-#### 2. **DEFEND_GUARD_GOAL**
-- **Goal:** Protect own goal from opponent attacks
-- **Trigger:** Opponent has ball in defensive half
-- **Behavior:** Position between ball and goal, maintain defensive zone
+#### 2. **DEFEND**
+- **Goal:** Reach position between one opponnent (without ball) and own goal to a) prevent opponent to shoot a goal and b) make opponent a bad option to receive pass.
+- **Trigger:** Opponent team has ball. Another Team mate is in better position to capture ball.
+- **Behavior:** Cut of opponent player between opponent player position and own goal. In own thir, stick close on opponent player.
 
-#### 3. **DEFEND_GUARD_OPPONENT**
-- **Goal:** Apply pressure on opponent with ball
-- **Trigger:** Opponent has ball, bot is defender
-- **Behavior:** Move toward ball carrier, attempt to contest possession
-
-#### 4. **ATTACK_FIND_SPACE_FORWARD**
-- **Goal:** Position in attacking space ahead of ball
+#### 3. **ATTACK_FIND_SPACE_FORWARD**
+- **Goal:** Position in attacking space ahead of ball or in line with ball. Be able to receive pass or steep pass.
 - **Trigger:** Teammate has ball, bot is forward
 - **Behavior:** Move to open space toward opponent goal, avoid clustering
 
-#### 5. **ATTACK_FIND_SPACE_BACKWARD**
+#### 4. **ATTACK_FIND_SPACE_BACKWARD**
 - **Goal:** Provide support option behind ball
 - **Trigger:** Teammate has ball, bot is defender/midfielder
 - **Behavior:** Position in open space behind ball, passing lane available
@@ -72,6 +67,70 @@ Each AI bot operates in one of 5 states with clear goals:
 ### AI Limitations
 - **No Shooting:** AI bots never shoot (player with ball = human controlled)
 - **No Manual Passing:** AI doesn't trigger passes (only moves to position)
+
+---
+
+## 🐛 Debug Visualization
+
+### Development Mode Display
+Visual debugging aids to understand AI behavior during development:
+
+#### State Display
+- **Label Position:** Above each player sprite (y - 40px)
+- **Content:** Current AI state name (e.g., "DEFEND_GET_BALL", "ATTACK_FORWARD")
+- **Style:** Small white text (14px), centered above player
+- **Visibility:** Only shown for AI players (not human-controlled)
+
+#### Target Position Indicator
+- **Line:** Draw line from player center to target position
+- **Color:** Team color (blue: 0x0066ff, red: 0xff4444), semi-transparent (0.5 alpha)
+- **Width:** 2px
+- **Arrow:** Optional arrowhead at target position showing direction
+- **Visibility:** Only shown for AI players
+
+#### Debug Toggle
+- **Enable/Disable:** Keyboard shortcut (e.g., 'D' key) or dev flag
+- **Default:** Enabled in development mode (`import.meta.env.DEV`)
+- **Production:** Disabled by default, can be enabled via console
+
+### Implementation Notes
+```typescript
+// GameScene.ts - Debug rendering
+class GameScene {
+  private debugEnabled: boolean = import.meta.env.DEV
+
+  private renderAIDebug() {
+    if (!this.debugEnabled) return
+
+    this.players.forEach((player, playerId) => {
+      if (!player.isHuman && player.aiState && player.targetPosition) {
+        // Draw state label
+        const stateText = this.add.text(
+          player.x,
+          player.y - 40,
+          player.aiState,
+          { fontSize: '14px', color: '#ffffff' }
+        ).setOrigin(0.5)
+
+        // Draw target line
+        const targetLine = this.add.graphics()
+        targetLine.lineStyle(2, player.team === 'blue' ? 0x0066ff : 0xff4444, 0.5)
+        targetLine.lineBetween(
+          player.x, player.y,
+          player.targetPosition.x, player.targetPosition.y
+        )
+      }
+    })
+  }
+
+  // Toggle with 'D' key
+  setupDebugControls() {
+    this.input.keyboard.on('keydown-D', () => {
+      this.debugEnabled = !this.debugEnabled
+    })
+  }
+}
+```
 
 ---
 
@@ -99,16 +158,19 @@ class AIController {
   // State determination
   private determineState(bot: Player, gameState: GameState): AIState
 
-  // State-specific behaviors
-  private defendGetBall(bot: Player, ball: Ball): Vector2
-  private defendGuardGoal(bot: Player, ball: Ball, goal: Position): Vector2
-  private defendGuardOpponent(bot: Player, opponent: Player): Vector2
+  // State-specific behaviors (4 states)
+  private defendGetBall(bot: Player, opponents: Player[], ball: Ball): Vector2
+  private defend(bot: Player, opponentToMark: Player, ownGoal: Position): Vector2
   private attackFindSpaceForward(bot: Player, ball: Ball): Vector2
   private attackFindSpaceBackward(bot: Player, ball: Ball): Vector2
 
   // Utility functions
   private avoidClustering(bot: Player, teammates: Player[]): Vector2
   private addRandomness(target: Vector2, jitterFree: boolean): Vector2
+
+  // Debug support
+  getTargetPosition(bot: Player, gameState: GameState): Vector2
+  getCurrentState(bot: Player): AIState
 }
 ```
 
@@ -202,11 +264,10 @@ export class Player extends Schema {
 }
 
 type AIState =
-  | 'DEFEND_GET_BALL'
-  | 'DEFEND_GUARD_GOAL'
-  | 'DEFEND_GUARD_OPPONENT'
-  | 'ATTACK_FIND_SPACE_FORWARD'
-  | 'ATTACK_FIND_SPACE_BACKWARD'
+  | 'DEFEND_GET_BALL'       // Capture ball from opponent
+  | 'DEFEND'                // Mark opponent without ball
+  | 'ATTACK_FIND_SPACE_FORWARD'   // Position ahead of ball
+  | 'ATTACK_FIND_SPACE_BACKWARD'  // Support behind ball
 ```
 
 #### Server Input Processing

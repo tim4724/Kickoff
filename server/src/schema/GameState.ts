@@ -31,13 +31,20 @@ export class Player extends Schema {
   inputQueue: PlayerInput[] = []
   kickingUntil: number = 0 // Timestamp when kicking state should end
 
-  constructor(id: string, team: Team, x: number, y: number) {
+  // AI-specific fields (client-side only, not synced)
+  role?: 'defender' | 'forward'
+  aiState?: string // Current AI behavior state
+  targetPosition?: { x: number; y: number } // Target position for AI movement
+
+  constructor(id: string, team: Team, x: number, y: number, isHuman: boolean = true, role?: 'defender' | 'forward') {
     super()
     this.id = id
     this.team = team
     this.x = x
     this.y = y
-    this.isControlled = true // For now, each player controls themselves
+    this.isHuman = isHuman
+    this.isControlled = isHuman // Human players are controlled by default, AI are not
+    this.role = role
   }
 }
 
@@ -82,6 +89,9 @@ export class GameState extends Schema {
   private lastPossessionGainTime = new Map<string, number>() // when each player last gained possession
   private lastPossessionLossTime = new Map<string, number>() // when each player last lost possession
 
+  // AI control flag (disabled for test rooms)
+  aiEnabled: boolean = true
+
   addPlayer(sessionId: string) {
     // Defensive check: prevent duplicate player additions
     if (this.players.has(sessionId)) {
@@ -89,34 +99,75 @@ export class GameState extends Schema {
       return
     }
 
-    // Assign team based on team balance (assign to team with fewer players)
-    let blueCount = 0
-    let redCount = 0
+    // Count only human players to determine team assignment
+    let blueHumans = 0
+    let redHumans = 0
     this.players.forEach((player) => {
-      if (player.team === 'blue') blueCount++
-      else redCount++
+      if (player.isHuman) {
+        if (player.team === 'blue') blueHumans++
+        else redHumans++
+      }
     })
 
-    const team: Team = blueCount <= redCount ? 'blue' : 'red'
+    const team: Team = blueHumans <= redHumans ? 'blue' : 'red'
 
-    // Starting positions (proportional to 1920x1080)
-    const x = team === 'blue' ? 360 : GAME_CONFIG.FIELD_WIDTH - 360
-    const y = GAME_CONFIG.FIELD_HEIGHT / 2
+    if (this.aiEnabled) {
+      // AI enabled: spawn with 2 bots per team
+      if (team === 'blue') {
+        // Blue team formation: 2 defenders + 1 forward
+        const humanPlayer = new Player(sessionId, team, 360, 540, true, 'defender')
+        const bot1 = new Player(`${sessionId}-bot1`, team, 360, 200, false, 'defender')
+        const bot2 = new Player(`${sessionId}-bot2`, team, 700, 370, false, 'forward')
 
-    const player = new Player(sessionId, team, x, y)
-    this.players.set(sessionId, player)
+        this.players.set(sessionId, humanPlayer)
+        this.players.set(`${sessionId}-bot1`, bot1)
+        this.players.set(`${sessionId}-bot2`, bot2)
 
-    console.log(`Added player ${sessionId} to team ${team} (current players: ${this.players.size})`)
+        console.log(`Added player ${sessionId} to team ${team} with 2 AI bots (current players: ${this.players.size})`)
+      } else {
+        // Red team formation: 2 defenders + 1 forward (mirrored)
+        const humanPlayer = new Player(sessionId, team, 1560, 540, true, 'defender')
+        const bot1 = new Player(`${sessionId}-bot1`, team, 1560, 200, false, 'defender')
+        const bot2 = new Player(`${sessionId}-bot2`, team, 1220, 370, false, 'forward')
+
+        this.players.set(sessionId, humanPlayer)
+        this.players.set(`${sessionId}-bot1`, bot1)
+        this.players.set(`${sessionId}-bot2`, bot2)
+
+        console.log(`Added player ${sessionId} to team ${team} with 2 AI bots (current players: ${this.players.size})`)
+      }
+    } else {
+      // AI disabled (test mode): spawn human player only
+      const x = team === 'blue' ? 360 : GAME_CONFIG.FIELD_WIDTH - 360
+      const y = GAME_CONFIG.FIELD_HEIGHT / 2
+
+      const humanPlayer = new Player(sessionId, team, x, y, true)
+      this.players.set(sessionId, humanPlayer)
+
+      console.log(`Added player ${sessionId} to team ${team} (AI disabled, current players: ${this.players.size})`)
+    }
   }
 
   removePlayer(sessionId: string) {
-    // Release ball possession if this player had it
-    if (this.ball.possessedBy === sessionId) {
+    // Release ball possession if this player or their bots had it
+    if (this.ball.possessedBy === sessionId ||
+        this.ball.possessedBy === `${sessionId}-bot1` ||
+        this.ball.possessedBy === `${sessionId}-bot2`) {
       this.ball.possessedBy = ''
-      console.log(`⚽ [Server] Ball released (player ${sessionId} left)`)
+      console.log(`⚽ [Server] Ball released (player ${sessionId} or bot left)`)
     }
 
+    // Remove human player
     this.players.delete(sessionId)
+
+    // Remove AI bots if AI is enabled
+    if (this.aiEnabled) {
+      this.players.delete(`${sessionId}-bot1`)
+      this.players.delete(`${sessionId}-bot2`)
+      console.log(`Removed player ${sessionId} and their AI bots (remaining players: ${this.players.size})`)
+    } else {
+      console.log(`Removed player ${sessionId} (remaining players: ${this.players.size})`)
+    }
   }
 
   queueInput(sessionId: string, input: PlayerInput) {
@@ -522,16 +573,43 @@ export class GameState extends Schema {
 
   private resetPlayers() {
     this.players.forEach((player, sessionId) => {
-      // Reset to starting positions based on team
-      player.x = player.team === 'blue' ? 360 : GAME_CONFIG.FIELD_WIDTH - 360
-      player.y = GAME_CONFIG.FIELD_HEIGHT / 2
+      // Reset to formation positions based on team and player type
+      if (player.team === 'blue') {
+        if (sessionId.endsWith('-bot1')) {
+          // Blue defender bot (back-right)
+          player.x = 360
+          player.y = 200
+        } else if (sessionId.endsWith('-bot2')) {
+          // Blue forward bot
+          player.x = 700
+          player.y = 370
+        } else {
+          // Blue human defender (back-left)
+          player.x = 360
+          player.y = 540
+        }
+      } else {
+        if (sessionId.endsWith('-bot1')) {
+          // Red defender bot (back-left)
+          player.x = 1560
+          player.y = 200
+        } else if (sessionId.endsWith('-bot2')) {
+          // Red forward bot
+          player.x = 1220
+          player.y = 370
+        } else {
+          // Red human defender (back-right)
+          player.x = 1560
+          player.y = 540
+        }
+      }
 
       // Reset velocity and state
       player.velocityX = 0
       player.velocityY = 0
       player.state = 'idle'
 
-      console.log(`🔄 Reset player ${sessionId} (${player.team}) to starting position`)
+      console.log(`🔄 Reset player ${sessionId} (${player.team}) to starting position (${player.x}, ${player.y})`)
     })
   }
 
