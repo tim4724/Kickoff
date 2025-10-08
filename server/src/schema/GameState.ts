@@ -113,11 +113,38 @@ export class GameState extends Schema {
 
     if (this.aiEnabled) {
       // AI enabled: spawn with 2 bots per team
+      // Formation: human = forward (offensive), 2 bots = defenders (back)
+      // Positions calculated relative to field size for symmetry
+
       if (team === 'blue') {
-        // Blue team formation: 2 defenders + 1 forward
-        const humanPlayer = new Player(sessionId, team, 360, 540, true, 'defender')
-        const bot1 = new Player(`${sessionId}-bot1`, team, 360, 200, false, 'defender')
-        const bot2 = new Player(`${sessionId}-bot2`, team, 700, 370, false, 'forward')
+        // Blue team (left side): vertically symmetric formation
+        const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.36)  // Forward closer to center
+        const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.19) // Defenders near own goal
+
+        const humanPlayer = new Player(
+          sessionId,
+          team,
+          forwardX,
+          Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5), // Center
+          true,
+          'forward'
+        )
+        const bot1 = new Player(
+          `${sessionId}-bot1`,
+          team,
+          defenderX,
+          Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.25), // Top quarter
+          false,
+          'defender'
+        )
+        const bot2 = new Player(
+          `${sessionId}-bot2`,
+          team,
+          defenderX,
+          Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.75), // Bottom quarter
+          false,
+          'defender'
+        )
 
         this.players.set(sessionId, humanPlayer)
         this.players.set(`${sessionId}-bot1`, bot1)
@@ -125,10 +152,34 @@ export class GameState extends Schema {
 
         console.log(`Added player ${sessionId} to team ${team} with 2 AI bots (current players: ${this.players.size})`)
       } else {
-        // Red team formation: 2 defenders + 1 forward (mirrored)
-        const humanPlayer = new Player(sessionId, team, 1560, 540, true, 'defender')
-        const bot1 = new Player(`${sessionId}-bot1`, team, 1560, 200, false, 'defender')
-        const bot2 = new Player(`${sessionId}-bot2`, team, 1220, 370, false, 'forward')
+        // Red team (right side): vertically mirrored formation
+        const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.64)  // Forward closer to center
+        const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.81) // Defenders near own goal
+
+        const humanPlayer = new Player(
+          sessionId,
+          team,
+          forwardX,
+          Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5), // Center
+          true,
+          'forward'
+        )
+        const bot1 = new Player(
+          `${sessionId}-bot1`,
+          team,
+          defenderX,
+          Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.75), // Bottom quarter (mirrored)
+          false,
+          'defender'
+        )
+        const bot2 = new Player(
+          `${sessionId}-bot2`,
+          team,
+          defenderX,
+          Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.25), // Top quarter (mirrored)
+          false,
+          'defender'
+        )
 
         this.players.set(sessionId, humanPlayer)
         this.players.set(`${sessionId}-bot1`, bot1)
@@ -573,34 +624,40 @@ export class GameState extends Schema {
 
   private resetPlayers() {
     this.players.forEach((player, sessionId) => {
-      // Reset to formation positions based on team and player type
+      // Reset to formation positions based on team and player type (relative to field size)
       if (player.team === 'blue') {
+        const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.36)
+        const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.19)
+
         if (sessionId.endsWith('-bot1')) {
-          // Blue defender bot (back-right)
-          player.x = 360
-          player.y = 200
+          // Blue defender bot (top)
+          player.x = defenderX
+          player.y = Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.25)
         } else if (sessionId.endsWith('-bot2')) {
-          // Blue forward bot
-          player.x = 700
-          player.y = 370
+          // Blue defender bot (bottom)
+          player.x = defenderX
+          player.y = Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.75)
         } else {
-          // Blue human defender (back-left)
-          player.x = 360
-          player.y = 540
+          // Blue human forward (center)
+          player.x = forwardX
+          player.y = Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5)
         }
       } else {
+        const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.64)
+        const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.81)
+
         if (sessionId.endsWith('-bot1')) {
-          // Red defender bot (back-left)
-          player.x = 1560
-          player.y = 200
+          // Red defender bot (bottom - mirrored)
+          player.x = defenderX
+          player.y = Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.75)
         } else if (sessionId.endsWith('-bot2')) {
-          // Red forward bot
-          player.x = 1220
-          player.y = 370
+          // Red defender bot (top - mirrored)
+          player.x = defenderX
+          player.y = Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.25)
         } else {
-          // Red human defender (back-right)
-          player.x = 1560
-          player.y = 540
+          // Red human forward (center)
+          player.x = forwardX
+          player.y = Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5)
         }
       }
 

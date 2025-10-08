@@ -285,23 +285,27 @@ this.onMessage('batch_input', (client, message: MultiPlayerInput[]) => {
 
 ### Starting Positions
 
+Positions calculated relative to field size (1920x1080) for vertical symmetry:
+
 #### Blue Team (Left Side)
 ```typescript
-// Formation: 2 defenders + 1 forward
+// Formation: human = forward, 2 bots = defenders
+// Calculated: forwardX = 0.36 * width, defenderX = 0.19 * width
 positions = {
-  human: { x: 360, y: 540, role: 'defender' },    // Back-left
-  bot1:  { x: 360, y: 200, role: 'defender' },    // Back-right
-  bot2:  { x: 700, y: 370, role: 'forward' }      // Forward
+  human: { x: 691, y: 540, role: 'forward' },     // Center forward (0.36w, 0.5h)
+  bot1:  { x: 365, y: 270, role: 'defender' },    // Top defender (0.19w, 0.25h)
+  bot2:  { x: 365, y: 810, role: 'defender' }     // Bottom defender (0.19w, 0.75h)
 }
 ```
 
 #### Red Team (Right Side)
 ```typescript
-// Formation: 2 defenders + 1 forward (mirrored)
+// Formation: human = forward, 2 bots = defenders (vertically mirrored)
+// Calculated: forwardX = 0.64 * width, defenderX = 0.81 * width
 positions = {
-  human: { x: 1560, y: 540, role: 'defender' },   // Back-right
-  bot1:  { x: 1560, y: 200, role: 'defender' },   // Back-left
-  bot2:  { x: 1220, y: 370, role: 'forward' }     // Forward
+  human: { x: 1229, y: 540, role: 'forward' },    // Center forward (0.64w, 0.5h)
+  bot1:  { x: 1555, y: 810, role: 'defender' },   // Bottom defender (0.81w, 0.75h - mirrored)
+  bot2:  { x: 1555, y: 270, role: 'defender' }    // Top defender (0.81w, 0.25h - mirrored)
 }
 ```
 
@@ -438,14 +442,18 @@ export const GAME_CONFIG = {
   AI_RANDOMNESS: 20,  // Random offset range (px) for natural feel
   AI_UPDATE_INTERVAL: 1000/60,  // AI decision frequency (60Hz)
 
-  // Formation Positions
+  // Formation Positions (calculated relative to field size)
   FORMATION: {
-    BLUE_DEFENDER_1: { x: 360, y: 540 },
-    BLUE_DEFENDER_2: { x: 360, y: 200 },
-    BLUE_FORWARD: { x: 700, y: 370 },
-    RED_DEFENDER_1: { x: 1560, y: 540 },
-    RED_DEFENDER_2: { x: 1560, y: 200 },
-    RED_FORWARD: { x: 1220, y: 370 },
+    // Blue team (left): human = forward, bots = defenders
+    BLUE_FORWARD_X: 0.36,    // 36% of field width
+    BLUE_DEFENDER_X: 0.19,   // 19% of field width
+    // Red team (right): human = forward, bots = defenders
+    RED_FORWARD_X: 0.64,     // 64% of field width
+    RED_DEFENDER_X: 0.81,    // 81% of field width
+    // Vertical positions (same for both teams)
+    DEFENDER_TOP_Y: 0.25,    // 25% of field height
+    DEFENDER_BOTTOM_Y: 0.75, // 75% of field height
+    FORWARD_Y: 0.5,          // 50% of field height (center)
   }
 } as const
 ```

@@ -27,10 +27,8 @@ test.describe('Player Lifecycle Management', () => {
 
     // Connect both clients
     console.log('📤 Step 1: Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
@@ -146,10 +144,8 @@ test.describe('Player Lifecycle Management', () => {
     const client2 = await context2.newPage()
 
     console.log('📤 Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
@@ -206,10 +202,15 @@ test.describe('Player Lifecycle Management', () => {
   test('Player join/leave cycle maintains correct team colors', async ({ browser }, testInfo) => {
     console.log('📤 Testing player join/leave cycle...\n')
 
+    // Generate test room ID for all clients to use
+    const testRoomId = `test-w${testInfo.workerIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    console.log(`🔒 All clients will use test room: ${testRoomId}`)
+
     // Player 1 joins (should be blue)
     console.log('Step 1: Player 1 joins')
     const context1 = await browser.newContext()
     const client1 = await context1.newPage()
+    await client1.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client1.goto(CLIENT_URL)
     await client1.waitForTimeout(2000)
 
@@ -227,6 +228,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log('\nStep 2: Player 2 joins')
     const context2 = await browser.newContext()
     const client2 = await context2.newPage()
+    await client2.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client2.goto(CLIENT_URL)
     await client2.waitForTimeout(2000)
 
@@ -250,6 +252,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log('\nStep 4: Player 3 joins')
     const context3 = await browser.newContext()
     const client3 = await context3.newPage()
+    await client3.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client3.goto(CLIENT_URL)
     await client3.waitForTimeout(2000)
 
@@ -285,11 +288,16 @@ test.describe('Player Lifecycle Management', () => {
     const contexts = []
     const clients = []
 
+    // Generate test room ID for all clients
+    const testRoomId = `test-w${testInfo.workerIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    console.log(`🔒 All clients will use test room: ${testRoomId}`)
+
     // Create 2 clients
     console.log('📤 Creating 2 clients...')
     for (let i = 0; i < 2; i++) {
       const context = await browser.newContext()
       const client = await context.newPage()
+      await client.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
       await client.goto(CLIENT_URL)
       contexts.push(context)
       clients.push(client)
@@ -316,6 +324,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log('\n📤 Creating new client to check server state...')
     const verifyContext = await browser.newContext()
     const verifyClient = await verifyContext.newPage()
+    await verifyClient.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await verifyClient.goto(CLIENT_URL)
     await verifyClient.waitForTimeout(2000)
 

@@ -23,6 +23,19 @@ test.describe('Match Lifecycle', () => {
     const client1 = await context1.newPage()
     const client2 = await context2.newPage()
 
+    // Generate test room ID for isolation
+    const testRoomId = `test-w${testInfo.workerIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+    // Set room ID for both clients (but don't navigate yet)
+    await client1.addInitScript((id) => {
+      ;(window as any).__testRoomId = id
+    }, testRoomId)
+    await client2.addInitScript((id) => {
+      ;(window as any).__testRoomId = id
+    }, testRoomId)
+
+    console.log(`🔒 Both clients will use test room: ${testRoomId}`)
+
     // Client 1 connects first
     console.log('📤 Step 1: Client 1 connecting...')
     await client1.goto(CLIENT_URL)
@@ -91,10 +104,8 @@ test.describe('Match Lifecycle', () => {
     const client2 = await context2.newPage()
 
     console.log('📤 Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
@@ -183,10 +194,8 @@ test.describe('Match Lifecycle', () => {
     const client2 = await context2.newPage()
 
     console.log('📤 Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
@@ -296,10 +305,8 @@ test.describe('Match Lifecycle', () => {
     const client2 = await context2.newPage()
 
     console.log('📤 Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),

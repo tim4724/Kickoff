@@ -23,6 +23,7 @@ const gameServer = new Server({
 })
 
 // Register room handlers with metadata filtering for test isolation
+// filterBy checks options, not metadata - use options.roomName for matching
 gameServer.define('match', MatchRoom).filterBy(['roomName'])
 
 // Colyseus monitor (dev tool)

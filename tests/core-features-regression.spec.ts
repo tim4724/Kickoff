@@ -83,8 +83,9 @@ test.describe('Core Features Regression Suite', () => {
     console.log(`✅ Ball rendered at (${ballData.x}, ${ballData.y})`)
   })
 
-  test('4. Keyboard controls work (arrow keys)', async ({ page }) => {
-    await page.goto(CLIENT_URL)
+  test('4. Keyboard controls work (arrow keys)', async ({ page }, testInfo) => {
+    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Test isolated in room: ${roomId}`)
     await page.waitForTimeout(3000) // Wait for single-player match to start (2s delay + buffer)
 
     const initialPos = await page.evaluate(() => {
@@ -108,8 +109,9 @@ test.describe('Core Features Regression Suite', () => {
     console.log(`✅ Player moved ${moved.toFixed(1)}px with keyboard`)
   })
 
-  test('5. Touch joystick controls work', async ({ page }) => {
-    await page.goto(CLIENT_URL)
+  test('5. Touch joystick controls work', async ({ page }, testInfo) => {
+    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Test isolated in room: ${roomId}`)
     await page.waitForTimeout(3000) // Wait for single-player match to start (2s delay + buffer)
 
     const initialPos = await page.evaluate(() => {
@@ -254,10 +256,8 @@ test.describe('Core Features Regression Suite', () => {
     const client1 = await context1.newPage()
     const client2 = await context2.newPage()
 
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
@@ -286,10 +286,8 @@ test.describe('Core Features Regression Suite', () => {
     const client1 = await context1.newPage()
     const client2 = await context2.newPage()
 
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     // Wait for both clients to be connected
     await Promise.all([

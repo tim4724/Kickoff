@@ -24,10 +24,8 @@ test.describe('Game Over Screen', () => {
     const client2 = await context2.newPage()
 
     console.log('📤 Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
@@ -103,10 +101,8 @@ test.describe('Game Over Screen', () => {
     const client2 = await context2.newPage()
 
     console.log('📤 Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
@@ -167,10 +163,8 @@ test.describe('Game Over Screen', () => {
     const client2 = await context2.newPage()
 
     console.log('📤 Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
@@ -231,10 +225,8 @@ test.describe('Game Over Screen', () => {
     const client2 = await context2.newPage()
 
     console.log('📤 Connecting two clients...')
-    await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL)
-    ])
+    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
+    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
       client1.waitForTimeout(2000),
