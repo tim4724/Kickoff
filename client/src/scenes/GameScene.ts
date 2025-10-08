@@ -4,6 +4,8 @@ import { GeometryUtils } from '@shared/utils/geometry'
 import { VirtualJoystick } from '../controls/VirtualJoystick'
 import { ActionButton } from '../controls/ActionButton'
 import { NetworkManager } from '../network/NetworkManager'
+import { VISUAL_CONSTANTS } from './GameSceneConstants'
+import type { GameState, PlayerState, BallState, GoalScoredEvent, MatchEndEvent } from './GameSceneTypes'
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Arc
@@ -296,8 +298,8 @@ export class GameScene extends Phaser.Scene {
 
     // Player (blue circle) - will be positioned by server in multiplayer
     // Use thicker white border to indicate user-controlled player
-    this.player = this.add.circle(width / 2 - 240, height / 2, 30, 0x0066ff)
-    this.player.setStrokeStyle(4, 0xffffff)
+    this.player = this.add.circle(width / 2 - 240, height / 2, 30, VISUAL_CONSTANTS.PLAYER_BLUE_COLOR)
+    this.player.setStrokeStyle(VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER, VISUAL_CONSTANTS.BORDER_COLOR)
 
     this.gameObjects.push(this.player)
     this.uiCamera.ignore([this.player])
@@ -532,8 +534,8 @@ export class GameScene extends Phaser.Scene {
     const pressureLevel = state.ball.pressureLevel || 0
 
     // Team colors - darkened by 30% for ball visibility
-    const blueColor = 0x0047b3  // 0x0066ff darkened
-    const redColor = 0xb33030   // 0xff4444 darkened
+    const blueColor = VISUAL_CONSTANTS.BALL_BLUE_COLOR
+    const redColor = VISUAL_CONSTANTS.BALL_RED_COLOR
 
     if (pressureLevel === 0) {
       // No pressure - pure team color
@@ -609,7 +611,7 @@ export class GameScene extends Phaser.Scene {
     // Send input to server if multiplayer (send every frame with input)
     // Only send if there's actual movement to avoid zero-spam
     if (this.isMultiplayer && this.networkManager) {
-      const hasMovement = Math.abs(this.playerVelocity.x) > 0.01 || Math.abs(this.playerVelocity.y) > 0.01
+      const hasMovement = Math.abs(this.playerVelocity.x) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT || Math.abs(this.playerVelocity.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
 
       if (hasMovement) {
         const movement = {
@@ -633,7 +635,9 @@ export class GameScene extends Phaser.Scene {
       // Visual feedback: Tint when moving (use team color)
       if (velocityMagnitude > 0) {
         // Lighten color when moving
-        const movingColor = this.playerTeamColor === 0x0066ff ? 0x0088ff : 0xff6666
+        const movingColor = this.playerTeamColor === VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
+          ? VISUAL_CONSTANTS.PLAYER_BLUE_MOVING
+          : VISUAL_CONSTANTS.PLAYER_RED_MOVING
         this.player.setFillStyle(movingColor)
       } else {
         this.player.setFillStyle(this.playerTeamColor)
@@ -1074,7 +1078,7 @@ export class GameScene extends Phaser.Scene {
     console.log('🎭 Creating remote player:', sessionId, playerState.team)
 
     // Determine color based on team
-    const color = playerState.team === 'blue' ? 0x0066ff : 0xff4444
+    const color = playerState.team === 'blue' ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR : VISUAL_CONSTANTS.PLAYER_RED_COLOR
 
     // Create player sprite (circle) with standard border
     const remotePlayer = this.add.circle(
@@ -1083,7 +1087,7 @@ export class GameScene extends Phaser.Scene {
       30,
       color
     )
-    remotePlayer.setStrokeStyle(2, 0xffffff)
+    remotePlayer.setStrokeStyle(VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER, VISUAL_CONSTANTS.BORDER_COLOR)
     remotePlayer.setDepth(10)
 
     // Add to game objects and ignore on UI camera
@@ -1117,14 +1121,14 @@ export class GameScene extends Phaser.Scene {
     const deltaY = Math.abs(this.player.y - serverY)
 
     // Adaptive reconciliation factor based on error magnitude
-    let reconcileFactor = 0.05 // Ultra-gentle baseline for maximum responsiveness
+    let reconcileFactor = VISUAL_CONSTANTS.BASE_RECONCILE_FACTOR // Ultra-gentle baseline for maximum responsiveness
 
-    if (deltaX > 50 || deltaY > 50) {
+    if (deltaX > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD || deltaY > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD) {
       // Large error: strong correction (likely lag spike or bounds collision mismatch)
-      reconcileFactor = 0.6
-    } else if (deltaX > 25 || deltaY > 25) {
+      reconcileFactor = VISUAL_CONSTANTS.STRONG_RECONCILE_FACTOR
+    } else if (deltaX > VISUAL_CONSTANTS.MODERATE_ERROR_THRESHOLD || deltaY > VISUAL_CONSTANTS.MODERATE_ERROR_THRESHOLD) {
       // Moderate error: moderate correction
-      reconcileFactor = 0.3
+      reconcileFactor = VISUAL_CONSTANTS.MODERATE_RECONCILE_FACTOR
     }
 
     // Store old position for logging
@@ -1135,10 +1139,10 @@ export class GameScene extends Phaser.Scene {
     this.player.x += (serverX - this.player.x) * reconcileFactor
     this.player.y += (serverY - this.player.y) * reconcileFactor
 
-    // DEBUG: Log reconciliation (only if correction >2 pixels)
+    // DEBUG: Log reconciliation (only if correction >MIN_CORRECTION pixels)
     const correctionX = Math.abs(this.player.x - oldX)
     const correctionY = Math.abs(this.player.y - oldY)
-    if (correctionX > 2 || correctionY > 2) {
+    if (correctionX > VISUAL_CONSTANTS.MIN_CORRECTION || correctionY > VISUAL_CONSTANTS.MIN_CORRECTION) {
       console.log(
         `🔄 [Client] Local player reconciled: ` +
         `(${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${this.player.x.toFixed(1)}, ${this.player.y.toFixed(1)}), ` +
@@ -1167,15 +1171,15 @@ export class GameScene extends Phaser.Scene {
     // Interpolate toward server position for smooth rendering (same as ball)
     const serverX = playerState.x
     const serverY = playerState.y
-    const lerpFactor = 0.3
+    const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
 
     sprite.x += (serverX - sprite.x) * lerpFactor
     sprite.y += (serverY - sprite.y) * lerpFactor
 
     // DEBUG: Log player movement (only if moved >1 pixel)
-    const moved = Math.abs(sprite.x - oldX) > 1 || Math.abs(sprite.y - oldY) > 1
+    const moved = Math.abs(sprite.x - oldX) > VISUAL_CONSTANTS.REMOTE_MOVEMENT_THRESHOLD || Math.abs(sprite.y - oldY) > VISUAL_CONSTANTS.REMOTE_MOVEMENT_THRESHOLD
     if (moved) {
-//         console.log(`🎭 [Client] Remote player ${sessionId} updated: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${sprite.x.toFixed(1)}, ${sprite.y.toFixed(1)})`)
+      // Movement detected - position updated via interpolation
     }
   }
 
@@ -1196,7 +1200,7 @@ export class GameScene extends Phaser.Scene {
       // Use interpolation for smooth ball movement (hides network latency)
       // Higher lerp factor = more responsive but less smooth
       // Lower lerp factor = smoother but more latency
-      const lerpFactor = 0.3
+      const lerpFactor = VISUAL_CONSTANTS.BALL_LERP_FACTOR
 
       // Interpolate ball position toward server position
       this.ball.x += (serverBallX - this.ball.x) * lerpFactor
@@ -1206,11 +1210,10 @@ export class GameScene extends Phaser.Scene {
       this.ballVelocity.x = state.ball.velocityX || 0
       this.ballVelocity.y = state.ball.velocityY || 0
 
-      // DEBUG: Log ball position changes (only if moved >0.5 pixels)
-      const moved = Math.abs(this.ball.x - oldX) > 0.5 || Math.abs(this.ball.y - oldY) > 0.5
+      // DEBUG: Log ball position changes (only if moved >MIN_POSITION_CHANGE pixels)
+      const moved = Math.abs(this.ball.x - oldX) > VISUAL_CONSTANTS.MIN_POSITION_CHANGE || Math.abs(this.ball.y - oldY) > VISUAL_CONSTANTS.MIN_POSITION_CHANGE
       if (moved) {
-//         console.log(`⚽ [Client] Ball updated from server: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) → (${this.ball.x.toFixed(1)}, ${this.ball.y.toFixed(1)})`)
-//         console.log(`   Server: (${serverBallX.toFixed(1)}, ${serverBallY.toFixed(1)}) | Velocity: (${this.ballVelocity.x.toFixed(1)}, ${this.ballVelocity.y.toFixed(1)})`)
+        // Ball position updated via interpolation
       }
     } catch (error) {
       console.error('[GameScene] Error updating ball from server:', error)
@@ -1221,14 +1224,11 @@ export class GameScene extends Phaser.Scene {
   private updateFromServerState(state: any) {
     if (!state) return
 
-    // DEBUG: Log state updates (only every 60th call ~2 seconds at 30fps)
+    // DEBUG: Log state updates (only every STATE_UPDATE_LOG_INTERVAL calls ~2 seconds at 30fps)
     if (!this.stateUpdateCount) this.stateUpdateCount = 0
     this.stateUpdateCount++
-    if (this.stateUpdateCount % 60 === 0) {
-//       console.log(`📥 [Client] State update #${this.stateUpdateCount}`)
-//       console.log(`   Score: ${state.scoreBlue || 0} - ${state.scoreRed || 0}`)
-//       console.log(`   Time: ${state.matchTime?.toFixed(1) || 0}s`)
-//       console.log(`   Phase: ${state.phase}`)
+    if (this.stateUpdateCount % VISUAL_CONSTANTS.STATE_UPDATE_LOG_INTERVAL === 0) {
+      // Periodic state update received
     }
 
     // Update score display
@@ -1276,7 +1276,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Calculate team color
-      const teamColor = localPlayer.team === 'blue' ? 0x0066ff : 0xff4444
+      const teamColor = localPlayer.team === 'blue' ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR : VISUAL_CONSTANTS.PLAYER_RED_COLOR
 
       // Always update colors when this method is called
       // The caller (stateChange handler) already controls when this runs via colorInitialized flag
@@ -1396,17 +1396,17 @@ export class GameScene extends Phaser.Scene {
 
     // Update local player border
     if (this.mySessionId === this.controlledPlayerId) {
-      this.player.setStrokeStyle(4, 0xffffff)
+      this.player.setStrokeStyle(VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER, VISUAL_CONSTANTS.BORDER_COLOR)
     } else {
-      this.player.setStrokeStyle(2, 0xffffff)
+      this.player.setStrokeStyle(VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER, VISUAL_CONSTANTS.BORDER_COLOR)
     }
 
     // Update remote players borders
     this.remotePlayers.forEach((playerSprite, sessionId) => {
       if (sessionId === this.controlledPlayerId) {
-        playerSprite.setStrokeStyle(4, 0xffffff)
+        playerSprite.setStrokeStyle(VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER, VISUAL_CONSTANTS.BORDER_COLOR)
       } else {
-        playerSprite.setStrokeStyle(2, 0xffffff)
+        playerSprite.setStrokeStyle(VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER, VISUAL_CONSTANTS.BORDER_COLOR)
       }
     })
   }
