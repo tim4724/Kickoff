@@ -15,25 +15,25 @@ const FIXED_TIMESTEP_S = FIXED_TIMESTEP_MS / 1000 // 0.01666s
 const MAX_PHYSICS_STEPS = 5 // Prevent spiral of death under extreme load
 
 export class MatchRoom extends Room<GameState> {
-  maxClients = 2 // Start with 2 humans only (will add AI later)
+  maxClients = 2 // 2 human players (1v1 match)
   private singlePlayerStartTimeout?: NodeJS.Timeout
 
   // Fixed timestep accumulator for deterministic physics
   private physicsAccumulator: number = 0
 
-  onCreate(options: any) {
+  async onCreate(options: any) {
     console.log('Match room created:', this.roomId, options)
 
-    // Store room name in metadata for filtering (test isolation)
-    if (options.roomName) {
-      this.setMetadata({ roomName: options.roomName })
-      console.log('🏷️  Room name set:', options.roomName)
-    }
+    // Set metadata BEFORE any logic for filterBy to work
+    // filterBy checks metadata to match rooms, so this must be immediate
+    const roomName = options.roomName || 'match'
+    await this.setMetadata({ roomName })
+    console.log('🏷️  Room name set:', roomName)
 
     const gameState = new GameState()
 
     // Disable AI for test rooms
-    if (options.roomName && options.roomName.includes('test')) {
+    if (roomName.includes('test')) {
       gameState.aiEnabled = false
       console.log('🤖 AI disabled for test room')
     }
@@ -63,20 +63,33 @@ export class MatchRoom extends Room<GameState> {
     // Add player to game state
     this.state.addPlayer(client.sessionId)
 
+    // Count human players (non-AI)
+    let humanPlayerCount = 0
+    this.state.players.forEach((player) => {
+      if (player.isHuman) {
+        humanPlayerCount++
+      }
+    })
+
     // Clear any pending single-player start timeout
     if (this.singlePlayerStartTimeout) {
       clearTimeout(this.singlePlayerStartTimeout)
       this.singlePlayerStartTimeout = undefined
     }
 
-    // Start match when 2 players join (proper multiplayer)
-    if (this.state.players.size === 2) {
+    // Start match when 2 human players join (proper multiplayer)
+    if (humanPlayerCount === 2) {
       this.startMatch()
-    } else if (this.state.players.size === 1) {
+    } else if (humanPlayerCount === 1) {
       // Enable single-player mode: start match after 2 seconds if no second player joins
       console.log('⏱️ Single player detected, starting match in 2 seconds...')
       this.singlePlayerStartTimeout = setTimeout(() => {
-        if (this.state.players.size === 1 && this.state.phase === 'waiting') {
+        // Recount human players
+        let count = 0
+        this.state.players.forEach((player) => {
+          if (player.isHuman) count++
+        })
+        if (count === 1 && this.state.phase === 'waiting') {
           console.log('🎮 Starting single-player match')
           this.startMatch()
         }

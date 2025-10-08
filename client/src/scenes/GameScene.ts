@@ -12,6 +12,7 @@ export class GameScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
   private controlsHint!: Phaser.GameObjects.Text
+  private roomDebugText!: Phaser.GameObjects.Text
 
   // Dual camera system
   private gameCamera!: Phaser.Cameras.Scene2D.Camera
@@ -322,6 +323,14 @@ export class GameScene extends Phaser.Scene {
     this.timerText.setOrigin(0.5, 0)
     this.timerText.setScrollFactor(0)
 
+    // Room debug text (top-left corner)
+    this.roomDebugText = this.add.text(10, 10, 'Room: Not connected', {
+      fontSize: '14px',
+      color: '#888888',
+    })
+    this.roomDebugText.setOrigin(0, 0)
+    this.roomDebugText.setScrollFactor(0)
+
     // Controls hint (dynamic based on device)
     const controlsText = this.isMobile
       ? 'Touch Joystick to Move • Tap Button to Shoot'
@@ -335,7 +344,7 @@ export class GameScene extends Phaser.Scene {
     this.controlsHint.setScrollFactor(0)
 
     // Add UI objects and make game camera ignore them
-    this.uiObjects.push(this.scoreText, this.timerText, this.controlsHint)
+    this.uiObjects.push(this.scoreText, this.timerText, this.controlsHint, this.roomDebugText)
     this.gameCamera.ignore(this.uiObjects)
   }
 
@@ -931,8 +940,15 @@ export class GameScene extends Phaser.Scene {
       this.mySessionId = this.networkManager.getMySessionId()
       this.isMultiplayer = true
 
+      // Update room debug text with room ID
+      const room = this.networkManager.getRoom()
+      if (room) {
+        this.roomDebugText.setText(`Room: ${room.id}`)
+      }
+
       console.log('🎮 Multiplayer mode enabled')
       console.log('📡 Session ID:', this.mySessionId)
+      console.log('🏠 Room ID:', room?.id)
 
       this.setupNetworkListeners()
 
