@@ -11,6 +11,7 @@ interface PlayerInput {
   action: boolean
   actionPower?: number // 0.0-1.0, power for shooting (optional, defaults to 0.8)
   timestamp: number
+  playerId?: string // Player ID to control (for AI teammate switching)
 }
 
 export class Player extends Schema {
@@ -222,7 +223,9 @@ export class GameState extends Schema {
   }
 
   queueInput(sessionId: string, input: PlayerInput) {
-    const player = this.players.get(sessionId)
+    // Use playerId from input if provided (for AI teammate switching), otherwise use sessionId
+    const targetPlayerId = input.playerId || sessionId
+    const player = this.players.get(targetPlayerId)
     if (player) {
       player.inputQueue.push(input)
     }

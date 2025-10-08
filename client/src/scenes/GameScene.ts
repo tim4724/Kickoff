@@ -31,6 +31,8 @@ export class GameScene extends Phaser.Scene {
   // Multiplayer networking
   private networkManager?: NetworkManager
   private mySessionId?: string
+  private controlledPlayerId?: string // Player currently being controlled (can be human or AI teammate)
+  private previousBallPossessor?: string // Track previous possession for auto-switching
   private isMultiplayer: boolean = false
   private remotePlayers: Map<string, Phaser.GameObjects.Arc> = new Map()
 
@@ -378,9 +380,21 @@ export class GameScene extends Phaser.Scene {
       console.log(`🎨 [CreateControls] Applied persisted color ${this.playerTeamColor.toString(16)} to new controls`)
     }
 
-    // Set up action button callback
+    // Set up action button release callback - shoot if has ball, switch if not
     this.actionButton.setOnReleaseCallback((power) => {
-      this.shootBall(power)
+      // Check if controlled player has ball possession
+      const state = this.networkManager?.getState()
+      if (state && this.controlledPlayerId) {
+        const hasBall = state.ball.possessedBy === this.controlledPlayerId
+
+        if (hasBall) {
+          // Player has ball - shoot with power
+          this.shootBall(power)
+        } else {
+          // Player doesn't have ball - switch to next teammate
+          this.switchToNextTeammate()
+        }
+      }
     })
 
     // Make game camera ignore mobile controls (they're UI elements)
@@ -392,9 +406,9 @@ export class GameScene extends Phaser.Scene {
 
   private shootBall(power: number = 0.8) {
     if (this.isMultiplayer && this.networkManager) {
-      // Multiplayer: send action to server with power value
-      this.networkManager.sendInput({ x: 0, y: 0 }, true, power) // Pass power to server
-      console.log('📤 Shoot action sent to server, power:', power.toFixed(2))
+      // Multiplayer: send action to server with power value and controlled player ID
+      this.networkManager.sendInput({ x: 0, y: 0 }, true, power, this.controlledPlayerId)
+      console.log('📤 Shoot action sent to server, power:', power.toFixed(2), 'player:', this.controlledPlayerId)
     } else {
       // Single-player: apply local physics
       const dist = GeometryUtils.distance(this.player, this.ball)
@@ -477,6 +491,9 @@ export class GameScene extends Phaser.Scene {
     if (this.isMultiplayer && this.networkManager) {
       const state = this.networkManager.getState()
       this.updateBallColor(state)
+
+      // Auto-switch to teammate who gains possession
+      this.checkAutoSwitchOnPossession(state)
     }
 
     // Update mobile controls
@@ -599,25 +616,28 @@ export class GameScene extends Phaser.Scene {
           x: this.playerVelocity.x,
           y: this.playerVelocity.y
         }
-        this.networkManager.sendInput(movement, false) // false = not action button
+        this.networkManager.sendInput(movement, false, undefined, this.controlledPlayerId) // Send with controlled player ID
       }
     }
 
-    // Apply velocity (local prediction)
-    this.player.x += this.playerVelocity.x * GAME_CONFIG.PLAYER_SPEED * dt
-    this.player.y += this.playerVelocity.y * GAME_CONFIG.PLAYER_SPEED * dt
+    // Apply velocity (local prediction) - ONLY if controlling own player
+    // When controlling AI teammate, server handles their movement
+    if (this.controlledPlayerId === this.mySessionId) {
+      this.player.x += this.playerVelocity.x * GAME_CONFIG.PLAYER_SPEED * dt
+      this.player.y += this.playerVelocity.y * GAME_CONFIG.PLAYER_SPEED * dt
 
-    // Clamp to field bounds
-    this.player.x = Phaser.Math.Clamp(this.player.x, GAME_CONFIG.PLAYER_MARGIN, GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.PLAYER_MARGIN)
-    this.player.y = Phaser.Math.Clamp(this.player.y, GAME_CONFIG.PLAYER_MARGIN, GAME_CONFIG.FIELD_HEIGHT - GAME_CONFIG.PLAYER_MARGIN)
+      // Clamp to field bounds
+      this.player.x = Phaser.Math.Clamp(this.player.x, GAME_CONFIG.PLAYER_MARGIN, GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.PLAYER_MARGIN)
+      this.player.y = Phaser.Math.Clamp(this.player.y, GAME_CONFIG.PLAYER_MARGIN, GAME_CONFIG.FIELD_HEIGHT - GAME_CONFIG.PLAYER_MARGIN)
 
-    // Visual feedback: Tint when moving (use team color)
-    if (velocityMagnitude > 0) {
-      // Lighten color when moving
-      const movingColor = this.playerTeamColor === 0x0066ff ? 0x0088ff : 0xff6666
-      this.player.setFillStyle(movingColor)
-    } else {
-      this.player.setFillStyle(this.playerTeamColor)
+      // Visual feedback: Tint when moving (use team color)
+      if (velocityMagnitude > 0) {
+        // Lighten color when moving
+        const movingColor = this.playerTeamColor === 0x0066ff ? 0x0088ff : 0xff6666
+        this.player.setFillStyle(movingColor)
+      } else {
+        this.player.setFillStyle(this.playerTeamColor)
+      }
     }
   }
 
@@ -938,6 +958,7 @@ export class GameScene extends Phaser.Scene {
       })
       await this.networkManager.connect()
       this.mySessionId = this.networkManager.getMySessionId()
+      this.controlledPlayerId = this.mySessionId // Initially control your own player
       this.isMultiplayer = true
 
       // Update room debug text with room ID
@@ -1302,5 +1323,91 @@ export class GameScene extends Phaser.Scene {
     } catch (error) {
       console.error('[GameScene] Error syncing local player position:', error)
     }
+  }
+
+  /**
+   * Cycle to the next teammate (manual player switching)
+   */
+  private switchToNextTeammate() {
+    if (!this.isMultiplayer || !this.networkManager) return
+
+    const state = this.networkManager.getState()
+    if (!state || !state.players) return
+
+    // Get my team
+    const myTeam = state.players.get(this.mySessionId)?.team
+    if (!myTeam) return
+
+    // Collect all teammates on my team (including human and AI)
+    const teammates: string[] = []
+    state.players.forEach((player: any, playerId: string) => {
+      if (player.team === myTeam) {
+        teammates.push(playerId)
+      }
+    })
+
+    if (teammates.length === 0) return
+
+    // Find current index and cycle to next
+    const currentIndex = teammates.indexOf(this.controlledPlayerId || '')
+    const nextIndex = (currentIndex + 1) % teammates.length
+    this.controlledPlayerId = teammates[nextIndex]
+
+    console.log(`🔄 Switched control to player: ${this.controlledPlayerId}`)
+    this.updatePlayerBorders()
+  }
+
+  /**
+   * Auto-switch to teammate when they gain ball possession
+   */
+  private checkAutoSwitchOnPossession(state: any) {
+    if (!state || !state.players || !state.ball) return
+
+    // Get my team
+    const myTeam = state.players.get(this.mySessionId)?.team
+    if (!myTeam) return
+
+    // Check who has the ball (ball.possessedBy contains player ID)
+    const currentPossessor = state.ball.possessedBy
+
+    // Only auto-switch if possessor is on my team
+    if (currentPossessor) {
+      const possessorPlayer = state.players.get(currentPossessor)
+      if (possessorPlayer?.team === myTeam) {
+        // Check if possession changed to a teammate
+        if (currentPossessor !== this.previousBallPossessor) {
+          // Teammate gained possession - auto-switch to them
+          this.controlledPlayerId = currentPossessor
+          console.log(`⚡ Auto-switched to ${currentPossessor} (gained possession)`)
+          this.updatePlayerBorders()
+        }
+      }
+    }
+
+    // Update previous possessor for next frame
+    this.previousBallPossessor = currentPossessor
+  }
+
+  /**
+   * Update all player borders to show which player is controlled
+   */
+  private updatePlayerBorders() {
+    if (!this.controlledPlayerId) return
+
+    // Update local player border
+    if (this.mySessionId === this.controlledPlayerId) {
+      this.player.setStrokeStyle(4, 0xffffff)
+    } else {
+      this.player.setStrokeStyle(2, 0xffffff)
+    }
+
+    // Update remote players borders
+    this.remotePlayers.forEach((playerSprite, sessionId) => {
+      if (sessionId === this.controlledPlayerId) {
+        playerSprite.setStrokeStyle(4, 0xffffff)
+      } else {
+        playerSprite.setStrokeStyle(2, 0xffffff)
+      }
+    })
   }
 }

@@ -17,7 +17,6 @@ export class ActionButton {
 
   private isPressed: boolean = false
   private pressStartTime: number = 0
-  private holdDuration: number = 0
 
   // Team color for button styling
   private teamColor: number = 0xff4444 // Default red, updated via setTeamColor()
@@ -110,22 +109,22 @@ export class ActionButton {
 
   private onRelease() {
     this.isPressed = false
-    this.holdDuration = (Date.now() - this.pressStartTime) / 1000 // Convert to seconds
-
-    // Calculate power (0 to 1) based on hold duration (max 1 second)
-    const power = Math.min(this.holdDuration / 1.0, 1)
+    const holdDurationMs = Date.now() - this.pressStartTime
+    const holdDuration = holdDurationMs / 1000 // Convert to seconds
 
     // Reset visual - use team color
     this.button.setFillStyle(this.teamColor, 0.4)
     this.button.setScale(1)
 
-    // Callback
+    // Calculate power based on hold duration
+    const power = Math.min(holdDuration / 1.0, 1)
+
+    // Trigger release callback with power
     if (this.onReleaseCallback) {
       this.onReleaseCallback(power)
     }
 
     this.pointer = null
-    this.holdDuration = 0
   }
 
   /**
@@ -230,9 +229,8 @@ export class ActionButton {
   public __test_simulateRelease(holdDurationMs: number = 0) {
     if (!this.isPressed) return
 
-    // Manually set hold duration for testing
-    this.holdDuration = holdDurationMs / 1000
-    const power = Math.min(this.holdDuration / 1.0, 1)
+    const holdDuration = holdDurationMs / 1000
+    const power = Math.min(holdDuration / 1.0, 1)
 
     // Reset visual - use team color
     this.button.setFillStyle(this.teamColor, 0.4)
@@ -245,7 +243,6 @@ export class ActionButton {
 
     this.isPressed = false
     this.pointer = null
-    this.holdDuration = 0
   }
 
   /**
@@ -258,7 +255,6 @@ export class ActionButton {
       y: this.y,
       radius: this.radius,
       currentPower: this.getPower(),
-      holdDuration: this.holdDuration,
     }
   }
 }
