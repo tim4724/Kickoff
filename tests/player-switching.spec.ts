@@ -26,7 +26,7 @@ test('action button shoots when player has ball, switches when not', async ({ pa
 
   // Get initial ball possession state
   const initialPossession = await page.evaluate(() => {
-    const gameScene = (window as any).gameScene
+    const gameScene = (window as any).__gameControls?.scene
     if (!gameScene) return null
 
     const state = gameScene.networkManager?.getState()
@@ -46,13 +46,13 @@ test('action button shoots when player has ball, switches when not', async ({ pa
     console.log('Player does NOT have ball - testing switch behavior')
 
     const beforeSwitch = await page.evaluate(() => {
-      const gameScene = (window as any).gameScene
+      const gameScene = (window as any).__gameControls?.scene
       return gameScene?.controlledPlayerId
     })
 
     // Simulate action button press and release (no ball = switch)
     await page.evaluate(() => {
-      const gameScene = (window as any).gameScene
+      const gameScene = (window as any).__gameControls?.scene
       gameScene.actionButton.__test_simulatePress()
       gameScene.actionButton.__test_simulateRelease(100) // 100ms hold
     })
@@ -60,7 +60,7 @@ test('action button shoots when player has ball, switches when not', async ({ pa
     await page.waitForTimeout(100)
 
     const afterSwitch = await page.evaluate(() => {
-      const gameScene = (window as any).gameScene
+      const gameScene = (window as any).__gameControls?.scene
       return gameScene?.controlledPlayerId
     })
 
@@ -71,7 +71,7 @@ test('action button shoots when player has ball, switches when not', async ({ pa
   // Test 2: When player has ball, action button should shoot
   // Move controlled player to ball
   await page.evaluate(() => {
-    const gameScene = (window as any).gameScene
+    const gameScene = (window as any).__gameControls?.scene
     const state = gameScene.networkManager?.getState()
 
     // Get controlled player
@@ -87,7 +87,7 @@ test('action button shoots when player has ball, switches when not', async ({ pa
   await page.waitForTimeout(100)
 
   const hasBallNow = await page.evaluate(() => {
-    const gameScene = (window as any).gameScene
+    const gameScene = (window as any).__gameControls?.scene
     const state = gameScene.networkManager?.getState()
     return state.ball.possessedBy === gameScene.controlledPlayerId
   })
@@ -96,13 +96,13 @@ test('action button shoots when player has ball, switches when not', async ({ pa
     console.log('Player HAS ball - testing shoot behavior')
 
     const beforeControlled = await page.evaluate(() => {
-      const gameScene = (window as any).gameScene
+      const gameScene = (window as any).__gameControls?.scene
       return gameScene?.controlledPlayerId
     })
 
     // Simulate action button press and release with ball (should shoot, not switch)
     await page.evaluate(() => {
-      const gameScene = (window as any).gameScene
+      const gameScene = (window as any).__gameControls?.scene
       gameScene.actionButton.__test_simulatePress()
       gameScene.actionButton.__test_simulateRelease(500) // 500ms hold = 0.5 power
     })
@@ -110,7 +110,7 @@ test('action button shoots when player has ball, switches when not', async ({ pa
     await page.waitForTimeout(100)
 
     const afterControlled = await page.evaluate(() => {
-      const gameScene = (window as any).gameScene
+      const gameScene = (window as any).__gameControls?.scene
       return gameScene?.controlledPlayerId
     })
 
@@ -145,7 +145,7 @@ test('auto-switches to teammate when they gain ball possession', async ({ page, 
 
   // Get player's team and teammates
   const teamInfo = await page.evaluate(() => {
-    const gameScene = (window as any).gameScene
+    const gameScene = (window as any).__gameControls?.scene
     const state = gameScene.networkManager?.getState()
     const myTeam = state.players.get(gameScene.mySessionId)?.team
 
@@ -174,7 +174,7 @@ test('auto-switches to teammate when they gain ball possession', async ({ page, 
 
       // Simulate teammate gaining possession
       await page.evaluate((teammateId) => {
-        const gameScene = (window as any).gameScene
+        const gameScene = (window as any).__gameControls?.scene
         const state = gameScene.networkManager?.getState()
         state.ball.possessedBy = teammateId
 
@@ -185,7 +185,7 @@ test('auto-switches to teammate when they gain ball possession', async ({ page, 
       await page.waitForTimeout(100)
 
       const afterAutoSwitch = await page.evaluate(() => {
-        const gameScene = (window as any).gameScene
+        const gameScene = (window as any).__gameControls?.scene
         return gameScene?.controlledPlayerId
       })
 
