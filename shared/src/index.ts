@@ -1,2 +1,6 @@
 export * from './types'
 export * from './utils/geometry'
+export * from './engine/types'
+export * from './engine/PhysicsEngine'
+export * from './engine/GameEngine'
+export * from './ai/AIController'

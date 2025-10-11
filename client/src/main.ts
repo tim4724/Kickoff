@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
+import { MenuScene } from './scenes/MenuScene'
 import { GameScene } from './scenes/GameScene'
+import { SinglePlayerScene } from './scenes/SinglePlayerScene'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -18,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [GameScene],
+  scene: [MenuScene, GameScene, SinglePlayerScene],
 }
 
 // Remove loading text
@@ -55,4 +57,4 @@ window.addEventListener('contextmenu', (e) => e.preventDefault())
 // Export for debugging
 ;(window as any).game = game
 
-console.log('🎮 Socca2 initialized!')
+console.log('🎮 Kickoff initialized!')

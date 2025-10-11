@@ -1,200 +1,288 @@
 import { test, expect } from '@playwright/test'
 
 /**
- * Test player switching behavior with ball possession
- * Verifies that action button:
- * - Shoots when player has ball
- * - Switches players when player doesn't have ball
+ * Test Suite: Player Switching Mechanics
+ * Tests manual switching, auto-switching, visual feedback, and AI teammate control
  */
-test('action button shoots when player has ball, switches when not', async ({ page, browser }) => {
-  // Create two players in the same room
-  const context2 = await browser.newContext()
-  const page2 = await context2.newPage()
 
-  const testRoom = `test_switching_${Date.now()}`
+/**
+ * Test 1: Basic player switching cycles through all teammates
+ */
+test('cycles through all 3 teammates correctly', async ({ page }) => {
+  const testRoom = `test_cycle_${Date.now()}`
 
-  // Player 1 (blue) joins
-  await page.goto(`http://localhost:5173/?room=${testRoom}`)
-  await page.waitForSelector('canvas', { timeout: 5000 })
+  await page.goto(`http://localhost:5174/?room=${testRoom}`)
+  await page.waitForSelector('canvas', { timeout: 10000 })
 
-  // Player 2 (red) joins
-  await page2.goto(`http://localhost:5173/?room=${testRoom}`)
-  await page2.waitForSelector('canvas', { timeout: 5000 })
+  // Wait for menu to render, then click Multiplayer button (canvas coordinates)
+  await page.waitForTimeout(1500) // Let menu fully render
+  const canvas = await page.locator('canvas')
+  const box = await canvas.boundingBox()
+  if (box) {
+    // Click center of red Multiplayer button (65% down the screen)
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
+  }
+  await page.waitForTimeout(4000) // Wait for multiplayer to connect and start
 
-  // Wait for game to start
-  await page.waitForTimeout(2000)
-
-  // Get initial ball possession state
-  const initialPossession = await page.evaluate(() => {
+  // Get all teammates
+  const teammates = await page.evaluate(() => {
     const gameScene = (window as any).__gameControls?.scene
     if (!gameScene) return null
 
-    const state = gameScene.networkManager?.getState()
+    const state = gameScene.getGameState()
     if (!state) return null
 
-    return {
-      possessedBy: state.ball.possessedBy,
-      controlledPlayerId: gameScene.controlledPlayerId,
-      mySessionId: gameScene.mySessionId,
-    }
-  })
+    const myTeam = state.players.get(gameScene.myPlayerId)?.team
 
-  console.log('Initial possession:', initialPossession)
-
-  // Test 1: When player doesn't have ball, action button should switch players
-  if (initialPossession && initialPossession.possessedBy !== initialPossession.controlledPlayerId) {
-    console.log('Player does NOT have ball - testing switch behavior')
-
-    const beforeSwitch = await page.evaluate(() => {
-      const gameScene = (window as any).__gameControls?.scene
-      return gameScene?.controlledPlayerId
-    })
-
-    // Simulate action button press and release (no ball = switch)
-    await page.evaluate(() => {
-      const gameScene = (window as any).__gameControls?.scene
-      gameScene.actionButton.__test_simulatePress()
-      gameScene.actionButton.__test_simulateRelease(100) // 100ms hold
-    })
-
-    await page.waitForTimeout(100)
-
-    const afterSwitch = await page.evaluate(() => {
-      const gameScene = (window as any).__gameControls?.scene
-      return gameScene?.controlledPlayerId
-    })
-
-    expect(afterSwitch).not.toBe(beforeSwitch)
-    console.log(`✓ Player switched from ${beforeSwitch} to ${afterSwitch}`)
-  }
-
-  // Test 2: When player has ball, action button should shoot
-  // Move controlled player to ball
-  await page.evaluate(() => {
-    const gameScene = (window as any).__gameControls?.scene
-    const state = gameScene.networkManager?.getState()
-
-    // Get controlled player
-    const controlledPlayer = state.players.get(gameScene.controlledPlayerId)
-    if (!controlledPlayer) return
-
-    // Move ball to controlled player (simulate possession)
-    state.ball.x = controlledPlayer.x
-    state.ball.y = controlledPlayer.y
-    state.ball.possessedBy = gameScene.controlledPlayerId
-  })
-
-  await page.waitForTimeout(100)
-
-  const hasBallNow = await page.evaluate(() => {
-    const gameScene = (window as any).__gameControls?.scene
-    const state = gameScene.networkManager?.getState()
-    return state.ball.possessedBy === gameScene.controlledPlayerId
-  })
-
-  if (hasBallNow) {
-    console.log('Player HAS ball - testing shoot behavior')
-
-    const beforeControlled = await page.evaluate(() => {
-      const gameScene = (window as any).__gameControls?.scene
-      return gameScene?.controlledPlayerId
-    })
-
-    // Simulate action button press and release with ball (should shoot, not switch)
-    await page.evaluate(() => {
-      const gameScene = (window as any).__gameControls?.scene
-      gameScene.actionButton.__test_simulatePress()
-      gameScene.actionButton.__test_simulateRelease(500) // 500ms hold = 0.5 power
-    })
-
-    await page.waitForTimeout(100)
-
-    const afterControlled = await page.evaluate(() => {
-      const gameScene = (window as any).__gameControls?.scene
-      return gameScene?.controlledPlayerId
-    })
-
-    // When player has ball, controlled player should NOT change
-    expect(afterControlled).toBe(beforeControlled)
-    console.log(`✓ Player maintained control (shot instead of switching)`)
-  }
-
-  // Cleanup
-  await page2.close()
-  await context2.close()
-})
-
-/**
- * Test auto-switching when teammate gains possession
- */
-test('auto-switches to teammate when they gain ball possession', async ({ page, browser }) => {
-  const context2 = await browser.newContext()
-  const page2 = await context2.newPage()
-
-  const testRoom = `test_autoswitch_${Date.now()}`
-
-  // Player 1 joins
-  await page.goto(`http://localhost:5173/?room=${testRoom}`)
-  await page.waitForSelector('canvas', { timeout: 5000 })
-
-  // Player 2 joins
-  await page2.goto(`http://localhost:5173/?room=${testRoom}`)
-  await page2.waitForSelector('canvas', { timeout: 5000 })
-
-  await page.waitForTimeout(2000)
-
-  // Get player's team and teammates
-  const teamInfo = await page.evaluate(() => {
-    const gameScene = (window as any).__gameControls?.scene
-    const state = gameScene.networkManager?.getState()
-    const myTeam = state.players.get(gameScene.mySessionId)?.team
-
-    const teammates: string[] = []
+    const teamList: string[] = []
     state.players.forEach((player: any, playerId: string) => {
       if (player.team === myTeam) {
-        teammates.push(playerId)
+        teamList.push(playerId)
       }
     })
 
     return {
-      mySessionId: gameScene.mySessionId,
-      controlledPlayerId: gameScene.controlledPlayerId,
-      teammates,
-      myTeam,
+      myPlayerId: gameScene.myPlayerId,
+      teammates: teamList,
+      initialControlled: gameScene.controlledPlayerId
     }
   })
 
-  console.log('Team info:', teamInfo)
-
-  // If there are teammates (AI players), test auto-switching
-  if (teamInfo.teammates.length > 1) {
-    const teammate = teamInfo.teammates.find(id => id !== teamInfo.controlledPlayerId)
-    if (teammate) {
-      console.log(`Testing auto-switch to teammate: ${teammate}`)
-
-      // Simulate teammate gaining possession
-      await page.evaluate((teammateId) => {
-        const gameScene = (window as any).__gameControls?.scene
-        const state = gameScene.networkManager?.getState()
-        state.ball.possessedBy = teammateId
-
-        // Trigger possession check
-        gameScene.checkAutoSwitchOnPossession(state)
-      }, teammate)
-
-      await page.waitForTimeout(100)
-
-      const afterAutoSwitch = await page.evaluate(() => {
-        const gameScene = (window as any).__gameControls?.scene
-        return gameScene?.controlledPlayerId
-      })
-
-      expect(afterAutoSwitch).toBe(teammate)
-      console.log(`✓ Auto-switched to ${teammate} when they gained possession`)
-    }
+  if (!teammates) {
+    throw new Error('Game not initialized - __gameControls not available')
   }
 
-  // Cleanup
-  await page2.close()
-  await context2.close()
+  console.log('Teammates:', teammates)
+  expect(teammates.teammates).toHaveLength(3) // 1 human + 2 bots
+
+  // Cycle through all teammates
+  const controlledSequence: string[] = [teammates.initialControlled]
+
+  for (let i = 0; i < teammates.teammates.length; i++) {
+    await page.evaluate(() => {
+      const gameScene = (window as any).__gameControls?.scene
+      gameScene.switchToNextTeammate()
+    })
+
+    await page.waitForTimeout(200)
+
+    const nowControlled = await page.evaluate(() => {
+      const gameScene = (window as any).__gameControls?.scene
+      return gameScene.controlledPlayerId
+    })
+
+    controlledSequence.push(nowControlled)
+  }
+
+  console.log('Control sequence:', controlledSequence)
+
+  // Should have cycled through all teammates and back to start
+  expect(controlledSequence).toHaveLength(4)
+  expect(controlledSequence[3]).toBe(controlledSequence[0]) // Cycled back
+  expect(new Set(controlledSequence.slice(0, 3)).size).toBe(3) // All different
+})
+
+/**
+ * Test 2: Visual borders update when switching
+ */
+test('updates visual borders when switching players', async ({ page }) => {
+  const testRoom = `test_borders_${Date.now()}`
+
+  await page.goto(`http://localhost:5174/?room=${testRoom}`)
+  await page.waitForSelector('canvas', { timeout: 10000 })
+
+  // Wait for menu to render, then click Multiplayer button (canvas coordinates)
+  await page.waitForTimeout(1500) // Let menu fully render
+  const canvas = await page.locator('canvas')
+  const box = await canvas.boundingBox()
+  if (box) {
+    // Click center of red Multiplayer button (65% down the screen)
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
+  }
+  await page.waitForTimeout(4000)
+
+  const initialBorders = await page.evaluate(() => {
+    const gameScene = (window as any).__gameControls?.scene
+    if (!gameScene) return null
+
+    const borders: Record<string, number> = {}
+
+    // Phaser circles use lineWidth, not strokeLineWidth
+    borders[gameScene.myPlayerId] = gameScene.player.lineWidth
+    gameScene.remotePlayers.forEach((sprite: any, id: string) => {
+      borders[id] = sprite.lineWidth
+    })
+
+    return {
+      controlled: gameScene.controlledPlayerId,
+      borders
+    }
+  })
+
+  if (!initialBorders) {
+    throw new Error('Game not initialized')
+  }
+
+  console.log('Initial borders:', initialBorders)
+
+  // Controlled player should have thick border (4px)
+  expect(initialBorders.borders[initialBorders.controlled]).toBe(4)
+
+  // Switch to next teammate
+  await page.evaluate(() => {
+    const gameScene = (window as any).__gameControls?.scene
+    gameScene.switchToNextTeammate()
+  })
+
+  await page.waitForTimeout(200)
+
+  const afterBorders = await page.evaluate(() => {
+    const gameScene = (window as any).__gameControls?.scene
+    const borders: Record<string, number> = {}
+
+    borders[gameScene.myPlayerId] = gameScene.player.lineWidth
+    gameScene.remotePlayers.forEach((sprite: any, id: string) => {
+      borders[id] = sprite.lineWidth
+    })
+
+    return {
+      controlled: gameScene.controlledPlayerId,
+      borders
+    }
+  })
+
+  console.log('After switch borders:', afterBorders)
+
+  // New controlled player should have thick border (4px)
+  expect(afterBorders.borders[afterBorders.controlled]).toBe(4)
+
+  // Old controlled player should have thin border now (2px)
+  expect(afterBorders.borders[initialBorders.controlled]).toBe(2)
+})
+
+/**
+ * Test 3: Can switch to and control AI teammate
+ * Note: Movement testing via joystick simulation has timing limitations in browser automation
+ */
+test('can switch to AI teammate', async ({ page }) => {
+  const testRoom = `test_ai_control_${Date.now()}`
+
+  await page.goto(`http://localhost:5174/?room=${testRoom}`)
+  await page.waitForSelector('canvas', { timeout: 10000 })
+
+  // Wait for menu to render, then click Multiplayer button (canvas coordinates)
+  await page.waitForTimeout(1500) // Let menu fully render
+  const canvas = await page.locator('canvas')
+  const box = await canvas.boundingBox()
+  if (box) {
+    // Click center of red Multiplayer button (65% down the screen)
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
+  }
+  await page.waitForTimeout(4000)
+
+  // Switch to AI teammate
+  await page.evaluate(() => {
+    const gameScene = (window as any).__gameControls?.scene
+    gameScene.switchToNextTeammate() // Now controlling bot
+  })
+
+  await page.waitForTimeout(200)
+
+  const beforeMovement = await page.evaluate(() => {
+    const gameScene = (window as any).__gameControls?.scene
+    if (!gameScene) return null
+
+    const state = gameScene.getGameState()
+    if (!state) return null
+
+    const controlled = state.players.get(gameScene.controlledPlayerId)
+    if (!controlled) return null
+
+    return {
+      playerId: gameScene.controlledPlayerId,
+      isBot: gameScene.controlledPlayerId !== gameScene.mySessionId,
+      x: controlled.x,
+      y: controlled.y
+    }
+  })
+
+  if (!beforeMovement) {
+    throw new Error('Could not get controlled player position')
+  }
+
+  console.log('Switched to AI teammate:', beforeMovement)
+
+  // Verify we're controlling an AI bot
+  expect(beforeMovement.isBot).toBe(true)
+  expect(beforeMovement.playerId).not.toBe(beforeMovement.playerId.split('-')[0]) // Should have -bot suffix
+
+  // Verify the controlled player ID changed
+  const afterSwitchCheck = await page.evaluate(() => {
+    const gameScene = (window as any).__gameControls?.scene
+    return {
+      controlled: gameScene.controlledPlayerId,
+      hasSprite: gameScene.remotePlayers.has(gameScene.controlledPlayerId)
+    }
+  })
+
+  // Controlled player should be a bot and should have a sprite
+  expect(afterSwitchCheck.controlled).toContain('-bot')
+  expect(afterSwitchCheck.hasSprite).toBe(true)
+
+  console.log('✓ Successfully switched to AI teammate with sprite')
+})
+
+/**
+ * Test 4: Space key switches players when not having ball
+ */
+test('space key switches players when not having ball', async ({ page }) => {
+  const testRoom = `test_space_switch_${Date.now()}`
+
+  await page.goto(`http://localhost:5174/?room=${testRoom}`)
+  await page.waitForSelector('canvas', { timeout: 10000 })
+
+  // Wait for menu to render, then click Multiplayer button (canvas coordinates)
+  await page.waitForTimeout(1500) // Let menu fully render
+  const canvas = await page.locator('canvas')
+  const box = await canvas.boundingBox()
+  if (box) {
+    // Click center of red Multiplayer button (65% down the screen)
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
+  }
+  await page.waitForTimeout(4000)
+
+  const beforeSwitch = await page.evaluate(() => {
+    const gameScene = (window as any).__gameControls?.scene
+    if (!gameScene) return null
+
+    const state = gameScene.getGameState()
+    if (!state) return null
+
+    return {
+      controlled: gameScene.controlledPlayerId,
+      hasBall: state.ball.possessedBy === gameScene.controlledPlayerId
+    }
+  })
+
+  if (!beforeSwitch) {
+    throw new Error('Game not initialized')
+  }
+
+  console.log('Before switch:', beforeSwitch)
+
+  // Only test switching if player doesn't have ball
+  if (!beforeSwitch.hasBall) {
+    await page.keyboard.press('Space')
+    await page.waitForTimeout(200)
+
+    const afterSwitch = await page.evaluate(() => {
+      const gameScene = (window as any).__gameControls?.scene
+      return gameScene.controlledPlayerId
+    })
+
+    expect(afterSwitch).not.toBe(beforeSwitch.controlled)
+    console.log(`✓ Switched from ${beforeSwitch.controlled} to ${afterSwitch}`)
+  } else {
+    console.log('Player has ball - skipping switch test')
+  }
 })

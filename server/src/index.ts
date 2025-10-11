@@ -34,12 +34,12 @@ app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: Date.now(),
-    server: 'Socca2 v0.1.0',
+    server: 'Kickoff v0.2.0',
   })
 })
 
 // Start server
 gameServer.listen(port, '0.0.0.0')
 
-console.log(`🚀 Socca2 Server listening on http://0.0.0.0:${port}`)
+console.log(`🚀 Kickoff Server listening on http://0.0.0.0:${port}`)
 console.log(`📊 Colyseus Monitor: http://0.0.0.0:${port}/colyseus`)
