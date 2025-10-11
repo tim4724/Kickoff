@@ -88,5 +88,13 @@ export class MenuScene extends Phaser.Scene {
     versionText.setOrigin(0.5)
 
     console.log('📋 Menu scene loaded')
+
+    // Auto-start multiplayer for tests
+    if (typeof window !== 'undefined' && (window as any).__testRoomId) {
+      console.log('🧪 Test mode detected - auto-starting multiplayer')
+      this.time.delayedCall(100, () => {
+        this.scene.start('GameScene')
+      })
+    }
   }
 }

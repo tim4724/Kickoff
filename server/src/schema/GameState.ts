@@ -122,7 +122,7 @@ export class GameState extends Schema {
     // Sync players from engine to Schema
     this.syncPlayersFromEngine()
 
-    console.log(`Added player ${sessionId} to team ${team} (current players: ${this.players.size})`)
+    console.log(`Added player ${sessionId} to team ${team} (total players: ${this.players.size})`)
   }
 
   removePlayer(sessionId: string) {
@@ -198,8 +198,8 @@ export class GameState extends Schema {
     // Sync timer
     this.matchTime = state.matchTime
 
-    // Sync phase
-    this.phase = state.phase
+    // DON'T sync phase - room controls phase lifecycle (waiting/playing/ended)
+    // this.phase = state.phase
   }
 
   /**
