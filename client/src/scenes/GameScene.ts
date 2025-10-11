@@ -359,6 +359,19 @@ export class GameScene extends BaseGameScene {
         this.updateRemotePlayer(sessionId, player)
       }
     })
+
+    // Update UI (score and timer)
+    this.scoreText.setText(`${state.scoreBlue} - ${state.scoreRed}`)
+
+    const minutes = Math.floor(state.matchTime / 60)
+    const seconds = Math.floor(state.matchTime % 60)
+    this.timerText.setText(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+
+    if (state.matchTime <= 30 && state.matchTime > 0) {
+      this.timerText.setColor('#ff4444')
+    } else {
+      this.timerText.setColor('#ffffff')
+    }
   }
 
   private reconcileLocalPlayer(playerState: any) {
