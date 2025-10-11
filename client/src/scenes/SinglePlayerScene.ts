@@ -15,15 +15,14 @@ export class SinglePlayerScene extends BaseGameScene {
   }
 
   protected initializeGameState(): void {
-    // Initialize game engine with AI enabled
+    // Initialize game engine
     this.gameEngine = new GameEngine({
       matchDuration: GAME_CONFIG.MATCH_DURATION,
-      enableAI: true,
     })
 
-    // Add players (3v3: 1 human + 2 AI bots per team)
-    this.gameEngine.addPlayer('player1', 'blue', true) // Human + 2 bots
-    this.gameEngine.addPlayer('player2', 'red', false) // 3 AI bots
+    // Add players (3v3: 3 players per team)
+    this.gameEngine.addPlayer('player1', 'blue', true) // Human controlled team
+    this.gameEngine.addPlayer('player2', 'red', false) // Non-human controlled team
 
     // Set up callbacks
     this.gameEngine.onGoal((event: { team: 'blue' | 'red'; time: number }) => {

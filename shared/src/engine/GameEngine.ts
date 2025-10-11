@@ -1,11 +1,10 @@
 /**
  * Game Engine
- * Complete game loop orchestrator - physics, AI, state management
+ * Complete game loop orchestrator - physics and state management
  * Shared between client single-player and server multiplayer
  */
 
 import { PhysicsEngine } from './PhysicsEngine'
-import { AIController } from '../ai/AIController'
 import type {
   EnginePlayerData,
   EngineBallData,
@@ -19,12 +18,10 @@ import { GAME_CONFIG } from '../types'
 
 export interface GameEngineConfig {
   matchDuration: number // seconds
-  enableAI: boolean
 }
 
 export class GameEngine {
   private physics: PhysicsEngine
-  private ai: AIController
   private state: GameEngineState
   private config: GameEngineConfig
   private goalScored: boolean = false
@@ -65,15 +62,6 @@ export class GameEngine {
     }
     this.physics = new PhysicsEngine(physicsConfig)
 
-    // Initialize AI controller
-    this.ai = new AIController({
-      fieldWidth: GAME_CONFIG.FIELD_WIDTH,
-      fieldHeight: GAME_CONFIG.FIELD_HEIGHT,
-      chaseDistance: 400,
-      shootDistance: 600,
-      passDistance: 800,
-    })
-
     // Initialize state
     this.state = {
       players: new Map(),
@@ -96,7 +84,7 @@ export class GameEngine {
   }
 
   /**
-   * Add a player to the game
+   * Add a player to the game (always creates 3 players per team for 3v3)
    */
   addPlayer(sessionId: string, team: Team, isHuman: boolean = true): void {
     if (this.state.players.has(sessionId)) {
@@ -104,9 +92,8 @@ export class GameEngine {
       return
     }
 
-    if (this.config.enableAI) {
-      // Add human player + 2 AI bots
-      if (team === 'blue') {
+    // Always create 3 players per team (3v3 format)
+    if (team === 'blue') {
         const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.36)
         const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.19)
 
@@ -152,79 +139,59 @@ export class GameEngine {
           role: 'defender',
         }
 
-        this.state.players.set(sessionId, human)
-        this.state.players.set(`${sessionId}-bot1`, bot1)
-        this.state.players.set(`${sessionId}-bot2`, bot2)
-      } else {
-        // Red team
-        const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.64)
-        const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.81)
-
-        const human: EnginePlayerData = {
-          id: sessionId,
-          team,
-          isHuman: true,
-          isControlled: true,
-          x: forwardX,
-          y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5),
-          velocityX: 0,
-          velocityY: 0,
-          state: 'idle',
-          direction: 0,
-          role: 'forward',
-        }
-
-        const bot1: EnginePlayerData = {
-          id: `${sessionId}-bot1`,
-          team,
-          isHuman: false,
-          isControlled: false,
-          x: defenderX,
-          y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.75),
-          velocityX: 0,
-          velocityY: 0,
-          state: 'idle',
-          direction: 0,
-          role: 'defender',
-        }
-
-        const bot2: EnginePlayerData = {
-          id: `${sessionId}-bot2`,
-          team,
-          isHuman: false,
-          isControlled: false,
-          x: defenderX,
-          y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.25),
-          velocityX: 0,
-          velocityY: 0,
-          state: 'idle',
-          direction: 0,
-          role: 'defender',
-        }
-
-        this.state.players.set(sessionId, human)
-        this.state.players.set(`${sessionId}-bot1`, bot1)
-        this.state.players.set(`${sessionId}-bot2`, bot2)
-      }
+      this.state.players.set(sessionId, human)
+      this.state.players.set(`${sessionId}-bot1`, bot1)
+      this.state.players.set(`${sessionId}-bot2`, bot2)
     } else {
-      // No AI - just add human player
-      const x = team === 'blue' ? 360 : GAME_CONFIG.FIELD_WIDTH - 360
-      const y = GAME_CONFIG.FIELD_HEIGHT / 2
+      // Red team
+      const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.64)
+      const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.81)
 
-      const player: EnginePlayerData = {
+      const human: EnginePlayerData = {
         id: sessionId,
         team,
         isHuman: true,
         isControlled: true,
-        x,
-        y,
+        x: forwardX,
+        y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5),
         velocityX: 0,
         velocityY: 0,
         state: 'idle',
         direction: 0,
+        role: 'forward',
       }
 
-      this.state.players.set(sessionId, player)
+      const bot1: EnginePlayerData = {
+        id: `${sessionId}-bot1`,
+        team,
+        isHuman: false,
+        isControlled: false,
+        x: defenderX,
+        y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.75),
+        velocityX: 0,
+        velocityY: 0,
+        state: 'idle',
+        direction: 0,
+        role: 'defender',
+      }
+
+      const bot2: EnginePlayerData = {
+        id: `${sessionId}-bot2`,
+        team,
+        isHuman: false,
+        isControlled: false,
+        x: defenderX,
+        y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.25),
+        velocityX: 0,
+        velocityY: 0,
+        state: 'idle',
+        direction: 0,
+        role: 'defender',
+      }
+
+      this.state.players.set(sessionId, human)
+      this.state.players.set(`${sessionId}-bot1`, bot1)
+      this.state.players.set(`${sessionId}-bot2`, bot2)
     }
   }
 
@@ -242,11 +209,8 @@ export class GameEngine {
     }
 
     this.state.players.delete(sessionId)
-
-    if (this.config.enableAI) {
-      this.state.players.delete(`${sessionId}-bot1`)
-      this.state.players.delete(`${sessionId}-bot2`)
-    }
+    this.state.players.delete(`${sessionId}-bot1`)
+    this.state.players.delete(`${sessionId}-bot2`)
   }
 
   /**
@@ -260,7 +224,7 @@ export class GameEngine {
   }
 
   /**
-   * Update which player is being controlled by a human (for AI teammate switching)
+   * Update which player is being controlled by a human (for teammate switching)
    */
   setPlayerControl(sessionId: string, controlledPlayerId: string): void {
     // Get the team from either the session player or the controlled player
@@ -305,19 +269,6 @@ export class GameEngine {
   }
 
   /**
-   * Update AI for all bot players
-   */
-  private updateAI(): void {
-    if (!this.config.enableAI) return
-
-    const aiInputs = this.ai.updateAllAI(this.state.players, this.state.ball)
-
-    aiInputs.forEach((input, playerId) => {
-      this.queueInput(playerId, input)
-    })
-  }
-
-  /**
    * Main update loop (called at variable framerate, uses fixed timestep internally)
    */
   update(deltaTime: number): void {
@@ -334,10 +285,7 @@ export class GameEngine {
       this.physicsAccumulator >= this.FIXED_TIMESTEP_MS &&
       physicsSteps < MAX_PHYSICS_STEPS
     ) {
-      // Update AI (generates inputs for bots)
-      this.updateAI()
-
-      // Process all inputs (human + AI)
+      // Process all inputs
       this.processInputs(this.FIXED_TIMESTEP_S)
 
       // Update possession pressure

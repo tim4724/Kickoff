@@ -72,17 +72,15 @@ export class GameState extends Schema {
   @type({ map: Player }) players = new MapSchema<Player>()
   @type(Ball) ball = new Ball()
 
-  // Internal GameEngine (not synced, just for physics/AI)
+  // Internal GameEngine (not synced, just for physics)
   private gameEngine: GameEngine
-  private aiEnabled: boolean = false
 
   constructor() {
     super()
 
-    // Initialize GameEngine with AI disabled for multiplayer
+    // Initialize GameEngine
     this.gameEngine = new GameEngine({
       matchDuration: GAME_CONFIG.MATCH_DURATION,
-      enableAI: false,
     })
 
     // Register callbacks
@@ -98,14 +96,6 @@ export class GameState extends Schema {
     })
   }
 
-  /**
-   * Disable AI (for test rooms)
-   */
-  setAIEnabled(enabled: boolean) {
-    this.aiEnabled = enabled
-    // Note: GameEngine AI is already enabled in constructor
-    // This flag is for future extensibility
-  }
 
   addPlayer(sessionId: string) {
     // Defensive check: prevent duplicate player additions
@@ -141,18 +131,13 @@ export class GameState extends Schema {
 
     // Remove from Schema
     this.players.delete(sessionId)
-
-    if (this.aiEnabled) {
-      this.players.delete(`${sessionId}-bot1`)
-      this.players.delete(`${sessionId}-bot2`)
-      console.log(`Removed player ${sessionId} and their AI bots (remaining players: ${this.players.size})`)
-    } else {
-      console.log(`Removed player ${sessionId} (remaining players: ${this.players.size})`)
-    }
+    this.players.delete(`${sessionId}-bot1`)
+    this.players.delete(`${sessionId}-bot2`)
+    console.log(`Removed player ${sessionId} and their teammates (remaining players: ${this.players.size})`)
   }
 
   queueInput(sessionId: string, input: PlayerInput) {
-    // Use playerId from input if provided (for AI teammate switching)
+    // Use playerId from input if provided (for teammate switching)
     const targetPlayerId = input.playerId || sessionId
 
     // Update control status in GameEngine if switching players

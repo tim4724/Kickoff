@@ -31,17 +31,6 @@ export class MatchRoom extends Room<GameState> {
     console.log('🏷️  Room name set:', roomName)
 
     const gameState = new GameState()
-
-    // Disable AI for test rooms and multiplayer
-    if (roomName.includes('test')) {
-      gameState.aiEnabled = false
-      console.log('🤖 AI disabled for test room')
-    } else {
-      // Disable AI for multiplayer temporarily
-      gameState.aiEnabled = false
-      console.log('🤖 AI disabled for multiplayer (temporary)')
-    }
-
     this.setState(gameState)
 
     // Start game loop at 60 Hz
@@ -123,7 +112,7 @@ export class MatchRoom extends Room<GameState> {
 
   private onPlayerInput(client: Client, input: any) {
     // Input logging disabled for performance (60+ calls/sec per player)
-    // Use input.playerId if provided (for AI teammate switching), otherwise use client.sessionId
+    // Use input.playerId if provided (for teammate switching), otherwise use client.sessionId
     const targetPlayerId = input.playerId || client.sessionId
     this.state.queueInput(targetPlayerId, input)
   }
