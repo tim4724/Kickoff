@@ -131,8 +131,10 @@ export class SinglePlayerScene extends BaseGameScene {
       if (playerId === this.myPlayerId) {
         // Always update the main player sprite (represents original human player)
         this.player.setPosition(playerData.x, playerData.y)
+        // Ensure color is always set
+        this.player.setFillStyle(this.playerTeamColor)
       } else {
-        // Update remote player sprites (AI teammates and opponents)
+        // Update remote player sprites (teammates and opponents)
         const sprite = this.remotePlayers.get(playerId)
         if (sprite) {
           sprite.setPosition(playerData.x, playerData.y)
