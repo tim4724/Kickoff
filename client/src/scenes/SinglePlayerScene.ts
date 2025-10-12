@@ -112,6 +112,7 @@ export class SinglePlayerScene extends BaseGameScene {
             ? GAME_CONFIG.TEAM_BLUE_COLOR
             : GAME_CONFIG.TEAM_RED_COLOR
         this.player.setFillStyle(color)
+        this.player.isFilled = true // Restore fill after setFillStyle
         this.playerTeamColor = color
       } else {
         this.createRemotePlayer(playerId, playerData)
@@ -133,6 +134,7 @@ export class SinglePlayerScene extends BaseGameScene {
         this.player.setPosition(playerData.x, playerData.y)
         // Ensure color is always set
         this.player.setFillStyle(this.playerTeamColor)
+        this.player.isFilled = true // Restore fill after setFillStyle
       } else {
         // Update remote player sprites (teammates and opponents)
         const sprite = this.remotePlayers.get(playerId)

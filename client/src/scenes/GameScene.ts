@@ -169,14 +169,19 @@ export class GameScene extends BaseGameScene {
   create() {
     super.create()
 
-    // Add room debug text (multiplayer-specific UI)
+    // Add room debug text (multiplayer-specific UI) at top left corner
     this.roomDebugText = this.add.text(10, 10, 'Room: Not connected', {
       fontSize: '14px',
       color: '#888888',
     })
     this.roomDebugText.setOrigin(0, 0)
     this.roomDebugText.setScrollFactor(0)
+    this.roomDebugText.setDepth(10000) // Very high depth to render on top
+
     this.uiObjects.push(this.roomDebugText)
+
+    // Ensure UI camera renders this text
+    this.cameraManager.getGameCamera().ignore([this.roomDebugText])
 
     // Expose controls for testing (development only)
     if (typeof window !== 'undefined' && import.meta.env.DEV) {
@@ -341,9 +346,15 @@ export class GameScene extends BaseGameScene {
 
     // Update ball position with interpolation
     if (state.ball) {
-      const lerpFactor = VISUAL_CONSTANTS.BALL_LERP_FACTOR
-      this.ball.x += (state.ball.x - this.ball.x) * lerpFactor
-      this.ball.y += (state.ball.y - this.ball.y) * lerpFactor
+      // Initialize ball position if not set or invalid (fixes null/NaN position issue)
+      if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
+        this.ball.x = state.ball.x
+        this.ball.y = state.ball.y
+      } else {
+        const lerpFactor = VISUAL_CONSTANTS.BALL_LERP_FACTOR
+        this.ball.x += (state.ball.x - this.ball.x) * lerpFactor
+        this.ball.y += (state.ball.y - this.ball.y) * lerpFactor
+      }
       // Update shadow to follow ball
       this.ballShadow.x = this.ball.x + 2
       this.ballShadow.y = this.ball.y + 3

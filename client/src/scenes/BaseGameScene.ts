@@ -96,6 +96,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
       VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER,
       VISUAL_CONSTANTS.BORDER_COLOR
     )
+    // Ensure circle is filled (setStrokeStyle can clear isFilled flag)
+    this.player.isFilled = true
 
     this.gameObjects.push(this.player)
     this.cameraManager.getUICamera().ignore([this.player])
@@ -214,6 +216,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
       VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
       VISUAL_CONSTANTS.BORDER_COLOR
     )
+    // Ensure circle is filled (setStrokeStyle can clear isFilled flag)
+    remotePlayer.isFilled = true
     remotePlayer.setDepth(10)
 
     this.gameObjects.push(remotePlayer)
@@ -227,11 +231,13 @@ export abstract class BaseGameScene extends Phaser.Scene {
         VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER,
         VISUAL_CONSTANTS.BORDER_COLOR
       )
+      this.player.isFilled = true // Restore fill after setStrokeStyle
     } else {
       this.player.setStrokeStyle(
         VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
         VISUAL_CONSTANTS.BORDER_COLOR
       )
+      this.player.isFilled = true // Restore fill after setStrokeStyle
     }
 
     this.remotePlayers.forEach((playerSprite, sessionId) => {
@@ -240,11 +246,13 @@ export abstract class BaseGameScene extends Phaser.Scene {
           VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER,
           VISUAL_CONSTANTS.BORDER_COLOR
         )
+        playerSprite.isFilled = true // Restore fill after setStrokeStyle
       } else {
         playerSprite.setStrokeStyle(
           VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
           VISUAL_CONSTANTS.BORDER_COLOR
         )
+        playerSprite.isFilled = true // Restore fill after setStrokeStyle
       }
     })
   }
