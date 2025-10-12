@@ -68,6 +68,7 @@ export class NetworkManager {
   private onMatchStart?: (duration: number) => void
   private onMatchEnd?: (winner: 'blue' | 'red', scoreBlue: number, scoreRed: number) => void
   private onConnectionError?: (error: string) => void
+  private onPlayerReady?: (sessionId: string, team: 'blue' | 'red') => void
 
   constructor(config: NetworkConfig) {
     this.config = config
@@ -321,6 +322,14 @@ export class NetworkManager {
   private setupMessageListeners(): void {
     if (!this.room) return
 
+    // Player ready event - confirms player is fully initialized on server
+    this.room.onMessage('player_ready', (message) => {
+      console.log('[NetworkManager] Player ready!', message)
+      // Update sessionId from server confirmation (though it should already match)
+      this.sessionId = message.sessionId
+      this.onPlayerReady?.(message.sessionId, message.team)
+    })
+
     // Match start event
     this.room.onMessage('match_start', (message) => {
       console.log('[NetworkManager] Match starting!', message)
@@ -350,6 +359,7 @@ export class NetworkManager {
   on(event: 'matchStart', callback: (duration: number) => void): void
   on(event: 'matchEnd', callback: (winner: 'blue' | 'red', scoreBlue: number, scoreRed: number) => void): void
   on(event: 'connectionError', callback: (error: string) => void): void
+  on(event: 'playerReady', callback: (sessionId: string, team: 'blue' | 'red') => void): void
   on(event: string, callback: any): void {
     switch (event) {
       case 'stateChange':
@@ -372,6 +382,9 @@ export class NetworkManager {
         break
       case 'connectionError':
         this.onConnectionError = callback
+        break
+      case 'playerReady':
+        this.onPlayerReady = callback
         break
     }
   }

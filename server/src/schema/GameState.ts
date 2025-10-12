@@ -75,6 +75,9 @@ export class GameState extends Schema {
   // Internal GameEngine (not synced, just for physics)
   private gameEngine: GameEngine
 
+  // Player addition lock to prevent race conditions when multiple clients join simultaneously
+  private playerAdditionLock: Promise<void> = Promise.resolve()
+
   constructor() {
     super()
 
@@ -97,32 +100,50 @@ export class GameState extends Schema {
   }
 
 
-  addPlayer(sessionId: string) {
-    // Defensive check: prevent duplicate player additions
-    if (this.players.has(sessionId)) {
-      console.warn(`⚠️ Player ${sessionId} already exists, skipping add`)
-      return
-    }
+  async addPlayer(sessionId: string): Promise<{ team: Team }> {
+    // Serialize player additions to prevent race conditions
+    // Wait for any pending player addition to complete
+    await this.playerAdditionLock
 
-    // Count only human players to determine team assignment
-    let blueHumans = 0
-    let redHumans = 0
-    this.players.forEach((player) => {
-      if (player.isHuman) {
-        if (player.team === 'blue') blueHumans++
-        else redHumans++
-      }
+    // Create new lock for this addition
+    let resolveLock: () => void
+    this.playerAdditionLock = new Promise((resolve) => {
+      resolveLock = resolve
     })
 
-    const team: Team = blueHumans <= redHumans ? 'blue' : 'red'
+    try {
+      // Defensive check: prevent duplicate player additions
+      if (this.players.has(sessionId)) {
+        console.warn(`⚠️ Player ${sessionId} already exists, skipping add`)
+        return { team: this.players.get(sessionId)!.team }
+      }
 
-    // Add player to GameEngine (automatically creates bots if AI enabled)
-    this.gameEngine.addPlayer(sessionId, team, true)
+      // Count only human players to determine team assignment
+      // This runs atomically now due to the lock
+      let blueHumans = 0
+      let redHumans = 0
+      this.players.forEach((player) => {
+        if (player.isHuman) {
+          if (player.team === 'blue') blueHumans++
+          else redHumans++
+        }
+      })
 
-    // Sync players from engine to Schema
-    this.syncPlayersFromEngine()
+      const team: Team = blueHumans <= redHumans ? 'blue' : 'red'
 
-    console.log(`Added player ${sessionId} to team ${team} (total players: ${this.players.size})`)
+      // Add player to GameEngine (automatically creates bots if AI enabled)
+      this.gameEngine.addPlayer(sessionId, team, true)
+
+      // Sync players from engine to Schema
+      this.syncPlayersFromEngine()
+
+      console.log(`✅ Player ${sessionId} added to ${team} team (Blue: ${blueHumans + (team === 'blue' ? 1 : 0)}, Red: ${redHumans + (team === 'red' ? 1 : 0)})`)
+
+      return { team }
+    } finally {
+      // Release the lock
+      resolveLock!()
+    }
   }
 
   removePlayer(sessionId: string) {

@@ -64,6 +64,10 @@ export async function setupIsolatedTest(
   const roomId = generateTestRoomId(workerIndex)
   await setTestRoomId(page, roomId)
   await page.goto(url)
+
+  // Wait for player to be ready (server confirms initialization)
+  await waitForPlayerReady(page)
+
   return roomId
 }
 
@@ -113,5 +117,32 @@ export async function setupMultiClientTest(
     pages.map(page => page.goto(url))
   )
 
+  // Wait for all players to be ready (server confirms initialization)
+  await Promise.all(
+    pages.map(page => waitForPlayerReady(page))
+  )
+
   return roomId
+}
+
+/**
+ * Wait for player_ready message from server
+ *
+ * This ensures the player is fully initialized on the server before
+ * proceeding with tests. Prevents race conditions with team assignment
+ * and session ID availability.
+ *
+ * @param page - Playwright page object
+ * @param timeoutMs - Maximum time to wait (default: 10000ms)
+ * @returns Promise that resolves when player is ready
+ */
+export async function waitForPlayerReady(
+  page: Page,
+  timeoutMs: number = 10000
+): Promise<void> {
+  await page.waitForFunction(() => {
+    const scene = (window as any).__gameControls?.scene
+    // Player is ready when we have both sessionId and it exists in the players map
+    return scene?.mySessionId && scene?.networkManager?.getState()?.players?.has(scene.mySessionId)
+  }, { timeout: timeoutMs })
 }

@@ -50,11 +50,20 @@ export class MatchRoom extends Room<GameState> {
     console.log('✅ Match room initialized')
   }
 
-  onJoin(client: Client, options: any) {
+  async onJoin(client: Client, options: any) {
     console.log(`Player joined: ${client.sessionId}`)
 
-    // Add player to game state
-    this.state.addPlayer(client.sessionId)
+    // Add player to game state (wait for completion to ensure atomic team assignment)
+    const playerInfo = await this.state.addPlayer(client.sessionId)
+
+    // Send player_ready message with sessionId and team
+    // This signals to the client that initialization is complete
+    client.send('player_ready', {
+      sessionId: client.sessionId,
+      team: playerInfo.team,
+    })
+
+    console.log(`🎮 Player ${client.sessionId} ready on ${playerInfo.team} team`)
 
     // Count human players (non-AI)
     let humanPlayerCount = 0
@@ -72,6 +81,7 @@ export class MatchRoom extends Room<GameState> {
 
     // Start match when 2 human players join (proper multiplayer)
     if (humanPlayerCount === 2) {
+      console.log('🎮 Two players connected, starting multiplayer match!')
       this.startMatch()
     } else if (humanPlayerCount === 1) {
       // Enable single-player mode: start match after 2 seconds if no second player joins
