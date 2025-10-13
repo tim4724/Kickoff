@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test'
 test('cycles through all 3 teammates correctly', async ({ page }) => {
   const testRoom = `test_cycle_${Date.now()}`
 
-  await page.goto(`http://localhost:5174/?room=${testRoom}`)
+  await page.goto(`http://localhost:5173/?room=${testRoom}`)
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
@@ -88,7 +88,7 @@ test('cycles through all 3 teammates correctly', async ({ page }) => {
 test('updates visual borders when switching players', async ({ page }) => {
   const testRoom = `test_borders_${Date.now()}`
 
-  await page.goto(`http://localhost:5174/?room=${testRoom}`)
+  await page.goto(`http://localhost:5173/?room=${testRoom}`)
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
@@ -167,7 +167,7 @@ test('updates visual borders when switching players', async ({ page }) => {
 test('can switch to AI teammate', async ({ page }) => {
   const testRoom = `test_ai_control_${Date.now()}`
 
-  await page.goto(`http://localhost:5174/?room=${testRoom}`)
+  await page.goto(`http://localhost:5173/?room=${testRoom}`)
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
@@ -238,7 +238,7 @@ test('can switch to AI teammate', async ({ page }) => {
 test('space key switches players when not having ball', async ({ page }) => {
   const testRoom = `test_space_switch_${Date.now()}`
 
-  await page.goto(`http://localhost:5174/?room=${testRoom}`)
+  await page.goto(`http://localhost:5173/?room=${testRoom}`)
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)

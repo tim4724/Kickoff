@@ -338,7 +338,9 @@ test.describe('Match Lifecycle', () => {
     })
 
     console.log(`  Phase with 1 player: ${waitingPhase}`)
-    expect(waitingPhase).toBe('waiting')
+    // With AI enabled, game stays in 'playing' phase (1 human + 2 AI = 3 players)
+    // Without AI, it would return to 'waiting'
+    expect(waitingPhase).toBe('playing')
 
     await client1.close()
     await context1.close()

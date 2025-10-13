@@ -5,6 +5,7 @@
  */
 
 import { PhysicsEngine } from './PhysicsEngine'
+import { gameClock } from './GameClock'
 import type {
   EnginePlayerData,
   EngineBallData,
@@ -35,6 +36,9 @@ export class GameEngine {
   // Event callbacks
   private onGoalCallback?: (event: GoalEvent) => void
   private onMatchEndCallback?: () => void
+
+  // Goal reset timer
+  private goalResetTimerId?: number
 
   constructor(config: GameEngineConfig) {
     this.config = config
@@ -357,14 +361,20 @@ export class GameEngine {
       this.onGoalCallback({ team, time: this.state.matchTime })
     }
 
-    // Reset ball after delay
-    setTimeout(() => {
+    // Cancel any pending goal reset
+    if (this.goalResetTimerId !== undefined) {
+      gameClock.clearTimeout(this.goalResetTimerId)
+    }
+
+    // Reset ball after delay using GameClock
+    this.goalResetTimerId = gameClock.setTimeout(() => {
       this.physics.resetBall(
         this.state.ball,
         GAME_CONFIG.FIELD_WIDTH,
         GAME_CONFIG.FIELD_HEIGHT
       )
       this.goalScored = false
+      this.goalResetTimerId = undefined
     }, 1000)
   }
 

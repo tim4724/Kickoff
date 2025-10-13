@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from '@shared/types'
+import { GameClock } from '@shared'
 import { NetworkManager } from '../network/NetworkManager'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
@@ -212,7 +213,11 @@ export class GameScene extends BaseGameScene {
         },
       }
 
+      // Expose GameClock for time control in tests
+      ;(window as any).GameClock = GameClock
+
       console.log('🧪 Testing API exposed: window.__gameControls')
+      console.log('🕐 GameClock exposed for time control')
     }
   }
 

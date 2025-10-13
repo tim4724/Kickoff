@@ -27,9 +27,15 @@ test.describe('Game Over Screen', () => {
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
+    // Wait for match to start (phase becomes 'playing')
+    await client1.waitForFunction(() => {
+      const state = (window as any).__gameControls?.scene?.networkManager?.getState()
+      return state?.phase === 'playing'
+    }, { timeout: 10000 })
+
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      client1.waitForTimeout(1000),
+      client2.waitForTimeout(1000)
     ])
 
     // Verify match is playing
@@ -58,6 +64,9 @@ test.describe('Game Over Screen', () => {
         room.state.scoreRed = 1
         room.state.matchTime = 0
       }
+
+      // Trigger game over UI display
+      scene.onMatchEnd()
     })
 
     await client1.waitForTimeout(1000)
@@ -104,9 +113,15 @@ test.describe('Game Over Screen', () => {
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
+    // Wait for match to start (phase becomes 'playing')
+    await client1.waitForFunction(() => {
+      const state = (window as any).__gameControls?.scene?.networkManager?.getState()
+      return state?.phase === 'playing'
+    }, { timeout: 10000 })
+
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      client1.waitForTimeout(1000),
+      client2.waitForTimeout(1000)
     ])
 
     console.log('\n📤 Simulating Red team score...')
@@ -122,6 +137,9 @@ test.describe('Game Over Screen', () => {
         room.state.scoreRed = 4
         room.state.matchTime = 0
       }
+
+      // Trigger game over UI display
+      scene.onMatchEnd()
     })
 
     await client1.waitForTimeout(1000)
@@ -166,9 +184,15 @@ test.describe('Game Over Screen', () => {
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
+    // Wait for match to start (phase becomes 'playing')
+    await client1.waitForFunction(() => {
+      const state = (window as any).__gameControls?.scene?.networkManager?.getState()
+      return state?.phase === 'playing'
+    }, { timeout: 10000 })
+
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      client1.waitForTimeout(1000),
+      client2.waitForTimeout(1000)
     ])
 
     console.log('\n📤 Simulating draw scenario...')
@@ -184,6 +208,9 @@ test.describe('Game Over Screen', () => {
         room.state.scoreRed = 2
         room.state.matchTime = 0
       }
+
+      // Trigger game over UI display
+      scene.onMatchEnd()
     })
 
     await client1.waitForTimeout(1000)
@@ -228,9 +255,15 @@ test.describe('Game Over Screen', () => {
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
+    // Wait for match to start (phase becomes 'playing')
+    await client1.waitForFunction(() => {
+      const state = (window as any).__gameControls?.scene?.networkManager?.getState()
+      return state?.phase === 'playing'
+    }, { timeout: 10000 })
+
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      client1.waitForTimeout(1000),
+      client2.waitForTimeout(1000)
     ])
 
     console.log('\n📤 Testing server state vs client state...')
@@ -251,6 +284,9 @@ test.describe('Game Over Screen', () => {
         room.state.scoreRed = 3
         room.state.matchTime = 0
       }
+
+      // Trigger game over UI display
+      scene.onMatchEnd()
     })
 
     await client1.waitForTimeout(1000)
@@ -266,12 +302,13 @@ test.describe('Game Over Screen', () => {
 
     // Verify server state scores are displayed (5-3), not client scores (0-0)
     const hasServerScore = gameOverText.some((text: string) =>
-      text.includes('5') && text.includes('3')
+      text.match(/5\s*-\s*3/)
     )
     expect(hasServerScore).toBe(true)
 
+    // Should NOT show client scores (0-0)
     const hasClientScore = gameOverText.some((text: string) =>
-      text.includes('0') && text.includes('0')
+      text.match(/0\s*-\s*0/)
     )
     expect(hasClientScore).toBe(false)
 

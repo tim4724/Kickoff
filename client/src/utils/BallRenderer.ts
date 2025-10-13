@@ -41,14 +41,12 @@ export class BallRenderer {
     blueColor: number,
     redColor: number
   ): void {
-    if (!possessorTeam) {
-      ball.setFillStyle(0xffffff)
-      return
-    }
+    let targetColor: number
 
-    if (pressureLevel === 0) {
-      const teamColor = possessorTeam === 'blue' ? blueColor : redColor
-      ball.setFillStyle(teamColor)
+    if (!possessorTeam) {
+      targetColor = 0xffffff
+    } else if (pressureLevel === 0) {
+      targetColor = possessorTeam === 'blue' ? blueColor : redColor
     } else {
       // Interpolate between team colors based on pressure
       const startColor = possessorTeam === 'blue' ? blueColor : redColor
@@ -66,8 +64,13 @@ export class BallRenderer {
       const g = Math.round(startG + (endG - startG) * pressureLevel)
       const b = Math.round(startB + (endB - startB) * pressureLevel)
 
-      const interpolatedColor = (r << 16) | (g << 8) | b
-      ball.setFillStyle(interpolatedColor)
+      targetColor = (r << 16) | (g << 8) | b
     }
+
+    // Set the fill color - setFillStyle clears isFilled flag
+    ball.setFillStyle(targetColor)
+    // Restore fill by setting it again with same color to ensure isFilled is true
+    ball.fillColor = targetColor
+    ball.isFilled = true
   }
 }

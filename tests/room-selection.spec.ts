@@ -72,12 +72,12 @@ test.describe('Room Selection', () => {
       client4.goto(CLIENT_URL),
     ])
 
-    // Wait for all clients to connect and join rooms
+    // Wait for all clients to connect and join rooms (longer wait for Phaser initialization)
     await Promise.all([
-      client1.waitForTimeout(4000),
-      client2.waitForTimeout(4000),
-      client3.waitForTimeout(4000),
-      client4.waitForTimeout(4000),
+      client1.waitForTimeout(5000),
+      client2.waitForTimeout(5000),
+      client3.waitForTimeout(5000),
+      client4.waitForTimeout(5000),
     ])
 
     // Verify Room A clients joined the correct room

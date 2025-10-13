@@ -217,10 +217,10 @@ test.describe('Two-Player Room Joining', () => {
     await client2.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client2.goto(CLIENT_URL)
 
-    // Wait briefly for connection and match start
+    // Wait for connection and match start (need longer for Phaser initialization)
     await Promise.all([
-      client1.waitForTimeout(1500),
-      client2.waitForTimeout(1500)
+      client1.waitForTimeout(2500),
+      client2.waitForTimeout(2500)
     ])
 
     // Check phase on both clients (should be 'playing')
@@ -403,10 +403,10 @@ test.describe('Two-Player Room Joining', () => {
     await client2.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client2.goto(CLIENT_URL)
 
-    // Wait for match to start
+    // Wait for match to start (need longer for Phaser initialization)
     await Promise.all([
-      client1.waitForTimeout(1500),
-      client2.waitForTimeout(1500)
+      client1.waitForTimeout(2500),
+      client2.waitForTimeout(2500)
     ])
 
     // Should now be in playing phase

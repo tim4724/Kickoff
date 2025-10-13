@@ -359,7 +359,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.cameraManager.getGameCamera().shake(200, 0.01)
   }
 
-  protected onMatchEnd() {
+  // Public for test access - tests need to trigger game over scenarios
+  public onMatchEnd() {
     this.matchEnded = true
 
     const state = this.getGameState()

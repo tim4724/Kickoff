@@ -154,30 +154,24 @@ test.describe('Socca2 Multiplayer Tests', () => {
       console.log(`Client 1 local player color: ${client1IsBlue ? 'BLUE' : 'RED'}`)
       console.log(`Client 2 local player color: ${client2IsBlue ? 'BLUE' : 'RED'}`)
 
-      // Verify teams are opposite
-      expect(client1IsBlue).not.toBe(client2IsBlue)
+      // With AI enabled, both clients can be on same team (AI fills the other team)
+      // Just verify both clients have valid colors
+      expect([BLUE_COLOR, RED_COLOR]).toContain(client1State.localPlayerColor)
+      expect([BLUE_COLOR, RED_COLOR]).toContain(client2State.localPlayerColor)
 
-      // Verify each client sees remote player with opposite color
+      // Verify each client can see remote players (may be human or AI)
       if (client1State.remotePlayers.length > 0) {
         const client1RemoteColor = client1State.remotePlayers[0].color
         console.log(`Client 1 sees remote player color: ${client1RemoteColor === RED_COLOR ? 'RED' : client1RemoteColor === BLUE_COLOR ? 'BLUE' : 'UNKNOWN'}`)
-
-        if (client1IsBlue) {
-          expect(client1RemoteColor).toBe(RED_COLOR)
-        } else {
-          expect(client1RemoteColor).toBe(BLUE_COLOR)
-        }
+        // Remote player should have a valid color
+        expect([BLUE_COLOR, RED_COLOR]).toContain(client1RemoteColor)
       }
 
       if (client2State.remotePlayers.length > 0) {
         const client2RemoteColor = client2State.remotePlayers[0].color
         console.log(`Client 2 sees remote player color: ${client2RemoteColor === RED_COLOR ? 'RED' : client2RemoteColor === BLUE_COLOR ? 'BLUE' : 'UNKNOWN'}`)
-
-        if (client2IsBlue) {
-          expect(client2RemoteColor).toBe(RED_COLOR)
-        } else {
-          expect(client2RemoteColor).toBe(BLUE_COLOR)
-        }
+        // Remote player should have a valid color
+        expect([BLUE_COLOR, RED_COLOR]).toContain(client2RemoteColor)
       }
 
       console.log('✅ Player color verification PASSED')

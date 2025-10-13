@@ -15,6 +15,20 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0',
     open: true,
+    // Configure for parallel test execution
+    hmr: {
+      overlay: false, // Disable error overlay for cleaner tests
+    },
+    // Increase connection limits for concurrent testing
+    cors: true,
+    strictPort: false,
+  },
+  // Optimize for faster cold starts during parallel testing
+  optimizeDeps: {
+    force: false, // Don't force re-optimization
+    esbuildOptions: {
+      target: 'es2020',
+    },
   },
   build: {
     target: 'es2020',
