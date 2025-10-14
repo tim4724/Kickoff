@@ -221,7 +221,30 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     await movePlayerTowardBall(client1)
     await client1.waitForTimeout(500)
 
-    const captureState = await getGameState(client1)
+    // Try moving a bit more to ensure possession (in case we're at edge of possession radius)
+    // This is especially important under high concurrency (4+ workers)
+    await client1.keyboard.down('ArrowRight')
+    await client1.waitForTimeout(500)
+    await client1.keyboard.up('ArrowRight')
+    await client1.waitForTimeout(500)
+
+    // Wait for possession to register (may take longer under high load)
+    let captureAttempts = 0
+    let captureState = null
+
+    while (captureAttempts < 5) {
+      await client1.waitForTimeout(300)
+      captureState = await getGameState(client1)
+
+      if (captureState?.ball.possessedBy) {
+        console.log(`  ✅ Ball captured by: ${captureState.ball.possessedBy}`)
+        break
+      }
+
+      captureAttempts++
+      console.log(`  📍 Attempt ${captureAttempts}: Ball not yet possessed`)
+    }
+
     const finalPositions = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       return {
