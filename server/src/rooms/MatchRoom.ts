@@ -16,7 +16,6 @@ const MAX_PHYSICS_STEPS = 5 // Prevent spiral of death under extreme load
 
 export class MatchRoom extends Room<GameState> {
   maxClients = 2 // 2 human players (1v1 match)
-  private singlePlayerStartTimeout?: NodeJS.Timeout
 
   // Fixed timestep accumulator for deterministic physics
   private physicsAccumulator: number = 0
@@ -73,30 +72,13 @@ export class MatchRoom extends Room<GameState> {
       }
     })
 
-    // Clear any pending single-player start timeout
-    if (this.singlePlayerStartTimeout) {
-      clearTimeout(this.singlePlayerStartTimeout)
-      this.singlePlayerStartTimeout = undefined
-    }
-
     // Start match when 2 human players join (proper multiplayer)
     if (humanPlayerCount === 2) {
       console.log('🎮 Two players connected, starting multiplayer match!')
       this.startMatch()
     } else if (humanPlayerCount === 1) {
-      // Enable single-player mode: start match after 2 seconds if no second player joins
-      console.log('⏱️ Single player detected, starting match in 2 seconds...')
-      this.singlePlayerStartTimeout = setTimeout(() => {
-        // Recount human players
-        let count = 0
-        this.state.players.forEach((player) => {
-          if (player.isHuman) count++
-        })
-        if (count === 1 && this.state.phase === 'waiting') {
-          console.log('🎮 Starting single-player match')
-          this.startMatch()
-        }
-      }, 2000)
+      // Wait indefinitely for second player - no timeout
+      console.log('⏱️ Waiting for second player to join...')
     }
   }
 
@@ -192,11 +174,5 @@ export class MatchRoom extends Room<GameState> {
 
   onDispose() {
     console.log('Match room disposed:', this.roomId)
-
-    // Clear any pending single-player start timeout
-    if (this.singlePlayerStartTimeout) {
-      clearTimeout(this.singlePlayerStartTimeout)
-      this.singlePlayerStartTimeout = undefined
-    }
   }
 }
