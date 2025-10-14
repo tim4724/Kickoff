@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { MenuScene } from './scenes/MenuScene'
 import { GameScene } from './scenes/GameScene'
 import { SinglePlayerScene } from './scenes/SinglePlayerScene'
+import { AIOnlyScene } from './scenes/AIOnlyScene'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -20,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [MenuScene, GameScene, SinglePlayerScene],
+  scene: [MenuScene, GameScene, SinglePlayerScene, AIOnlyScene],
 }
 
 // Remove loading text

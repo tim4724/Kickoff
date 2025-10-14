@@ -54,6 +54,23 @@ export class MenuScene extends Phaser.Scene {
     })
     multiplayerText.setOrigin(0.5)
 
+    // AI-Only Button (Dev Mode)
+    const aiOnlyButton = this.add.rectangle(
+      width / 2,
+      height * 0.8,
+      400,
+      80,
+      0xffaa00
+    )
+    aiOnlyButton.setInteractive({ useHandCursor: true })
+
+    const aiOnlyText = this.add.text(width / 2, height * 0.8, 'AI-Only (Dev)', {
+      fontSize: '32px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+    })
+    aiOnlyText.setOrigin(0.5)
+
     // Button hover effects
     singlePlayerButton.on('pointerover', () => {
       singlePlayerButton.setFillStyle(0x0088ff)
@@ -69,6 +86,13 @@ export class MenuScene extends Phaser.Scene {
       multiplayerButton.setFillStyle(0xff4444)
     })
 
+    aiOnlyButton.on('pointerover', () => {
+      aiOnlyButton.setFillStyle(0xffcc00)
+    })
+    aiOnlyButton.on('pointerout', () => {
+      aiOnlyButton.setFillStyle(0xffaa00)
+    })
+
     // Button click handlers
     singlePlayerButton.on('pointerdown', () => {
       console.log('🎮 Starting Single Player mode')
@@ -78,6 +102,11 @@ export class MenuScene extends Phaser.Scene {
     multiplayerButton.on('pointerdown', () => {
       console.log('🌐 Starting Multiplayer mode')
       this.scene.start('GameScene')
+    })
+
+    aiOnlyButton.on('pointerdown', () => {
+      console.log('🤖 Starting AI-Only mode')
+      this.scene.start('AIOnlyScene')
     })
 
     // Version info
