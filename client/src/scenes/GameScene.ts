@@ -397,7 +397,7 @@ export class GameScene extends BaseGameScene {
     const deltaY = Math.abs(this.player.y - serverY)
 
     // Adaptive reconciliation factor based on error magnitude
-    let reconcileFactor = VISUAL_CONSTANTS.BASE_RECONCILE_FACTOR
+    let reconcileFactor: number = VISUAL_CONSTANTS.BASE_RECONCILE_FACTOR
 
     if (deltaX > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD || deltaY > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD) {
       reconcileFactor = VISUAL_CONSTANTS.STRONG_RECONCILE_FACTOR

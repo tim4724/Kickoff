@@ -2,6 +2,7 @@ import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
 import type { EnginePlayerData } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
+import { VISUAL_CONSTANTS } from './GameSceneConstants'
 
 /**
  * Single Player Scene
@@ -109,8 +110,8 @@ export class SinglePlayerScene extends BaseGameScene {
         this.player.setPosition(playerData.x, playerData.y)
         const color =
           playerData.team === 'blue'
-            ? GAME_CONFIG.TEAM_BLUE_COLOR
-            : GAME_CONFIG.TEAM_RED_COLOR
+            ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
+            : VISUAL_CONSTANTS.PLAYER_RED_COLOR
         this.player.setFillStyle(color)
         this.player.isFilled = true // Restore fill after setFillStyle
         this.playerTeamColor = color
