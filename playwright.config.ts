@@ -3,11 +3,16 @@ import { defineConfig, devices } from '@playwright/test'
 /**
  * Playwright configuration for Socca2 multiplayer testing
  *
- * Performance characteristics:
- * - 1 worker: 100% pass rate (slow)
- * - 4 workers: 85% pass rate
- * - 8 workers: ~90% pass rate (balanced)
- * - 24 workers: 64% pass rate (too aggressive)
+ * Performance characteristics with synchronized 10x time acceleration:
+ * - 10x time acceleration enabled on BOTH client and server
+ * - Tests run ~10x faster with synchronized physics simulation
+ * - 8 workers: Optimal parallelism (tests complete in ~3 minutes)
+ * - 4 workers: CI configuration (more conservative, ~5 minutes)
+ *
+ * Time acceleration implementation:
+ * - Client: GameClock.setTimeScale(10) via test fixtures
+ * - Server: deltaTime scaling in MatchRoom update loop
+ * - Both synchronized via __testTimeScale window variable
  */
 export default defineConfig({
   testDir: './tests',
@@ -21,13 +26,13 @@ export default defineConfig({
   // Smart retry strategy: retry on network/timeout errors only
   retries: process.env.CI ? 2 : 1, // Changed from 0 to 1 locally for flaky physics tests
 
-  // Optimal worker configuration for physics-sensitive tests
-  // With 10x time acceleration, tests run much faster
-  workers: process.env.CI ? 4 : 8, // CI: conservative, Local: balanced performance
+  // Optimal worker configuration with 10x time acceleration
+  // 4 workers achieves good parallelism while avoiding severe CPU throttling
+  workers: 4, // Reduced from 8 for test stability with browser throttling
 
   // Global timeout to prevent hanging tests
-  // Reduced due to 10x time acceleration
-  timeout: 30000, // 30 seconds per test (was 60s, now 10x faster)
+  // With 10x time acceleration: 30s real-time = 5 minutes game-time
+  timeout: 30000, // 30 seconds per test at 10x speed
 
   // Expect timeout for assertions
   expect: {
@@ -70,6 +75,9 @@ export default defineConfig({
             '--disable-web-security',
             '--disable-features=IsolateOrigins,site-per-process',
             '--disable-gpu',
+            '--disable-background-timer-throttling', // Prevent requestAnimationFrame throttling
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
           ],
         },
       },
@@ -89,6 +97,9 @@ export default defineConfig({
             '--disable-web-security',
             '--disable-features=IsolateOrigins,site-per-process',
             '--disable-gpu',
+            '--disable-background-timer-throttling', // Prevent requestAnimationFrame throttling
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
           ],
         },
       },
@@ -107,6 +118,9 @@ export default defineConfig({
             '--disable-web-security',
             '--disable-features=IsolateOrigins,site-per-process',
             '--disable-gpu',
+            '--disable-background-timer-throttling', // Prevent requestAnimationFrame throttling
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
           ],
         },
       },

@@ -3,6 +3,7 @@ import { GameEngine } from '@shared'
 import type { EnginePlayerData } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
+import { gameClock as GameClock } from '@shared/engine/GameClock'
 
 /**
  * Single Player Scene
@@ -45,6 +46,82 @@ export class SinglePlayerScene extends BaseGameScene {
 
     // Initialize player visuals from engine state
     this.syncPlayersFromEngine()
+
+    // Expose controls for testing (development only)
+    if (typeof window !== 'undefined' && import.meta.env.DEV) {
+      ;(window as any).__gameControls = {
+        joystick: this.joystick,
+        button: this.actionButton,
+        scene: this,
+        test: {
+          touchJoystick: (x: number, y: number) => {
+            this.joystick.__test_simulateTouch(x, y)
+          },
+          dragJoystick: (x: number, y: number) => {
+            this.joystick.__test_simulateDrag(x, y)
+          },
+          releaseJoystick: () => {
+            this.joystick.__test_simulateRelease()
+          },
+          pressButton: () => {
+            this.actionButton.__test_simulatePress()
+          },
+          releaseButton: (holdMs: number = 500) => {
+            this.actionButton.__test_simulateRelease(holdMs)
+          },
+          getState: () => ({
+            joystick: this.joystick.__test_getState(),
+            button: this.actionButton.__test_getState(),
+          }),
+          // Direct input method (bypasses UI simulation)
+          // Queues continuous input for specified duration
+          // durationMs is in GAME TIME - we convert to real time based on time scale
+          directMove: async (dx: number, dy: number, gameTimeDurationMs: number) => {
+            // Normalize direction vector
+            const length = Math.sqrt(dx * dx + dy * dy)
+            const normalizedX = length > 0 ? dx / length : 0
+            const normalizedY = length > 0 ? dy / length : 0
+
+            const timeScale = GameClock.getTimeScale()
+
+            // Convert game time to real time
+            // With 10x acceleration: 2000ms game time = 200ms real time (2000 / 10)
+            const realTimeDurationMs = gameTimeDurationMs / timeScale
+
+            console.log(`🎮 [Test] Direct move: (${normalizedX.toFixed(2)}, ${normalizedY.toFixed(2)})`)
+            console.log(`  Game time: ${gameTimeDurationMs}ms, Real time: ${realTimeDurationMs}ms, Scale: ${timeScale}x`)
+
+            const startTime = performance.now()
+            const endTime = startTime + realTimeDurationMs
+
+            // Queue input continuously in real time
+            // Queue multiple inputs per iteration to ensure smooth movement under CPU load
+            let iterations = 0
+            while (performance.now() < endTime) {
+              // Queue 3 inputs per iteration for redundancy
+              for (let i = 0; i < 3; i++) {
+                this.gameEngine.queueInput(this.myPlayerId, {
+                  movement: { x: normalizedX, y: normalizedY },
+                  action: false,
+                  power: undefined
+                })
+              }
+              iterations++
+
+              // Small delay to avoid overwhelming the queue (real time)
+              await new Promise(resolve => setTimeout(resolve, 5))
+            }
+
+            const actualRealTime = performance.now() - startTime
+            console.log(`🎮 [Test] Direct move complete: ${iterations} iterations, ${actualRealTime.toFixed(1)}ms real time`)
+          },
+        },
+      }
+      // Expose GameClock for time control in tests
+      ;(window as any).GameClock = GameClock
+      console.log('🧪 Testing API exposed: window.__gameControls')
+      console.log('🕐 GameClock exposed for time control')
+    }
   }
 
   protected getGameState(): any {

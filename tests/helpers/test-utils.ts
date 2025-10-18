@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test'
+import { waitScaled } from './time-control'
 
 /**
  * Test Helper Utilities
@@ -87,9 +88,9 @@ export async function movePlayer(
   durationMs: number
 ) {
   await client.keyboard.down(direction)
-  await client.waitForTimeout(durationMs)
+  await waitScaled(client, durationMs)
   await client.keyboard.up(direction)
-  await client.waitForTimeout(200) // Small buffer for state to settle
+  await waitScaled(client, 200) // Small buffer for state to settle
 }
 
 /**
@@ -97,7 +98,7 @@ export async function movePlayer(
  */
 export async function gainPossession(
   client: Page,
-  maxAttempts: number = 5
+  maxAttempts: number = 10
 ): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     const state = await getServerState(client)
@@ -107,8 +108,9 @@ export async function gainPossession(
       return true
     }
 
-    // Move toward ball
-    await movePlayer(client, 'ArrowRight', 1000)
+    // Move toward ball (much longer duration for CPU-throttled parallel workers)
+    // With 10x time acceleration and 8 workers, we need 3000ms game time = 300ms real time
+    await movePlayer(client, 'ArrowRight', 3000)
   }
 
   return false
@@ -119,9 +121,9 @@ export async function gainPossession(
  */
 export async function shoot(client: Page, holdDurationMs: number = 200) {
   await client.keyboard.down('Space')
-  await client.waitForTimeout(holdDurationMs)
+  await waitScaled(client, holdDurationMs)
   await client.keyboard.up('Space')
-  await client.waitForTimeout(200)
+  await waitScaled(client, 200)
 }
 
 /**

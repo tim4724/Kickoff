@@ -18,7 +18,7 @@ export async function setTimeScale(page: Page, timeScale: number): Promise<void>
   await page.evaluate((scale) => {
     const { GameClock } = (window as any)
     if (GameClock) {
-      GameClock.getInstance().setTimeScale(scale)
+      GameClock.setTimeScale(scale)
       console.log(`🕐 Time scale set to ${scale}x`)
     } else {
       console.warn('⚠️ GameClock not available')
@@ -34,7 +34,7 @@ export async function enableMockTime(page: Page): Promise<void> {
   await page.evaluate(() => {
     const { GameClock } = (window as any)
     if (GameClock) {
-      GameClock.getInstance().useMockTime()
+      GameClock.useMockTime()
       console.log('🕐 Mock time enabled')
     } else {
       console.warn('⚠️ GameClock not available')
@@ -50,7 +50,7 @@ export async function disableMockTime(page: Page): Promise<void> {
   await page.evaluate(() => {
     const { GameClock } = (window as any)
     if (GameClock) {
-      GameClock.getInstance().useRealTime()
+      GameClock.useRealTime()
       console.log('🕐 Real time restored')
     } else {
       console.warn('⚠️ GameClock not available')
@@ -67,7 +67,7 @@ export async function advanceTime(page: Page, deltaMs: number): Promise<void> {
   await page.evaluate((delta) => {
     const { GameClock } = (window as any)
     if (GameClock) {
-      GameClock.getInstance().tick(delta)
+      GameClock.tick(delta)
     } else {
       console.warn('⚠️ GameClock not available')
     }
@@ -92,19 +92,26 @@ export async function advanceFrames(page: Page, numFrames: number): Promise<void
 }
 
 /**
- * Wait for real-world time (scaled by time scale)
- * This replaces waitForTimeout with scale-aware waiting
+ * Wait for game time duration (NOT real time)
+ * With 10x time acceleration, game runs 10x faster, so we wait LESS real time
+ *
+ * Example: waitScaled(page, 1000) with 10x acceleration
+ *   - Game time: 1000ms passes in the game
+ *   - Real time: 100ms actual wait (1000ms / 10)
+ *
  * @param page Playwright page
- * @param ms Milliseconds to wait (will be divided by time scale)
+ * @param gameTimeMs Game time milliseconds to wait
  */
-export async function waitScaled(page: Page, ms: number): Promise<void> {
+export async function waitScaled(page: Page, gameTimeMs: number): Promise<void> {
   const timeScale = await page.evaluate(() => {
-    const { GameClock } = (window as any)
-    return GameClock ? GameClock.getInstance().getTimeScale() : 1
+    const GameClock = (window as any).GameClock
+    // GameClock is the singleton instance, not a class
+    return GameClock ? GameClock.getTimeScale() : 1
   })
 
-  const actualWaitMs = ms / timeScale
-  await page.waitForTimeout(actualWaitMs)
+  // With time acceleration, game runs faster, so we wait LESS real time
+  const realTimeMs = gameTimeMs / timeScale
+  await page.waitForTimeout(realTimeMs)
 }
 
 /**
@@ -115,7 +122,7 @@ export async function resetTimeScale(page: Page): Promise<void> {
   await page.evaluate(() => {
     const { GameClock } = (window as any)
     if (GameClock) {
-      GameClock.getInstance().resetTimeScale()
+      GameClock.resetTimeScale()
       console.log('🕐 Time scale reset to 1x')
     }
   })
@@ -129,7 +136,7 @@ export async function resetTimeScale(page: Page): Promise<void> {
 export async function getTimeScale(page: Page): Promise<number> {
   return page.evaluate(() => {
     const { GameClock } = (window as any)
-    return GameClock ? GameClock.getInstance().getTimeScale() : 1
+    return GameClock ? GameClock.getTimeScale() : 1
   })
 }
 
@@ -141,7 +148,7 @@ export async function getTimeScale(page: Page): Promise<number> {
 export async function isMockMode(page: Page): Promise<boolean> {
   return page.evaluate(() => {
     const { GameClock } = (window as any)
-    return GameClock ? GameClock.getInstance().isMockMode() : false
+    return GameClock ? GameClock.isMockMode() : false
   })
 }
 
@@ -153,7 +160,7 @@ export async function isMockMode(page: Page): Promise<boolean> {
 export async function getMockTime(page: Page): Promise<number> {
   return page.evaluate(() => {
     const { GameClock } = (window as any)
-    return GameClock ? GameClock.getInstance().getMockTime() : 0
+    return GameClock ? GameClock.getMockTime() : 0
   })
 }
 
@@ -214,8 +221,8 @@ export async function runGameFor(
     const numFrames = Math.ceil(durationMs / frameMs)
     for (let i = 0; i < numFrames; i++) {
       await advanceTime(page, frameMs)
-      // Small delay to allow game to process
-      await page.waitForTimeout(1)
+      // Small delay to allow game to process (real-time, not scaled)
+      await new Promise(resolve => setTimeout(resolve, 1))
     }
   } else {
     // Use scaled waiting for real-time or accelerated mode
