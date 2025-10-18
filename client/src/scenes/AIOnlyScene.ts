@@ -14,9 +14,29 @@ export class AIOnlyScene extends BaseGameScene {
   private gameEngine!: GameEngine
   private aiDebugRenderer!: AIDebugRenderer
   private debugEnabled: boolean = true
+  private paused: boolean = false
+  private gameSpeed: number = 0.05 // Initial speed: 0.05 (range: 0.01 to 1.0)
+  private gameSpeedText!: Phaser.GameObjects.Text
 
   constructor() {
     super({ key: 'AIOnlyScene' })
+  }
+
+  /**
+   * Override setupInput to remove player switching behavior
+   */
+  protected setupInput(): void {
+    // Create cursor keys but don't add spacebar handler
+    this.cursors = this.input.keyboard!.createCursorKeys()
+    // Spacebar will be handled in setupSpectatorControls instead
+  }
+
+  /**
+   * Override createMobileControls to skip creating joystick and action button
+   */
+  protected createMobileControls(): void {
+    // Do nothing - AI-only mode doesn't need controls
+    // Joystick and action button will not be created
   }
 
   protected initializeGameState(): void {
@@ -58,6 +78,9 @@ export class AIOnlyScene extends BaseGameScene {
     // Initialize AI debug renderer (pass UI camera so debug elements only show on game camera)
     this.aiDebugRenderer = new AIDebugRenderer(this, this.cameraManager.getUICamera())
 
+    // Update controls hint for AI-only mode
+    this.controlsHint.setText('SPACE: Play/Pause • +/-: Speed • D: Toggle Debug')
+
     // Enable spectator camera controls
     this.setupSpectatorControls()
   }
@@ -68,10 +91,15 @@ export class AIOnlyScene extends BaseGameScene {
 
   protected updateGameState(delta: number): void {
     // No human input - all players are AI-controlled
-    // Just update game engine
-    this.gameEngine.update(delta)
 
-    // Sync visuals from engine state
+    // Apply pause and game speed
+    if (!this.paused) {
+      // Scale delta by game speed
+      const scaledDelta = delta * this.gameSpeed
+      this.gameEngine.update(scaledDelta)
+    }
+
+    // Sync visuals from engine state (always update visuals even when paused)
     this.syncVisualsFromEngine()
 
     // Update AI debug visualization
@@ -93,10 +121,46 @@ export class AIOnlyScene extends BaseGameScene {
    */
   private setupSpectatorControls() {
     console.log('📹 AI-Only Mode - Spectator View')
+    console.log('  - SPACE: Play/Pause')
+    console.log('  - +/-: Adjust game speed (current: 0.05x)')
     console.log('  - D: Toggle AI debug visualization')
 
-    // Hide joystick and action button (they exist but we don't need them)
-    // Controls are created in BaseGameScene but not needed for spectating
+    // Create game speed display
+    const width = this.scale.width
+    this.gameSpeedText = this.add.text(width - 20, 30, this.getSpeedDisplayText(), {
+      fontSize: '20px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+      backgroundColor: '#000000aa',
+      padding: { x: 12, y: 8 },
+    })
+    this.gameSpeedText.setOrigin(1, 0)
+    this.gameSpeedText.setScrollFactor(0)
+    this.gameSpeedText.setDepth(1000)
+
+    // Make it visible only in UI camera (not game camera)
+    this.cameraManager.getGameCamera().ignore([this.gameSpeedText])
+
+    // Add SPACE key for play/pause
+    this.input.keyboard?.on('keydown-SPACE', () => {
+      this.paused = !this.paused
+      this.updateSpeedDisplay()
+      console.log('⏸️ Game:', this.paused ? 'PAUSED' : 'PLAYING')
+    })
+
+    // Add + key (PLUS and EQUALS for convenience) to increase game speed
+    this.input.keyboard?.on('keydown-PLUS', () => {
+      this.adjustGameSpeed(0.05)
+    })
+    this.input.keyboard?.on('keydown-EQUALS', () => {
+      // Handle + without shift (= key)
+      this.adjustGameSpeed(0.05)
+    })
+
+    // Add - key (MINUS) to decrease game speed
+    this.input.keyboard?.on('keydown-MINUS', () => {
+      this.adjustGameSpeed(-0.05)
+    })
 
     // Add D key to toggle debug visualization
     this.input.keyboard?.on('keydown-D', () => {
@@ -104,6 +168,32 @@ export class AIOnlyScene extends BaseGameScene {
       this.aiDebugRenderer.setEnabled(this.debugEnabled)
       console.log('🐛 AI Debug:', this.debugEnabled ? 'ON' : 'OFF')
     })
+  }
+
+  /**
+   * Adjust game speed within range (0.01 to 1.0)
+   */
+  private adjustGameSpeed(delta: number): void {
+    this.gameSpeed = Math.max(0.01, Math.min(1.0, this.gameSpeed + delta))
+    this.updateSpeedDisplay()
+    console.log(`⏩ Game Speed: ${this.gameSpeed.toFixed(2)}x`)
+  }
+
+  /**
+   * Get formatted speed display text
+   */
+  private getSpeedDisplayText(): string {
+    const pausedText = this.paused ? ' [PAUSED]' : ''
+    return `Speed: ${this.gameSpeed.toFixed(2)}x${pausedText}`
+  }
+
+  /**
+   * Update speed display text
+   */
+  private updateSpeedDisplay(): void {
+    if (this.gameSpeedText) {
+      this.gameSpeedText.setText(this.getSpeedDisplayText())
+    }
   }
 
   private syncPlayersFromEngine() {

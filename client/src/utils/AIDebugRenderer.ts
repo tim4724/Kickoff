@@ -83,98 +83,15 @@ export class AIDebugRenderer {
 
     line.clear()
 
-    // Color code by team
+    // Color code by team (simplified: more transparent)
     const color = team === 'blue' ? 0x0066ff : 0xff4444
 
-    // Draw dashed line to target
-    line.lineStyle(8, color, 0.7)
-    this.drawDashedLine(line, from.x, from.y, to.x, to.y, 10, 5)
-
-    // Draw direction arrow
-    this.drawArrow(line, from, to, color)
-  }
-
-  /**
-   * Draw dashed line between two points
-   */
-  private drawDashedLine(
-    graphics: Phaser.GameObjects.Graphics,
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    dashLength: number,
-    gapLength: number
-  ): void {
-    const dx = x2 - x1
-    const dy = y2 - y1
-    const distance = Math.sqrt(dx * dx + dy * dy)
-
-    if (distance === 0) return
-
-    const dashCount = Math.floor(distance / (dashLength + gapLength))
-
-    const stepX = (dx / distance) * (dashLength + gapLength)
-    const stepY = (dy / distance) * (dashLength + gapLength)
-
-    for (let i = 0; i < dashCount; i++) {
-      const startX = x1 + stepX * i
-      const startY = y1 + stepY * i
-      const endX = startX + (dx / distance) * dashLength
-      const endY = startY + (dy / distance) * dashLength
-
-      graphics.beginPath()
-      graphics.moveTo(startX, startY)
-      graphics.lineTo(endX, endY)
-      graphics.strokePath()
-    }
-  }
-
-  /**
-   * Draw arrow at end of line
-   */
-  private drawArrow(
-    graphics: Phaser.GameObjects.Graphics,
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-    color: number
-  ): void {
-    const dx = to.x - from.x
-    const dy = to.y - from.y
-    const distance = Math.sqrt(dx * dx + dy * dy)
-
-    if (distance === 0) return
-
-    // Normalize direction
-    const dirX = dx / distance
-    const dirY = dy / distance
-
-    // Arrow position (near target)
-    const arrowDist = Math.min(distance * 0.8, distance - 30)
-    const arrowX = from.x + dirX * arrowDist
-    const arrowY = from.y + dirY * arrowDist
-
-    // Arrow size
-    const arrowSize = 15
-
-    // Calculate arrow points
-    const angle = Math.atan2(dy, dx)
-    const arrowAngle = Math.PI / 6 // 30 degrees
-
-    const p1x = arrowX - arrowSize * Math.cos(angle - arrowAngle)
-    const p1y = arrowY - arrowSize * Math.sin(angle - arrowAngle)
-
-    const p2x = arrowX - arrowSize * Math.cos(angle + arrowAngle)
-    const p2y = arrowY - arrowSize * Math.sin(angle + arrowAngle)
-
-    // Draw arrow head
-    graphics.fillStyle(color, 0.8)
-    graphics.beginPath()
-    graphics.moveTo(arrowX, arrowY)
-    graphics.lineTo(p1x, p1y)
-    graphics.lineTo(p2x, p2y)
-    graphics.closePath()
-    graphics.fillPath()
+    // Draw simple solid line to target
+    line.lineStyle(8, color, 0.4)
+    line.beginPath()
+    line.moveTo(from.x, from.y)
+    line.lineTo(to.x, to.y)
+    line.strokePath()
   }
 
   /**
