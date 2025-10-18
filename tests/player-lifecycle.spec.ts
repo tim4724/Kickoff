@@ -1,5 +1,6 @@
 import { test, expect, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Test Suite: Player Lifecycle Management
@@ -31,8 +32,8 @@ test.describe('Player Lifecycle Management', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     const [session1, session2] = await Promise.all([
@@ -62,9 +63,9 @@ test.describe('Player Lifecycle Management', () => {
 
     while (!hasPossession && attempts < 15) {
       await client1.keyboard.down(moveKey)
-      await client1.waitForTimeout(300) // Move in 300ms bursts (increased from 200ms)
+      await waitScaled(client1, 300) // Move in 300ms bursts (increased from 200ms)
       await client1.keyboard.up(moveKey)
-      await client1.waitForTimeout(200) // Wait longer between bursts
+      await waitScaled(client1, 200) // Wait longer between bursts
 
       const check = await client1.evaluate((sid) => {
         const state = (window as any).__gameControls?.scene?.networkManager?.getState()
@@ -75,7 +76,7 @@ test.describe('Player Lifecycle Management', () => {
       attempts++
     }
 
-    await client1.waitForTimeout(500) // Stabilize after gaining possession (increased from 300ms)
+    await waitScaled(client1, 500) // Stabilize after gaining possession (increased from 300ms)
 
     const ballState = await client1.evaluate((sid) => {
       const scene = (window as any).__gameControls?.scene
@@ -109,7 +110,7 @@ test.describe('Player Lifecycle Management', () => {
     await context1.close()
 
     // Wait for server to process disconnect
-    await client2.waitForTimeout(1000)
+    await waitScaled(client2, 1000)
 
     // Check ball possession on Client 2
     const ballAfterDisconnect = await client2.evaluate(() => {
@@ -148,8 +149,8 @@ test.describe('Player Lifecycle Management', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     const session2 = await client2.evaluate(() =>
@@ -171,7 +172,7 @@ test.describe('Player Lifecycle Management', () => {
     await client2.close()
     await context2.close()
 
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     // Client 1 should no longer see Client 2
     const remotePlayerAfter = await client1.evaluate((remoteId) => {
@@ -212,7 +213,7 @@ test.describe('Player Lifecycle Management', () => {
     const client1 = await context1.newPage()
     await client1.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client1.goto(CLIENT_URL)
-    await client1.waitForTimeout(2000)
+    await waitScaled(client1, 2000)
 
     const color1 = await client1.evaluate(() =>
       (window as any).__gameControls?.scene?.player?.fillColor
@@ -230,7 +231,7 @@ test.describe('Player Lifecycle Management', () => {
     const client2 = await context2.newPage()
     await client2.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client2.goto(CLIENT_URL)
-    await client2.waitForTimeout(2000)
+    await waitScaled(client2, 2000)
 
     const color2 = await client2.evaluate(() =>
       (window as any).__gameControls?.scene?.player?.fillColor
@@ -248,7 +249,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log('\nStep 3: Player 1 leaves')
     await client1.close()
     await context1.close()
-    await client2.waitForTimeout(1000)
+    await waitScaled(client2, 1000)
 
     // Player 3 joins (should be blue, reusing Player 1's slot)
     console.log('\nStep 4: Player 3 joins')
@@ -256,7 +257,7 @@ test.describe('Player Lifecycle Management', () => {
     const client3 = await context3.newPage()
     await client3.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client3.goto(CLIENT_URL)
-    await client3.waitForTimeout(2000)
+    await waitScaled(client3, 2000)
 
     const color3 = await client3.evaluate(() =>
       (window as any).__gameControls?.scene?.player?.fillColor
@@ -308,7 +309,7 @@ test.describe('Player Lifecycle Management', () => {
     }
 
     // Wait longer for match to start and AI to spawn (4s for Phaser + match start + AI spawn)
-    await Promise.all(clients.map(c => c.waitForTimeout(4000)))
+    await Promise.all(clients.map(c => waitScaled(c, 4000)))
 
     // Get player count
     const initialCount = await clients[0].evaluate(() => {
@@ -333,7 +334,7 @@ test.describe('Player Lifecycle Management', () => {
     const verifyClient = await verifyContext.newPage()
     await verifyClient.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await verifyClient.goto(CLIENT_URL)
-    await verifyClient.waitForTimeout(2000)
+    await waitScaled(verifyClient, 2000)
 
     const finalCount = await verifyClient.evaluate(() => {
       const scene = (window as any).__gameControls?.scene

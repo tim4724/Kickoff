@@ -1,5 +1,6 @@
 import { test, expect, Page, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Test: Two-Client Cross-Visibility Synchronization
@@ -69,7 +70,7 @@ async function getRemotePlayerView(page: Page, targetSessionId: string) {
 
     // Wait and retry
     if (attempt < 2) {
-      await page.waitForTimeout(100)
+      await waitScaled(page, 100)
     }
   }
 
@@ -104,8 +105,8 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
 
-    await client1.waitForTimeout(2000)
-    await client2.waitForTimeout(2000)
+    await waitScaled(client1, 2000)
+    await waitScaled(client2, 2000)
 
     // Get session IDs
     const MAX_RETRIES = 8
@@ -122,7 +123,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
       }
 
       if (attempt < MAX_RETRIES) {
-        await client1.waitForTimeout(1000)
+        await waitScaled(client1, 1000)
       }
     }
 
@@ -132,8 +133,8 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
 
     // Wait longer for clients to sync and see each other's remote players
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
     console.log('\n🧪 TEST: Cross-Client Position Visibility')
     console.log('='.repeat(70))
@@ -161,7 +162,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
     const SAMPLE_INTERVAL = 100
 
     for (let i = 0; i < SAMPLE_COUNT; i++) {
-      await client1.waitForTimeout(SAMPLE_INTERVAL)
+      await waitScaled(client1, SAMPLE_INTERVAL)
 
       // Get Client 1's view of their own position
       const client1Data = await getLocalPlayerData(client1, client1SessionId)
@@ -205,7 +206,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
       console.log('🕹️ Client 1: Released joystick')
     })
 
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     // Calculate statistics
     const crossDeltas = samples.map(s => s.crossClientDelta)
@@ -262,8 +263,8 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
 
-    await client1.waitForTimeout(2000)
-    await client2.waitForTimeout(2000)
+    await waitScaled(client1, 2000)
+    await waitScaled(client2, 2000)
 
     // Get session IDs
     const MAX_RETRIES = 8
@@ -278,7 +279,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
       }
 
       if (attempt < MAX_RETRIES) {
-        await client1.waitForTimeout(1000)
+        await waitScaled(client1, 1000)
       }
     }
 
@@ -288,8 +289,8 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
 
     // Wait longer for clients to sync and see each other's remote players
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
     console.log('\n🧪 TEST: Reverse Cross-Client Position Visibility')
     console.log('='.repeat(70))
@@ -316,7 +317,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
     const SAMPLE_INTERVAL = 100
 
     for (let i = 0; i < SAMPLE_COUNT; i++) {
-      await client2.waitForTimeout(SAMPLE_INTERVAL)
+      await waitScaled(client2, SAMPLE_INTERVAL)
 
       const client2Data = await getLocalPlayerData(client2, client2SessionId)
       const client1View = await getRemotePlayerView(client1, client2SessionId)
@@ -354,7 +355,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
       console.log('🕹️ Client 2: Released joystick')
     })
 
-    await client2.waitForTimeout(500)
+    await waitScaled(client2, 500)
 
     const crossDeltas = samples.map(s => s.crossClientDelta)
 
@@ -397,8 +398,8 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
 
-    await client1.waitForTimeout(2000)
-    await client2.waitForTimeout(2000)
+    await waitScaled(client1, 2000)
+    await waitScaled(client2, 2000)
 
     // Get session IDs
     const MAX_RETRIES = 8
@@ -413,7 +414,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
       }
 
       if (attempt < MAX_RETRIES) {
-        await client1.waitForTimeout(1000)
+        await waitScaled(client1, 1000)
       }
     }
 
@@ -423,8 +424,8 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
 
     // Wait longer for clients to sync and see each other's remote players
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
     console.log('\n🧪 TEST: Simultaneous Two-Client Movement')
     console.log('='.repeat(70))
@@ -458,7 +459,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
     const SAMPLE_INTERVAL = 100
 
     for (let i = 0; i < SAMPLE_COUNT; i++) {
-      await client1.waitForTimeout(SAMPLE_INTERVAL)
+      await waitScaled(client1, SAMPLE_INTERVAL)
 
       const [client1Data, client2View, client2Data, client1View] = await Promise.all([
         getLocalPlayerData(client1, client1SessionId),
@@ -506,7 +507,7 @@ test.describe('Two-Client Cross-Visibility Synchronization', () => {
       })
     ])
 
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     // Check if we have samples before calculating statistics
     if (samples.length === 0) {

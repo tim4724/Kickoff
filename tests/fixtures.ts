@@ -7,15 +7,23 @@ import { setTimeScale } from './helpers/time-control'
 export const test = base.extend({
   page: async ({ page }, use) => {
     // Apply 10x time acceleration to all tests
+    const TIME_SCALE = 10
+
     try {
-      // Wait for page to load first
+      // Set time scale window variable BEFORE navigation for server-side acceleration
+      await page.addInitScript((timeScale) => {
+        ;(window as any).__testTimeScale = timeScale
+      }, TIME_SCALE)
+
+      // Wait for page to load
       await page.waitForLoadState('domcontentloaded')
 
-      // Apply time scale (will work once GameClock is exposed)
-      await setTimeScale(page, 10).catch(() => {
+      // Apply client-side time acceleration
+      await setTimeScale(page, TIME_SCALE).catch(() => {
         // Silently fail if GameClock not available yet
-        // (e.g., on menu scene before game scene loads)
       })
+
+      console.log(`⏱️  Time acceleration enabled: ${TIME_SCALE}x (client + server)`)
     } catch (error) {
       // Ignore errors if page not ready
     }

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Test Suite: Player Switching Mechanics
@@ -15,14 +16,14 @@ test('cycles through all 3 teammates correctly', async ({ page }) => {
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
-  await page.waitForTimeout(1500) // Let menu fully render
+  await waitScaled(page, 1500) // Let menu fully render
   const canvas = await page.locator('canvas')
   const box = await canvas.boundingBox()
   if (box) {
     // Click center of red Multiplayer button (65% down the screen)
     await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
   }
-  await page.waitForTimeout(4000) // Wait for multiplayer to connect and start
+  await waitScaled(page, 4000) // Wait for multiplayer to connect and start
 
   // Get all teammates
   const teammates = await page.evaluate(() => {
@@ -64,7 +65,7 @@ test('cycles through all 3 teammates correctly', async ({ page }) => {
       gameScene.switchToNextTeammate()
     })
 
-    await page.waitForTimeout(200)
+    await waitScaled(page, 200)
 
     const nowControlled = await page.evaluate(() => {
       const gameScene = (window as any).__gameControls?.scene
@@ -92,14 +93,14 @@ test('updates visual borders when switching players', async ({ page }) => {
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
-  await page.waitForTimeout(1500) // Let menu fully render
+  await waitScaled(page, 1500) // Let menu fully render
   const canvas = await page.locator('canvas')
   const box = await canvas.boundingBox()
   if (box) {
     // Click center of red Multiplayer button (65% down the screen)
     await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
   }
-  await page.waitForTimeout(4000)
+  await waitScaled(page, 4000)
 
   const initialBorders = await page.evaluate(() => {
     const gameScene = (window as any).__gameControls?.scene
@@ -134,7 +135,7 @@ test('updates visual borders when switching players', async ({ page }) => {
     gameScene.switchToNextTeammate()
   })
 
-  await page.waitForTimeout(200)
+  await waitScaled(page, 200)
 
   const afterBorders = await page.evaluate(() => {
     const gameScene = (window as any).__gameControls?.scene
@@ -171,14 +172,14 @@ test('can switch to AI teammate', async ({ page }) => {
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
-  await page.waitForTimeout(1500) // Let menu fully render
+  await waitScaled(page, 1500) // Let menu fully render
   const canvas = await page.locator('canvas')
   const box = await canvas.boundingBox()
   if (box) {
     // Click center of red Multiplayer button (65% down the screen)
     await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
   }
-  await page.waitForTimeout(4000)
+  await waitScaled(page, 4000)
 
   // Switch to AI teammate
   await page.evaluate(() => {
@@ -186,7 +187,7 @@ test('can switch to AI teammate', async ({ page }) => {
     gameScene.switchToNextTeammate() // Now controlling bot
   })
 
-  await page.waitForTimeout(200)
+  await waitScaled(page, 200)
 
   const beforeMovement = await page.evaluate(() => {
     const gameScene = (window as any).__gameControls?.scene
@@ -242,30 +243,40 @@ test('space key switches players when not having ball', async ({ page }) => {
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
-  await page.waitForTimeout(1500) // Let menu fully render
+  await waitScaled(page, 1500) // Let menu fully render
   const canvas = await page.locator('canvas')
   const box = await canvas.boundingBox()
   if (box) {
     // Click center of red Multiplayer button (65% down the screen)
     await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
   }
-  await page.waitForTimeout(4000)
 
-  const beforeSwitch = await page.evaluate(() => {
-    const gameScene = (window as any).__gameControls?.scene
-    if (!gameScene) return null
+  // Wait longer for game initialization with retry logic
+  let beforeSwitch = null
+  let retries = 0
+  const maxRetries = 10
 
-    const state = gameScene.getGameState()
-    if (!state) return null
+  while (retries < maxRetries && !beforeSwitch) {
+    await waitScaled(page, 1000)
 
-    return {
-      controlled: gameScene.controlledPlayerId,
-      hasBall: state.ball.possessedBy === gameScene.controlledPlayerId
-    }
-  })
+    beforeSwitch = await page.evaluate(() => {
+      const gameScene = (window as any).__gameControls?.scene
+      if (!gameScene) return null
+
+      const state = gameScene.getGameState()
+      if (!state) return null
+
+      return {
+        controlled: gameScene.controlledPlayerId,
+        hasBall: state.ball.possessedBy === gameScene.controlledPlayerId
+      }
+    })
+
+    retries++
+  }
 
   if (!beforeSwitch) {
-    throw new Error('Game not initialized')
+    throw new Error('Game not initialized after 10 seconds')
   }
 
   console.log('Before switch:', beforeSwitch)
@@ -273,7 +284,7 @@ test('space key switches players when not having ball', async ({ page }) => {
   // Only test switching if player doesn't have ball
   if (!beforeSwitch.hasBall) {
     await page.keyboard.press('Space')
-    await page.waitForTimeout(200)
+    await waitScaled(page, 200)
 
     const afterSwitch = await page.evaluate(() => {
       const gameScene = (window as any).__gameControls?.scene

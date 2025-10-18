@@ -1,5 +1,6 @@
 import { test, expect, Page, Browser } from '@playwright/test'
-import { setupIsolatedTest, setupMultiClientTest } from './helpers/room-utils'
+import { setupSinglePlayerTest, setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Shooting Mechanics Test Suite
@@ -22,7 +23,7 @@ const EXPECTED_VELOCITY = MIN_SHOOT_SPEED + (SHOOT_SPEED - MIN_SHOOT_SPEED) * DE
 const POSSESSION_RADIUS = 70 // px (updated from 50)
 
 /**
- * Helper: Get ball state from server
+ * Helper: Get ball state (works for both single-player and multiplayer)
  */
 async function getBallState(page: Page): Promise<{
   x: number
@@ -33,9 +34,15 @@ async function getBallState(page: Page): Promise<{
 }> {
   return await page.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    if (!scene?.networkManager) return null
 
-    const state = scene.networkManager.getState()
+    // Try GameEngine first (single-player), then NetworkManager (multiplayer)
+    let state
+    if (scene?.gameEngine) {
+      state = scene.gameEngine.getState()
+    } else if (scene?.networkManager) {
+      state = scene.networkManager.getState()
+    }
+
     if (!state?.ball) return null
 
     return {
@@ -49,7 +56,7 @@ async function getBallState(page: Page): Promise<{
 }
 
 /**
- * Helper: Get player state from server
+ * Helper: Get player state (works for both single-player and multiplayer)
  */
 async function getPlayerState(page: Page, sessionId?: string): Promise<{
   x: number
@@ -60,12 +67,20 @@ async function getPlayerState(page: Page, sessionId?: string): Promise<{
 }> {
   return await page.evaluate((sid) => {
     const scene = (window as any).__gameControls?.scene
-    if (!scene?.networkManager) return null
 
-    const state = scene.networkManager.getState()
+    // Try GameEngine first (single-player), then NetworkManager (multiplayer)
+    let state
+    let playerId
+    if (scene?.gameEngine) {
+      state = scene.gameEngine.getState()
+      playerId = sid || scene.myPlayerId || 'player1'
+    } else if (scene?.networkManager) {
+      state = scene.networkManager.getState()
+      playerId = sid || scene.mySessionId
+    }
+
     if (!state?.players) return null
 
-    const playerId = sid || scene.mySessionId
     const player = state.players.get(playerId)
     if (!player) return null
 
@@ -90,13 +105,16 @@ async function gainPossession(page: Page): Promise<boolean> {
     const playerState = await getPlayerState(page)
 
     if (!ballState || !playerState) {
-      await page.waitForTimeout(200)
+      await waitScaled(page, 200)
       continue
     }
 
     // Check if already has possession
-    const sessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
-    if (ballState.possessedBy === sessionId) {
+    const playerId = await page.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      return scene?.mySessionId || scene?.myPlayerId || 'player1'
+    })
+    if (ballState.possessedBy === playerId) {
       console.log(`✅ Already has possession (attempt ${attempt + 1})`)
       return true
     }
@@ -110,44 +128,60 @@ async function gainPossession(page: Page): Promise<boolean> {
 
     if (dist < POSSESSION_RADIUS) {
       // Close enough, wait for possession to register
-      await page.waitForTimeout(500)
+      await waitScaled(page, 500)
       const updatedBall = await getBallState(page)
-      if (updatedBall.possessedBy === sessionId) {
+      if (updatedBall.possessedBy === playerId) {
         console.log(`✅ Gained possession at distance ${dist.toFixed(1)}px`)
         return true
       }
     }
 
-    // Move toward ball
+    // Move toward ball using direct input method
     const dirX = dx / dist
     const dirY = dy / dist
 
     // Adjust movement time based on distance to avoid overshooting
     const movementTime = dist > 200 ? 800 : dist > 100 ? 400 : 200
 
-    await page.evaluate(({ x, y }) => {
+    // Use directMove if available, otherwise fall back to joystick simulation
+    const hasDirectMove = await page.evaluate(() => {
       const controls = (window as any).__gameControls
-      if (!controls?.test) return
-
-      const touchX = 150
-      const touchY = 300
-      controls.test.touchJoystick(touchX, touchY)
-
-      const dragDistance = 80
-      const dragX = touchX + x * dragDistance
-      const dragY = touchY + y * dragDistance
-
-      controls.test.dragJoystick(dragX, dragY)
-    }, { x: dirX, y: dirY })
-
-    await page.waitForTimeout(movementTime)
-
-    await page.evaluate(() => {
-      const controls = (window as any).__gameControls
-      controls.test.releaseJoystick()
+      return !!controls?.test?.directMove
     })
 
-    await page.waitForTimeout(300)
+    if (hasDirectMove) {
+      await page.evaluate(({ x, y, duration }) => {
+        const controls = (window as any).__gameControls
+        return controls.test.directMove(x, y, duration)
+      }, { x: dirX, y: dirY, duration: movementTime })
+
+      await waitScaled(page, 300) // Settling time
+    } else {
+      // Fallback to joystick simulation for multiplayer tests
+      await page.evaluate(({ x, y }) => {
+        const controls = (window as any).__gameControls
+        if (!controls?.test) return
+
+        const touchX = 150
+        const touchY = 300
+        controls.test.touchJoystick(touchX, touchY)
+
+        const dragDistance = 80
+        const dragX = touchX + x * dragDistance
+        const dragY = touchY + y * dragDistance
+
+        controls.test.dragJoystick(dragX, dragY)
+      }, { x: dirX, y: dirY })
+
+      await waitScaled(page, movementTime)
+
+      await page.evaluate(() => {
+        const controls = (window as any).__gameControls
+        controls.test.releaseJoystick()
+      })
+
+      await waitScaled(page, 300)
+    }
   }
 
   console.log(`❌ Failed to gain possession after ${maxAttempts} attempts`)
@@ -159,7 +193,7 @@ async function gainPossession(page: Page): Promise<boolean> {
  */
 async function shootBall(page: Page): Promise<void> {
   await page.keyboard.press('Space')
-  await page.waitForTimeout(100) // Wait for network round-trip
+  await waitScaled(page, 100) // Wait for network round-trip
 }
 
 /**
@@ -179,19 +213,20 @@ function calculateAngle(dx: number, dy: number): number {
 test.describe('Shooting Mechanics', () => {
   // Tests use isolated rooms for parallel execution
 
-  test('Test 1: Basic shooting when in possession', async ({ page }, testInfo) => {
+  test('Test 1: Basic shooting when in possession', async ({ page }) => {
     console.log('\n🧪 TEST 1: Basic Shooting When In Possession')
     console.log('='.repeat(70))
 
-    // Setup isolated test room
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
+    // Setup single-player scene
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('✅ Single-player scene loaded')
 
-    await page.waitForTimeout(3000) // Wait for single-player match to start
-
-    const sessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
-    expect(sessionId).toBeTruthy()
-    console.log(`✅ Connected: ${sessionId}`)
+    const playerId = await page.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      return scene?.myPlayerId || 'player1'
+    })
+    expect(playerId).toBeTruthy()
+    console.log(`✅ Player ID: ${playerId}`)
 
     // Gain possession
     console.log('\n📤 Step 1: Gaining possession...')
@@ -203,14 +238,14 @@ test.describe('Shooting Mechanics', () => {
     console.log(`  Ball position: (${ballBeforeShoot.x.toFixed(1)}, ${ballBeforeShoot.y.toFixed(1)})`)
     console.log(`  Ball velocity: (${ballBeforeShoot.velocityX.toFixed(1)}, ${ballBeforeShoot.velocityY.toFixed(1)})`)
 
-    expect(ballBeforeShoot.possessedBy).toBe(sessionId)
+    expect(ballBeforeShoot.possessedBy).toBe(playerId)
     expect(ballBeforeShoot.velocityX).toBe(0)
     expect(ballBeforeShoot.velocityY).toBe(0)
 
     // Shoot
     console.log('\n⚽ Step 2: Shooting ball...')
     await shootBall(page)
-    await page.waitForTimeout(200) // Wait for physics update
+    await waitScaled(page, 200) // Wait for physics update
 
     const ballAfterShoot = await getBallState(page)
     const playerAfterShoot = await getPlayerState(page)
@@ -228,7 +263,7 @@ test.describe('Shooting Mechanics', () => {
     expect(playerAfterShoot.state).toBe('kicking') // Player animation state proves shot occurred
 
     // Ball should either be moving OR have been re-captured by AI (which stops velocity)
-    const ballWasShot = velocity > MIN_SHOOT_SPEED || ballAfterShoot.possessedBy !== sessionId
+    const ballWasShot = velocity > MIN_SHOOT_SPEED || ballAfterShoot.possessedBy !== playerId
     expect(ballWasShot).toBe(true)
 
     console.log('\n✅ TEST 1 PASSED: Basic shooting works correctly')
@@ -238,9 +273,9 @@ test.describe('Shooting Mechanics', () => {
     console.log('\n🧪 TEST 2: Shoot Direction Accuracy')
     console.log('='.repeat(70))
 
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(3000) // Wait for single-player match to start
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('✅ Single-player scene loaded')
+    
 
     // Gain possession
     console.log('\n📤 Step 1: Gaining possession...')
@@ -254,12 +289,12 @@ test.describe('Shooting Mechanics', () => {
       controls.test.touchJoystick(150, 300)
       controls.test.dragJoystick(230, 300) // Move right
     })
-    await page.waitForTimeout(500)
+    await waitScaled(page, 500)
     await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.releaseJoystick()
     })
-    await page.waitForTimeout(200)
+    await waitScaled(page, 200)
 
     const playerBeforeShoot = await getPlayerState(page)
     const playerDirection = playerBeforeShoot.direction
@@ -268,7 +303,7 @@ test.describe('Shooting Mechanics', () => {
     // Shoot
     console.log('\n⚽ Step 3: Shooting...')
     await shootBall(page)
-    await page.waitForTimeout(200)
+    await waitScaled(page, 200)
 
     const ballAfterShoot = await getBallState(page)
     const ballDirection = calculateAngle(ballAfterShoot.velocityX, ballAfterShoot.velocityY)
@@ -290,11 +325,8 @@ test.describe('Shooting Mechanics', () => {
     console.log('\n🧪 TEST 3: No Shoot Without Possession')
     console.log('='.repeat(70))
 
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(3000) // Wait for single-player match to start
-
-    const sessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('✅ Single-player scene loaded')
 
     // Get initial ball state (player should NOT have possession initially)
     const ballBefore = await getBallState(page)
@@ -305,7 +337,7 @@ test.describe('Shooting Mechanics', () => {
     // Try to shoot without possession
     console.log('\n⚽ Step 1: Attempting to shoot without possession...')
     await shootBall(page)
-    await page.waitForTimeout(200)
+    await waitScaled(page, 200)
 
     const ballAfter = await getBallState(page)
     console.log(`  Ball position after: (${ballAfter.x.toFixed(1)}, ${ballAfter.y.toFixed(1)})`)
@@ -326,9 +358,9 @@ test.describe('Shooting Mechanics', () => {
     console.log('\n🧪 TEST 4: Shoot Power Variation (Action Button)')
     console.log('='.repeat(70))
 
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(3000) // Wait for single-player match to start
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('✅ Single-player scene loaded')
+    
 
     // Gain possession
     console.log('\n📤 Step 1: Gaining possession for weak shot...')
@@ -341,12 +373,12 @@ test.describe('Shooting Mechanics', () => {
       const controls = (window as any).__gameControls
       controls.test.pressButton()
     })
-    await page.waitForTimeout(100)
+    await waitScaled(page, 100)
     await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.releaseButton(100)
     })
-    await page.waitForTimeout(200)
+    await waitScaled(page, 200)
 
     const ballAfterWeak = await getBallState(page)
     const weakVelocity = calculateVelocityMagnitude(ballAfterWeak.velocityX, ballAfterWeak.velocityY)
@@ -354,7 +386,7 @@ test.describe('Shooting Mechanics', () => {
 
     // Reset: wait for ball to stop and regain possession
     console.log('\n📤 Step 3: Regaining possession for strong shot...')
-    await page.waitForTimeout(2000) // Wait for ball to slow down
+    await waitScaled(page, 2000) // Wait for ball to slow down
     const hasPossession2 = await gainPossession(page)
     expect(hasPossession2).toBe(true)
 
@@ -364,12 +396,12 @@ test.describe('Shooting Mechanics', () => {
       const controls = (window as any).__gameControls
       controls.test.pressButton()
     })
-    await page.waitForTimeout(500)
+    await waitScaled(page, 500)
     await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.releaseButton(500)
     })
-    await page.waitForTimeout(200)
+    await waitScaled(page, 200)
 
     const ballAfterStrong = await getBallState(page)
     const strongVelocity = calculateVelocityMagnitude(ballAfterStrong.velocityX, ballAfterStrong.velocityY)
@@ -407,8 +439,8 @@ test.describe('Shooting Mechanics', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
 
     const [session1, session2] = await Promise.all([
@@ -422,9 +454,9 @@ test.describe('Shooting Mechanics', () => {
     // Move Client 2 away from ball to prevent interference
     console.log('\n📤 Step 1: Moving Client 2 away from ball...')
     await client2.keyboard.down('ArrowUp')
-    await client2.waitForTimeout(1000)
+    await waitScaled(client2, 1000)
     await client2.keyboard.up('ArrowUp')
-    await client2.waitForTimeout(200)
+    await waitScaled(client2, 200)
 
     // Client 1 gains possession and shoots
     console.log('\n📤 Step 2: Client 1 gaining possession...')
@@ -440,8 +472,8 @@ test.describe('Shooting Mechanics', () => {
 
     // Wait for shooting to propagate across network (500ms for network sync)
     await Promise.all([
-      client1.waitForTimeout(500),
-      client2.waitForTimeout(500)
+      waitScaled(client1, 500),
+      waitScaled(client2, 500)
     ])
 
     // Check ball state on both clients
@@ -496,9 +528,9 @@ test.describe('Shooting Mechanics', () => {
     console.log('\n🧪 TEST 6: Rapid Shooting Behavior (No Cooldown)')
     console.log('='.repeat(70))
 
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(3000) // Wait for single-player match to start
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('✅ Single-player scene loaded')
+    
 
     // Gain possession
     console.log('\n📤 Step 1: Gaining possession...')
@@ -516,9 +548,9 @@ test.describe('Shooting Mechanics', () => {
       await shootBall(page)
       if (i === 0) {
         // Wait briefly after first shot for velocity to be applied
-        await page.waitForTimeout(100)
+        await waitScaled(page, 100)
       } else {
-        await page.waitForTimeout(20)
+        await waitScaled(page, 20)
       }
     }
 
@@ -552,11 +584,9 @@ test.describe('Shooting Mechanics', () => {
     console.log('\n🧪 TEST 7: Shoot At Goal (Integration Test)')
     console.log('='.repeat(70))
 
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(3000) // Wait for single-player match to start
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('✅ Single-player scene loaded')
 
-    const sessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
     const playerState = await getPlayerState(page)
 
     console.log(`  Player team: ${playerState.team}`)
@@ -577,14 +607,14 @@ test.describe('Shooting Mechanics', () => {
       controls.test.dragJoystick(dragX, 300)
     }, { dir: dirToGoal })
 
-    await page.waitForTimeout(2000) // Wait for movement toward goal
+    await waitScaled(page, 2000) // Wait for movement toward goal
 
     await page.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.releaseJoystick()
     })
 
-    await page.waitForTimeout(300)
+    await waitScaled(page, 300)
 
     // Gain possession
     console.log('\n📤 Step 2: Gaining possession...')
@@ -607,7 +637,7 @@ test.describe('Shooting Mechanics', () => {
     await shootBall(page)
 
     // Wait for ball to travel and potentially score
-    await page.waitForTimeout(3000)
+    await waitScaled(page, 3000)
 
     const scoreAfter = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene

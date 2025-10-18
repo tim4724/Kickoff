@@ -122,11 +122,21 @@ export class NetworkManager {
       // Get room name (test room ID or production room)
       const roomName = this.getRoomName()
 
+      // Build options object with roomName and optional timeScale (for tests)
+      const options: any = { roomName }
+
+      // Check for test time scale
+      const testTimeScale = (window as any).__testTimeScale
+      if (testTimeScale) {
+        options.timeScale = testTimeScale
+        console.log('[NetworkManager] Test time scale:', testTimeScale)
+      }
+
       // ALWAYS pass roomName for filterBy to work correctly
-      // Tests: unique room ID for isolation
+      // Tests: unique room ID for isolation + time scale
       // Production: use config room name for matchmaking
-      console.log('[NetworkManager] Joining room:', roomName)
-      this.room = await this.client.joinOrCreate('match', { roomName })
+      console.log('[NetworkManager] Joining room:', roomName, 'with options:', options)
+      this.room = await this.client.joinOrCreate('match', options)
 
       // Restore console.error
       console.error = originalError

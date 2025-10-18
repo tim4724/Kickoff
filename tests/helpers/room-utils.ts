@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test'
+import { waitScaled } from './time-control'
 
 /**
  * Test Room Isolation Utilities
@@ -123,6 +124,55 @@ export async function setupMultiClientTest(
   )
 
   return roomId
+}
+
+/**
+ * Setup single-player test environment
+ *
+ * Navigates to the client and starts single-player scene (no multiplayer).
+ * Use this for tests that only need physics/gameplay without networking.
+ *
+ * @param page - Playwright page object
+ * @param url - URL to navigate to
+ * @returns Promise that resolves when single-player scene is ready
+ *
+ * @example
+ * ```typescript
+ * test('physics test', async ({ page }) => {
+ *   await setupSinglePlayerTest(page, CLIENT_URL)
+ *   // ... test single-player physics
+ * })
+ * ```
+ */
+export async function setupSinglePlayerTest(
+  page: Page,
+  url: string
+): Promise<void> {
+  await page.goto(url)
+
+  // Wait for Phaser game instance to be available
+  await page.waitForFunction(() => {
+    const game = (window as any).game
+    return game && game.scene && game.scene.scenes && game.scene.scenes.length > 0
+  }, { timeout: 10000 })
+
+  // Start SinglePlayerScene
+  await page.evaluate(() => {
+    const game = (window as any).game
+    if (game && game.scene) {
+      game.scene.start('SinglePlayerScene')
+      game.scene.stop('MenuScene') // Stop menu scene
+    }
+  })
+
+  // Wait for single-player scene to be ready and expose test API
+  await page.waitForFunction(() => {
+    const scene = (window as any).__gameControls?.scene
+    return scene?.scene?.key === 'SinglePlayerScene' && scene?.player
+  }, { timeout: 10000 })
+
+  // Small delay for scene initialization
+  await waitScaled(page, 500)
 }
 
 /**

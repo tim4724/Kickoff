@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 
 const CLIENT_URL = 'http://localhost:5173'
 import { setupIsolatedTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 const GAME_WIDTH = 1920
 const GAME_HEIGHT = 1080
@@ -12,7 +13,7 @@ test.describe('Game Field Rendering', () => {
     await page.goto('http://localhost:5173/')
 
     // Wait for game to initialize
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     // Take screenshot
     await page.screenshot({ path: 'test-results/field-1920x1080.png' })
@@ -34,7 +35,7 @@ test.describe('Game Field Rendering', () => {
     await page.setViewportSize({ width: 2560, height: 1080 })
     await page.goto('http://localhost:5173/')
 
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
     await page.screenshot({ path: 'test-results/field-2560x1080.png' })
 
     const canvas = await page.locator('canvas').first()
@@ -64,7 +65,7 @@ test.describe('Game Field Rendering', () => {
     await page.setViewportSize({ width: 1920, height: 1200 })
     await page.goto('http://localhost:5173/')
 
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
     await page.screenshot({ path: 'test-results/field-1920x1200.png' })
 
     const canvas = await page.locator('canvas').first()
@@ -94,7 +95,7 @@ test.describe('Game Field Rendering', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('http://localhost:5173/')
 
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
     await page.screenshot({ path: 'test-results/field-390x844.png' })
 
     const canvas = await page.locator('canvas').first()
@@ -119,7 +120,7 @@ test.describe('Game Field Rendering', () => {
     await page.setViewportSize({ width: 844, height: 390 })
     await page.goto('http://localhost:5173/')
 
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
     await page.screenshot({ path: 'test-results/field-844x390.png' })
 
     const canvas = await page.locator('canvas').first()
@@ -152,7 +153,7 @@ test.describe('Game Field Rendering', () => {
     for (const size of sizes) {
       await page.setViewportSize({ width: size.width, height: size.height })
       await page.goto('http://localhost:5173/')
-      await page.waitForTimeout(2000)
+      await waitScaled(page, 2000)
 
       // Take screenshot for visual verification
       await page.screenshot({
@@ -186,7 +187,7 @@ test.describe('Game Field Rendering', () => {
     // Test with wider screen (vertical letterboxing)
     await page.setViewportSize({ width: 2560, height: 1080 })
     await page.goto('http://localhost:5173/')
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     const hasLetterbox = await page.evaluate(() => {
       const canvas = document.querySelector('canvas')
@@ -205,7 +206,7 @@ test.describe('Game Field Rendering', () => {
   test('Verify UI elements are in viewport coordinates', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await page.goto('http://localhost:5173/')
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     // Check score text position (should be at viewport top center)
     const scorePosition = await page.evaluate(() => {

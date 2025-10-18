@@ -20,8 +20,23 @@ export class MatchRoom extends Room<GameState> {
   // Fixed timestep accumulator for deterministic physics
   private physicsAccumulator: number = 0
 
+  // Time scale for test acceleration (default 1.0 = real-time)
+  private timeScale: number = 1.0
+
   async onCreate(options: any) {
     console.log('Match room created:', this.roomId, options)
+
+    // Apply time scale from environment variable or options (for tests)
+    const envTimeScale = process.env.TEST_TIME_SCALE
+    const optionsTimeScale = options.timeScale
+
+    if (optionsTimeScale) {
+      this.timeScale = parseFloat(optionsTimeScale)
+      console.log(`⏱️  Time scale set to ${this.timeScale}x (from room options)`)
+    } else if (envTimeScale) {
+      this.timeScale = parseFloat(envTimeScale)
+      console.log(`⏱️  Time scale set to ${this.timeScale}x (from TEST_TIME_SCALE env)`)
+    }
 
     // Set metadata BEFORE any logic for filterBy to work
     // filterBy checks metadata to match rooms, so this must be immediate
@@ -64,21 +79,44 @@ export class MatchRoom extends Room<GameState> {
 
     console.log(`🎮 Player ${client.sessionId} ready on ${playerInfo.team} team`)
 
-    // Count human players (non-AI)
+    // Count human players and check team distribution
     let humanPlayerCount = 0
+    let hasBlueTeam = false
+    let hasRedTeam = false
+
     this.state.players.forEach((player) => {
       if (player.isHuman) {
         humanPlayerCount++
       }
+      if (player.team === 'blue') hasBlueTeam = true
+      if (player.team === 'red') hasRedTeam = true
     })
 
-    // Start match when 2 human players join (proper multiplayer)
-    if (humanPlayerCount === 2) {
-      console.log('🎮 Two players connected, starting multiplayer match!')
+    // Start match when both teams exist (either 2 human players or 1 human + AI)
+    if (hasBlueTeam && hasRedTeam) {
+      if (humanPlayerCount === 2) {
+        console.log('🎮 Two players connected, starting multiplayer match!')
+      } else {
+        console.log('🎮 Single player with AI opponents, starting match!')
+      }
       this.startMatch()
     } else if (humanPlayerCount === 1) {
-      // Wait indefinitely for second player - no timeout
-      console.log('⏱️ Waiting for second player to join...')
+      // Wait for GameState to create AI opponents, then check again
+      console.log('⏱️ Waiting for AI opponents or second player...')
+
+      // Small delay to allow AI creation, then check if match should start
+      setTimeout(() => {
+        let hasBlue = false
+        let hasRed = false
+        this.state.players.forEach((player) => {
+          if (player.team === 'blue') hasBlue = true
+          if (player.team === 'red') hasRed = true
+        })
+        if (hasBlue && hasRed && this.state.phase === 'waiting') {
+          console.log('🤖 AI opponents created, starting single-player match!')
+          this.startMatch()
+        }
+      }, 100)
     }
   }
 
@@ -124,8 +162,11 @@ export class MatchRoom extends Room<GameState> {
   private update(deltaTime: number) {
     if (this.state.phase !== 'playing') return
 
-    // Accumulate real deltaTime for physics steps
-    this.physicsAccumulator += deltaTime
+    // Apply time scale for test acceleration (10x faster during tests)
+    const scaledDeltaTime = deltaTime * this.timeScale
+
+    // Accumulate scaled deltaTime for physics steps
+    this.physicsAccumulator += scaledDeltaTime
 
     // Run physics in fixed timesteps for deterministic simulation
     let physicsSteps = 0
@@ -146,8 +187,8 @@ export class MatchRoom extends Room<GameState> {
       this.physicsAccumulator = 0
     }
 
-    // Update timer with actual deltaTime (smooth countdown, independent of physics)
-    const dt = deltaTime / 1000
+    // Update timer with scaled deltaTime (accelerated during tests)
+    const dt = scaledDeltaTime / 1000
     this.state.updateTimer(dt)
 
     // Check for match end (timer reaches 0)

@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Ball Capture E2E Tests - Proximity Pressure System
@@ -73,9 +74,9 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     // Move toward ball
     await page.keyboard.down(key)
-    await page.waitForTimeout(timeMs)
+    await waitScaled(page, timeMs)
     await page.keyboard.up(key)
-    await page.waitForTimeout(300) // Settle time
+    await waitScaled(page, 300) // Settle time
   }
 
   // Helper: Move player away from ball (for test isolation)
@@ -101,9 +102,9 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     // Move away from ball for 1 second (should get far enough)
     await page.keyboard.down(key)
-    await page.waitForTimeout(1000)
+    await waitScaled(page, 1000)
     await page.keyboard.up(key)
-    await page.waitForTimeout(300) // Settle time
+    await waitScaled(page, 300) // Settle time
   }
 
   // Helper: Move one player toward another player (for pressure testing)
@@ -151,9 +152,9 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     // Move toward opponent
     await sourcePage.keyboard.down(key)
-    await sourcePage.waitForTimeout(timeMs)
+    await waitScaled(sourcePage, timeMs)
     await sourcePage.keyboard.up(key)
-    await sourcePage.waitForTimeout(300) // Settle time
+    await waitScaled(sourcePage, 300) // Settle time
   }
 
   // Helper: Wait for condition
@@ -168,7 +169,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
       if (state && condition(state)) {
         return true
       }
-      await page.waitForTimeout(100)
+      await waitScaled(page, 100)
     }
     return false
   }
@@ -183,14 +184,14 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     // Wait for game to load
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     console.log('\n🧪 TEST 1: Pressure Buildup from Opponent Proximity\n')
     console.log('='.repeat(70))
 
     console.log('\n📤 Step 1: Wait for initial game state and check player count...')
     // Longer initial wait for Test 1 since it runs first
-    await client1.waitForTimeout(1500)
+    await waitScaled(client1, 1500)
 
     const initialState = await getGameState(client1)
 
@@ -219,21 +220,23 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log('\n📤 Step 2: Move player to capture ball...')
     // Move client1's player toward the ball using keyboard
     await movePlayerTowardBall(client1)
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     // Try moving a bit more to ensure possession (in case we're at edge of possession radius)
     // This is especially important under high concurrency (4+ workers)
-    await client1.keyboard.down('ArrowRight')
-    await client1.waitForTimeout(500)
-    await client1.keyboard.up('ArrowRight')
-    await client1.waitForTimeout(500)
+    // Use deterministic input method (unaffected by RAF throttling with 8 workers)
+    await client1.evaluate(async () => {
+      await (window as any).__gameControls.test.movePlayerDirect(1, 0, 2000)
+    })
+    await waitScaled(client1, 500)
 
-    // Wait for possession to register (may take longer under high load)
+    // Wait for possession to register (network round-trip + physics processing)
+    // With 2 workers and 10x time acceleration, 500ms × 10 = 5s total wait
     let captureAttempts = 0
     let captureState = null
 
-    while (captureAttempts < 5) {
-      await client1.waitForTimeout(300)
+    while (captureAttempts < 10) {
+      await waitScaled(client1, 500) // Balanced timing for 2 workers
       captureState = await getGameState(client1)
 
       if (captureState?.ball.possessedBy) {
@@ -267,7 +270,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log('\n📤 Step 3: Move opponent toward ball carrier to create pressure...')
     // Move client2's player toward client1's player (who has the ball)
     await movePlayerTowardOpponent(client2, client1)
-    await client2.waitForTimeout(500)
+    await waitScaled(client2, 500)
 
     // Check positions after movement
     const positions = await client1.evaluate(() => {
@@ -301,7 +304,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     const pressureReadings: number[] = []
     for (let i = 0; i < 4; i++) {
-      await client1.waitForTimeout(500)
+      await waitScaled(client1, 500)
       const state = await getGameState(client1)
       if (state) {
         pressureReadings.push(state.ball.pressureLevel)
@@ -340,18 +343,18 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     // Wait for game to load
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     console.log('\n🧪 TEST 2: Ball Release at Pressure Threshold\n')
     console.log('='.repeat(70))
 
     console.log('\n📤 Step 1: Move player to capture ball...')
     await movePlayerTowardBall(client1)
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     console.log('\n📤 Step 2: Move opponent toward ball carrier...')
     await movePlayerTowardOpponent(client2, client1)
-    await client2.waitForTimeout(500)
+    await waitScaled(client2, 500)
 
     console.log('\n📤 Step 3: Monitoring for ball release events...')
 
@@ -374,7 +377,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
         }
       }
 
-      await client1.waitForTimeout(500)
+      await waitScaled(client1, 500)
     }
 
     console.log(`\n✅ Test complete: Release detected = ${releaseDetected}`)
@@ -397,25 +400,25 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     // Wait for game to load
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     console.log('\n🧪 TEST 3: Possession Indicator Fade with Pressure\n')
     console.log('='.repeat(70))
 
     console.log('\n📤 Step 1: Move player to capture ball...')
     await movePlayerTowardBall(client1)
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     console.log('\n📤 Step 2: Move opponent toward ball carrier to create pressure...')
     await movePlayerTowardOpponent(client2, client1)
-    await client2.waitForTimeout(1000) // Wait for pressure to stabilize
+    await waitScaled(client2, 1000) // Wait for pressure to stabilize
 
     console.log('\n📤 Step 3: Recording alpha values over pressure oscillation...')
     const alphaReadings: { pressure: number; alpha: number }[] = []
 
     // Record readings over time as pressure oscillates
     for (let i = 0; i < 10; i++) {
-      await client1.waitForTimeout(500)
+      await waitScaled(client1, 500)
 
       const reading = await client1.evaluate(() => {
         const scene = (window as any).__gameControls?.scene
@@ -485,20 +488,20 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     // Wait for game to load
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     console.log('\n🧪 TEST 4: No Regression - Basic Possession Mechanics\n')
     console.log('='.repeat(70))
 
     console.log('\n📤 Step 1: Move player to capture ball...')
     await movePlayerTowardBall(client1)
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     // Try moving a bit more to ensure possession (in case we're at edge of possession radius)
     await client1.keyboard.down('ArrowRight')
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
     await client1.keyboard.up('ArrowRight')
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     console.log('\n📤 Step 2: Verifying ball was captured...')
 
@@ -507,7 +510,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     let stateWithPossession = null
 
     while (captureAttempts < 5) {
-      await client1.waitForTimeout(300)
+      await waitScaled(client1, 300)
       stateWithPossession = await getGameState(client1)
 
       if (stateWithPossession?.ball.possessedBy) {
@@ -543,27 +546,26 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     // Wait for game to load
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     console.log('\n🧪 TEST 5: No Regression - Shooting Mechanics\n')
     console.log('='.repeat(70))
 
     console.log('\n📤 Step 1: Move player to capture ball...')
     await movePlayerTowardBall(client1)
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     // Try moving a bit more to ensure possession (in case we're at edge of possession radius)
-    await client1.keyboard.down('ArrowRight')
-    await client1.waitForTimeout(500)
-    await client1.keyboard.up('ArrowRight')
-    await client1.waitForTimeout(500)
+    await movePlayerTowardBall(client1)
+    await waitScaled(client1, 500)
 
-    // Wait for possession to register (may take a moment for network sync)
+    // Wait for possession to register (network round-trip + physics processing)
+    // With 2 workers and 10x time acceleration, 500ms × 10 = 5s total wait
     let captureAttempts = 0
     let captureState = null
 
-    while (captureAttempts < 5) {
-      await client1.waitForTimeout(300)
+    while (captureAttempts < 10) {
+      await waitScaled(client1, 500) // Balanced timing for 2 workers
       captureState = await getGameState(client1)
 
       if (captureState?.ball.possessedBy) {
@@ -589,14 +591,14 @@ test.describe('Ball Capture - Proximity Pressure', () => {
       controls.test.pressButton()
     })
 
-    await client1.waitForTimeout(100)
+    await waitScaled(client1, 100)
 
     await client1.evaluate(() => {
       const controls = (window as any).__gameControls
       controls.test.releaseButton(400) // 400ms hold = strong shot
     })
 
-    await client1.waitForTimeout(300)
+    await waitScaled(client1, 300)
 
     const stateAfter = await getGameState(client1)
     console.log(`  Ball possessed by after shoot: ${stateAfter?.ball.possessedBy}`)

@@ -1,5 +1,5 @@
 import { GAME_CONFIG } from '@shared/types'
-import { GameClock } from '@shared'
+import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { NetworkManager } from '../network/NetworkManager'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
@@ -210,6 +210,39 @@ export class GameScene extends BaseGameScene {
             joystick: this.joystick.__test_getState(),
             button: this.actionButton.__test_getState(),
           }),
+          // Deterministic player movement for tests (bypasses UI simulation)
+          // Directly sends input to server at fixed intervals, unaffected by RAF throttling
+          movePlayerDirect: async (dx: number, dy: number, durationMs: number): Promise<void> => {
+            if (!this.networkManager) {
+              throw new Error('NetworkManager not available')
+            }
+
+            // Normalize direction vector
+            const length = Math.sqrt(dx * dx + dy * dy)
+            const normalizedX = length > 0 ? dx / length : 0
+            const normalizedY = length > 0 ? dy / length : 0
+
+            console.log(`🎮 [Test] Direct move: (${normalizedX.toFixed(2)}, ${normalizedY.toFixed(2)}) for ${durationMs}ms game time`)
+
+            const GameClock = (window as any).GameClock
+            const startTime = GameClock.now()
+            const endTime = startTime + durationMs
+
+            // Send input continuously until game time duration expires
+            while (GameClock.now() < endTime) {
+              this.networkManager.sendInput(
+                { x: normalizedX, y: normalizedY },
+                false,
+                undefined,
+                this.controlledPlayerId
+              )
+
+              // Small delay in real time to avoid overwhelming network
+              await new Promise(resolve => setTimeout(resolve, 5))
+            }
+
+            console.log(`🎮 [Test] Direct move complete (game time: ${GameClock.now() - startTime}ms)`)
+          },
         },
       }
 

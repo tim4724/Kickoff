@@ -1,5 +1,6 @@
 import { test, expect, Page, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Socca2 Multiplayer End-to-End Test Suite
@@ -66,8 +67,8 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
     // Wait for game scene to load
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
 
     // Take initial screenshots
@@ -91,8 +92,8 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
     // Wait for multiplayer connection to establish and teams to be assigned
     await Promise.all([
-      client1.waitForTimeout(5000),
-      client2.waitForTimeout(5000)
+      waitScaled(client1, 5000),
+      waitScaled(client2, 5000)
     ])
 
     // Get game state from both clients using console evaluation
@@ -185,7 +186,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
   test('4. Keyboard Input Test (Known Limitation)', async ({ browser }, testInfo) => {
     const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
-    await client1.waitForTimeout(3000)
+    await waitScaled(client1, 3000)
 
     console.log('🧪 Testing keyboard input (may not work with Phaser)...')
 
@@ -199,7 +200,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
     // Attempt keyboard input (ArrowRight)
     await client1.keyboard.press('ArrowRight')
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     // Check if position changed
     const afterPos = await client1.evaluate(() => {
@@ -227,7 +228,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
   test('5. Player Position Synchronization (Programmatic Movement)', async ({ browser }, testInfo) => {
     const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     console.log('🧪 Testing position synchronization using game internals...')
 
@@ -240,7 +241,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
       }
     })
 
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     // Take screenshots showing movement
     await client1.screenshot({
@@ -278,7 +279,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
   test('6. Ball Magnetism Testing', async ({ browser }, testInfo) => {
     const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
-    await client1.waitForTimeout(3000)
+    await waitScaled(client1, 3000)
 
     console.log('🧪 Testing ball magnetism (possession system)...')
 
@@ -298,7 +299,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
       }
     })
 
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     // Check if player has possession
     const possessionActive = await client1.evaluate(() => {
@@ -332,7 +333,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
   test('7. Ball Shooting Testing', async ({ browser }, testInfo) => {
     const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     console.log('🧪 Testing ball shooting mechanics...')
 
@@ -346,7 +347,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
     // Attempt to shoot ball using Space key
     await client1.keyboard.press('Space')
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     // Get ball position after shoot
     const afterBallPos = await client1.evaluate(() => {
@@ -409,7 +410,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
   test('8. Network Diagnostics Summary', async ({ browser }, testInfo) => {
     const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     console.log('\n========== NETWORK DIAGNOSTICS SUMMARY ==========\n')
 
@@ -462,7 +463,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
 
   test('9. Final Screenshots and Test Summary', async ({ browser }, testInfo) => {
     const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     // Take final screenshots
     await client1.screenshot({

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Test Suite: Two-Player Room Joining and Team Assignment
@@ -35,8 +36,8 @@ test.describe('Two-Player Room Joining', () => {
     // Wait for clients to connect and initialize
     // Wait for page to load and scene to initialize
     await Promise.all([
-      client1.waitForTimeout(3000), // Give time for Phaser to initialize
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000), // Give time for Phaser to initialize
+      waitScaled(client2, 3000)
     ])
 
     console.log('\n📤 Step 2: Verifying session IDs...')
@@ -199,7 +200,7 @@ test.describe('Two-Player Room Joining', () => {
     console.log('Step 1: First client joins...')
     await client1.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client1.goto(CLIENT_URL)
-    await client1.waitForTimeout(1500) // Wait 1.5s (less than 2s timeout)
+    await waitScaled(client1, 1500) // Wait 1.5s (less than 2s timeout)
 
     // Check phase (should be 'waiting')
     const phaseBeforeSecond = await client1.evaluate(() => {
@@ -219,8 +220,8 @@ test.describe('Two-Player Room Joining', () => {
 
     // Wait for connection and match start (need longer for Phaser initialization)
     await Promise.all([
-      client1.waitForTimeout(2500),
-      client2.waitForTimeout(2500)
+      waitScaled(client1, 2500),
+      waitScaled(client2, 2500)
     ])
 
     // Check phase on both clients (should be 'playing')
@@ -266,8 +267,8 @@ test.describe('Two-Player Room Joining', () => {
 
     // Wait for page to load and scene to initialize
     await Promise.all([
-      client1.waitForTimeout(3000), // Give time for Phaser to initialize
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000), // Give time for Phaser to initialize
+      waitScaled(client2, 3000)
     ])
 
     const [session1, session2] = await Promise.all([
@@ -385,7 +386,7 @@ test.describe('Two-Player Room Joining', () => {
     const client1 = await context1.newPage()
     await client1.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client1.goto(CLIENT_URL)
-    await client1.waitForTimeout(1500) // Wait 1.5s (less than 2s timeout)
+    await waitScaled(client1, 1500) // Wait 1.5s (less than 2s timeout)
 
     // Should be in waiting phase
     const phase1 = await client1.evaluate(() => {
@@ -405,8 +406,8 @@ test.describe('Two-Player Room Joining', () => {
 
     // Wait for match to start (need longer for Phaser initialization)
     await Promise.all([
-      client1.waitForTimeout(2500),
-      client2.waitForTimeout(2500)
+      waitScaled(client1, 2500),
+      waitScaled(client2, 2500)
     ])
 
     // Should now be in playing phase
@@ -451,8 +452,8 @@ test.describe('Two-Player Room Joining', () => {
 
     // Wait for page to load and scene to initialize
     await Promise.all([
-      client1.waitForTimeout(3000), // Give time for Phaser to initialize
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000), // Give time for Phaser to initialize
+      waitScaled(client2, 3000)
     ])
 
     console.log('Step 1: Checking ball state in server...')

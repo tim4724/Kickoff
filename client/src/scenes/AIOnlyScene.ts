@@ -214,6 +214,12 @@ export class AIOnlyScene extends BaseGameScene {
         this.player.setFillStyle(color)
         this.player.isFilled = true
         this.playerTeamColor = color
+        // In AI-only mode, use thin border (no human control indicator)
+        this.player.setStrokeStyle(
+          VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
+          VISUAL_CONSTANTS.BORDER_COLOR
+        )
+        this.player.isFilled = true
         // Store reference so we can update it
         this.myPlayerId = playerId
         isFirstPlayer = false
@@ -258,6 +264,26 @@ export class AIOnlyScene extends BaseGameScene {
     } else {
       this.timerText.setColor('#ffffff')
     }
+  }
+
+  /**
+   * Override updatePlayerBorders to prevent human control indicator in AI-only mode
+   */
+  protected updatePlayerBorders(): void {
+    // In AI-only mode, ALL players should have thin borders (no human control)
+    this.player.setStrokeStyle(
+      VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
+      VISUAL_CONSTANTS.BORDER_COLOR
+    )
+    this.player.isFilled = true
+
+    this.remotePlayers.forEach((playerSprite) => {
+      playerSprite.setStrokeStyle(
+        VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
+        VISUAL_CONSTANTS.BORDER_COLOR
+      )
+      playerSprite.isFilled = true
+    })
   }
 
   /**

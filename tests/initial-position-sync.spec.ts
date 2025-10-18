@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Test: Initial Player Position Synchronization
@@ -82,7 +83,7 @@ test.describe('Initial Player Position Synchronization', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     // Wait for game to load
-    await Promise.all([client1.waitForTimeout(3000), client2.waitForTimeout(3000)])
+    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
 
     // Get session IDs
     const client1SessionId = await client1.evaluate(() => {
@@ -108,8 +109,8 @@ test.describe('Initial Player Position Synchronization', () => {
 
     // Wait for both clients to sync with each other (longer wait for network propagation)
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     // Get server state from both clients

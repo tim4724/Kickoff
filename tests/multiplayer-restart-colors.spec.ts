@@ -1,5 +1,6 @@
 import { test, expect, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Test Suite: Multiplayer Color Assignment After Restart
@@ -30,8 +31,8 @@ test.describe('Multiplayer Restart Color Assignment', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     // Get initial colors
@@ -70,8 +71,8 @@ test.describe('Multiplayer Restart Color Assignment', () => {
 
     // Wait for scenes to restart and reconnect
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
 
     // Get colors after restart
@@ -181,8 +182,8 @@ test.describe('Multiplayer Restart Color Assignment', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     console.log('📤 Testing multiple rapid restarts...')
@@ -197,8 +198,8 @@ test.describe('Multiplayer Restart Color Assignment', () => {
       ])
 
       await Promise.all([
-        client1.waitForTimeout(2000),
-        client2.waitForTimeout(2000)
+        waitScaled(client1, 2000),
+        waitScaled(client2, 2000)
       ])
 
       const colors = await Promise.all([

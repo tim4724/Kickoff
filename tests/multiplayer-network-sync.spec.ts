@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Socca2 Multiplayer Network Synchronization Test Suite
@@ -58,7 +59,7 @@ async function sendMovementInput(
   )
 
   // Hold the joystick for the duration
-  await page.waitForTimeout(duration)
+  await waitScaled(page, duration)
 
   // Release joystick
   await page.evaluate(() => {
@@ -68,7 +69,7 @@ async function sendMovementInput(
   })
 
   // Wait for network propagation
-  await page.waitForTimeout(NETWORK_PROPAGATION_DELAY)
+  await waitScaled(page, NETWORK_PROPAGATION_DELAY)
 }
 
 /**
@@ -94,7 +95,7 @@ async function sendActionInput(page: Page, holdDuration: number = 500): Promise<
     holdDuration
   )
 
-  await page.waitForTimeout(holdDuration + NETWORK_PROPAGATION_DELAY)
+  await waitScaled(page, holdDuration + NETWORK_PROPAGATION_DELAY)
 }
 
 /**
@@ -182,8 +183,8 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log(`🔒 Test isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     const MAX_RETRIES = 8
@@ -205,8 +206,8 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
       if (attempt < MAX_RETRIES) {
         console.log(`⏳ Attempt ${attempt}/${MAX_RETRIES}: Waiting for connections...`)
         await Promise.all([
-          client1.waitForTimeout(RETRY_INTERVAL),
-          client2.waitForTimeout(RETRY_INTERVAL)
+          waitScaled(client1, RETRY_INTERVAL),
+          waitScaled(client2, RETRY_INTERVAL)
         ])
       }
     }
@@ -222,7 +223,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log(`✅ Client 1 Session: ${client1SessionId}`)
     console.log(`✅ Client 2 Session: ${client2SessionId}`)
 
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
   })
 
   test('1. Server-Authoritative Player Movement', async () => {
@@ -405,7 +406,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     await sendMovementInput(client1, directionX, 0, 500) // Extra 0.5s to get within possession radius
 
     // Wait for possession to be established
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     const afterMoveBallState = await getServerBallState(client1)
     const afterMovePlayerState = await getServerPlayerState(client1, client1SessionId)
@@ -418,12 +419,28 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log(`Distance to ball: ${distanceToBall.toFixed(1)}px`)
     console.log(`Ball possession after move: "${afterMoveBallState.possessedBy}"`)
 
+    // Verify possession before shooting
+    if (afterMoveBallState.possessedBy !== client1SessionId) {
+      // Try moving closer if we don't have possession yet
+      console.log('⚠️ No possession yet, moving closer...')
+      await sendMovementInput(client1, directionX, 0, 500)
+      await waitScaled(client1, 500)
+
+      const retryBallState = await getServerBallState(client1)
+      console.log(`Ball possession after retry: "${retryBallState.possessedBy}"`)
+
+      if (retryBallState.possessedBy !== client1SessionId) {
+        console.log('⚠️ Still no possession, test may be flaky')
+        // Continue anyway to see what happens
+      }
+    }
+
     // Send shoot action
     console.log('\n📤 Sending SHOOT action...')
     await sendActionInput(client1)
 
     // Wait for ball to move
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     // Get ball state after shooting
     const afterShootBallState = await getServerBallState(client1)

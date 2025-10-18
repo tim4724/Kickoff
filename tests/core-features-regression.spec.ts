@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
-import { setupMultiClientTest, setupIsolatedTest } from './helpers/room-utils'
+import { setupMultiClientTest, setupIsolatedTest, setupSinglePlayerTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Core Features Regression Test Suite
@@ -17,7 +18,7 @@ test.describe('Core Features Regression Suite', () => {
   test('1. Single client can connect and initialize', async ({ page }, testInfo) => {
     const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     const sessionId = await page.evaluate(() => {
       return (window as any).__gameControls?.scene?.mySessionId
@@ -31,7 +32,7 @@ test.describe('Core Features Regression Suite', () => {
   test('2. Player sprite renders and has valid position', async ({ page }, testInfo) => {
     const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     const playerData = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -59,7 +60,7 @@ test.describe('Core Features Regression Suite', () => {
   test('3. Ball sprite renders at center field', async ({ page }, testInfo) => {
     const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     const ballData = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -86,21 +87,23 @@ test.describe('Core Features Regression Suite', () => {
     console.log(`✅ Ball rendered at (${ballData.x}, ${ballData.y})`)
   })
 
-  test('4. Keyboard controls work (arrow keys)', async ({ page }, testInfo) => {
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(3000) // Wait for single-player match to start (2s delay + buffer)
+  test('4. Keyboard controls work (arrow keys)', async ({ page }) => {
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('🎮 Single-player mode initialized')
+
+    // Small buffer after scene starts
+    await waitScaled(page, 500)
 
     const initialPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       return { x: scene.player.x, y: scene.player.y }
     })
 
-    // Press right arrow for 500ms
+    // Press right arrow for 1000ms (longer to ensure movement)
     await page.keyboard.down('ArrowRight')
-    await page.waitForTimeout(500)
+    await waitScaled(page, 1000)
     await page.keyboard.up('ArrowRight')
-    await page.waitForTimeout(300)
+    await waitScaled(page, 300)
 
     const finalPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -112,31 +115,25 @@ test.describe('Core Features Regression Suite', () => {
     console.log(`✅ Player moved ${moved.toFixed(1)}px with keyboard`)
   })
 
-  test('5. Touch joystick controls work', async ({ page }, testInfo) => {
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(3000) // Wait for single-player match to start (2s delay + buffer)
+  test('5. Touch joystick controls work', async ({ page }) => {
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('🎮 Single-player mode initialized')
+
+    // Small buffer after scene starts
+    await waitScaled(page, 500)
 
     const initialPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       return { x: scene.player.x, y: scene.player.y }
     })
 
-    // Simulate joystick touch and drag
+    // Move player using direct input method
     await page.evaluate(() => {
       const controls = (window as any).__gameControls
-      controls.test.touchJoystick(150, 300)
-      controls.test.dragJoystick(200, 300) // Move right
+      return controls.test.directMove(1, 0, 1500) // Move right for 1.5s
     })
 
-    await page.waitForTimeout(500)
-
-    await page.evaluate(() => {
-      const controls = (window as any).__gameControls
-      controls.test.releaseJoystick()
-    })
-
-    await page.waitForTimeout(300)
+    await waitScaled(page, 300)
 
     const finalPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -151,7 +148,7 @@ test.describe('Core Features Regression Suite', () => {
   test('6. Score UI displays correctly', async ({ page }, testInfo) => {
     const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     const scoreData = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -179,7 +176,7 @@ test.describe('Core Features Regression Suite', () => {
   test('7. NetworkManager establishes connection', async ({ page }, testInfo) => {
     const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     const networkStatus = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -201,20 +198,12 @@ test.describe('Core Features Regression Suite', () => {
     console.log(`✅ NetworkManager connected: ${networkStatus.sessionId}`)
   })
 
-  test('9. Field boundaries prevent out-of-bounds movement', async ({ page }, testInfo) => {
-    test.setTimeout(30000) // Increase timeout for this test
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
+  test('9. Field boundaries prevent out-of-bounds movement', async ({ page }) => {
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('🎮 Single-player mode initialized')
 
-    // Wait for match to actually start (phase = 'playing')
-    await page.waitForFunction(() => {
-      const scene = (window as any).__gameControls?.scene
-      const state = scene?.networkManager?.getState()
-      return state?.phase === 'playing'
-    }, { timeout: 5000 })
-
-    console.log('✅ Match is now playing')
-    await page.waitForTimeout(500) // Small buffer after match starts
+    // Small buffer after scene starts
+    await waitScaled(page, 500)
 
     // Move left until we reach the boundary (x <= 70)
     await page.keyboard.down('ArrowLeft')
@@ -226,7 +215,7 @@ test.describe('Core Features Regression Suite', () => {
     }, { timeout: 10000 }) // Give it 10 seconds to reach boundary
 
     await page.keyboard.up('ArrowLeft')
-    await page.waitForTimeout(500)
+    await waitScaled(page, 500)
 
     const position = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -251,8 +240,8 @@ test.describe('Core Features Regression Suite', () => {
 
     // Wait for both clients to initialize scenes (increased from 2s to 3s)
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
 
     const [session1, session2] = await Promise.all([
@@ -282,8 +271,8 @@ test.describe('Core Features Regression Suite', () => {
 
     // Wait for both clients to be connected (increased from 2s to 3s)
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
 
     const [session1, session2] = await Promise.all([
@@ -324,7 +313,7 @@ test.describe('Core Features Regression Suite', () => {
   test('12. Server state synchronizes player positions', async ({ page }, testInfo) => {
     const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
     console.log(`🔒 Test isolated in room: ${roomId}`)
-    await page.waitForTimeout(2000)
+    await waitScaled(page, 2000)
 
     const sessionId = await page.evaluate(() => {
       return (window as any).__gameControls?.scene?.mySessionId

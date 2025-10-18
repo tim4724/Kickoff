@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Test Suite: Game Over Screen Display
@@ -34,8 +35,8 @@ test.describe('Game Over Screen', () => {
     }, { timeout: 10000 })
 
     await Promise.all([
-      client1.waitForTimeout(1000),
-      client2.waitForTimeout(1000)
+      waitScaled(client1, 1000),
+      waitScaled(client2, 1000)
     ])
 
     // Verify match is playing
@@ -69,7 +70,7 @@ test.describe('Game Over Screen', () => {
       scene.onMatchEnd()
     })
 
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     // Check game over screen displays correct winner
     const gameOverText = await client1.evaluate(() => {
@@ -120,8 +121,8 @@ test.describe('Game Over Screen', () => {
     }, { timeout: 10000 })
 
     await Promise.all([
-      client1.waitForTimeout(1000),
-      client2.waitForTimeout(1000)
+      waitScaled(client1, 1000),
+      waitScaled(client2, 1000)
     ])
 
     console.log('\n📤 Simulating Red team score...')
@@ -142,7 +143,7 @@ test.describe('Game Over Screen', () => {
       scene.onMatchEnd()
     })
 
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     const gameOverText = await client1.evaluate(() => {
       const textObjects = (window as any).__gameControls?.scene?.children?.list
@@ -191,8 +192,8 @@ test.describe('Game Over Screen', () => {
     }, { timeout: 10000 })
 
     await Promise.all([
-      client1.waitForTimeout(1000),
-      client2.waitForTimeout(1000)
+      waitScaled(client1, 1000),
+      waitScaled(client2, 1000)
     ])
 
     console.log('\n📤 Simulating draw scenario...')
@@ -213,7 +214,7 @@ test.describe('Game Over Screen', () => {
       scene.onMatchEnd()
     })
 
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     const gameOverText = await client1.evaluate(() => {
       const textObjects = (window as any).__gameControls?.scene?.children?.list
@@ -262,8 +263,8 @@ test.describe('Game Over Screen', () => {
     }, { timeout: 10000 })
 
     await Promise.all([
-      client1.waitForTimeout(1000),
-      client2.waitForTimeout(1000)
+      waitScaled(client1, 1000),
+      waitScaled(client2, 1000)
     ])
 
     console.log('\n📤 Testing server state vs client state...')
@@ -289,7 +290,7 @@ test.describe('Game Over Screen', () => {
       scene.onMatchEnd()
     })
 
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     const gameOverText = await client1.evaluate(() => {
       const textObjects = (window as any).__gameControls?.scene?.children?.list

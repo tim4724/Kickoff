@@ -1,5 +1,6 @@
 import { test, expect, Browser } from '@playwright/test'
 import { setTestRoomId } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Room Selection Test Suite
@@ -74,10 +75,10 @@ test.describe('Room Selection', () => {
 
     // Wait for all clients to connect and join rooms (longer wait for Phaser initialization)
     await Promise.all([
-      client1.waitForTimeout(5000),
-      client2.waitForTimeout(5000),
-      client3.waitForTimeout(5000),
-      client4.waitForTimeout(5000),
+      waitScaled(client1, 5000),
+      waitScaled(client2, 5000),
+      waitScaled(client3, 5000),
+      waitScaled(client4, 5000),
     ])
 
     // Verify Room A clients joined the correct room
@@ -163,7 +164,7 @@ test.describe('Room Selection', () => {
     await client.goto(CLIENT_URL)
 
     // Wait for connection
-    await client.waitForTimeout(3000)
+    await waitScaled(client, 3000)
 
     // Verify client joined the custom room
     expect(roomLogs.some(log =>

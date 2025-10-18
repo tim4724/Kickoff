@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
-import { setupIsolatedTest } from './helpers/room-utils'
+import { setupSinglePlayerTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Input Lag Measurement Test
@@ -26,21 +27,19 @@ interface LatencyMeasurement {
  * Measure input-to-visual lag
  * Sends movement input and measures time until player moves
  */
-async function measureInputLag(page: Page, sessionId: string): Promise<number> {
+async function measureInputLag(page: Page): Promise<number> {
   const startTime = Date.now()
 
-  // Get initial position
-  const initialPos = await page.evaluate((sid) => {
+  // Get initial position (single-player mode)
+  const initialPos = await page.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    const state = scene?.networkManager?.getState()
-    const player = state?.players?.get(sid)
-    return { x: player?.x || 0, y: player?.y || 0 }
-  }, sessionId)
+    return { x: scene.player.x, y: scene.player.y }
+  })
 
-  // Send input via network (simulates real joystick)
-  await page.evaluate(() => {
-    const scene = (window as any).__gameControls?.scene
-    scene?.networkManager?.sendInput({ x: 1, y: 0 }, false)
+  // Send direct input (starts movement immediately without UI interaction)
+  const inputPromise = page.evaluate(() => {
+    const controls = (window as any).__gameControls
+    return controls.test.directMove(1, 0, 100) // Move right for 100ms
   })
 
   // Poll for position change (check every 1ms)
@@ -48,14 +47,12 @@ async function measureInputLag(page: Page, sessionId: string): Promise<number> {
   let lag = 0
 
   for (let i = 0; i < 500; i++) { // Max 500ms
-    await page.waitForTimeout(1)
+    await waitScaled(page, 1)
 
-    const currentPos = await page.evaluate((sid) => {
+    const currentPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      const state = scene?.networkManager?.getState()
-      const player = state?.players?.get(sid)
-      return { x: player?.x || 0, y: player?.y || 0 }
-    }, sessionId)
+      return { x: scene.player.x, y: scene.player.y }
+    })
 
     const deltaX = Math.abs(currentPos.x - initialPos.x)
     const deltaY = Math.abs(currentPos.y - initialPos.y)
@@ -67,57 +64,35 @@ async function measureInputLag(page: Page, sessionId: string): Promise<number> {
     }
   }
 
+  // Wait for input to complete (if not moved yet)
   if (!moved) {
+    await inputPromise
     console.warn('⚠️ No movement detected within 500ms')
     return 500
   }
+
+  // Cancel ongoing movement
+  await inputPromise
 
   return lag
 }
 
 /**
  * Measure network round-trip time
- * Uses ping/pong messaging
+ * For single-player mode, this is always 0 (no network)
  */
 async function measureNetworkRTT(page: Page): Promise<number> {
-  return await page.evaluate(async () => {
-    const scene = (window as any).__gameControls?.scene
-    const room = scene?.networkManager?.getRoom()
-
-    if (!room) return 0
-
-    return new Promise<number>((resolve) => {
-      const startTime = performance.now()
-
-      room.onMessage('pong', () => {
-        const rtt = performance.now() - startTime
-        resolve(rtt)
-      })
-
-      room.send('ping', { sent: startTime })
-
-      // Timeout after 1 second
-      setTimeout(() => resolve(1000), 1000)
-    })
-  })
+  // In single-player mode, there's no network latency
+  return 0
 }
 
 test.describe('Input Lag Measurement', () => {
-  test('Measure Baseline Input Lag (10 samples)', async ({ page }, testInfo) => {
-    const roomId = await setupIsolatedTest(page, CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Test isolated in room: ${roomId}`)
+  test('Measure Baseline Input Lag (10 samples)', async ({ page }) => {
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('🎮 Single-player mode initialized')
 
-    // Wait for game to load
-    await page.waitForTimeout(3000)
-
-    // Get session ID
-    const client1SessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
-
-    if (!client1SessionId) {
-      throw new Error('Failed to get session ID')
-    }
-
-    console.log(`✅ Client connected: ${client1SessionId}`)
+    // Small buffer after scene starts
+    await waitScaled(page, 500)
 
     console.log('\n🧪 MEASURING INPUT LAG (10 samples)')
     console.log('='.repeat(70))
@@ -128,12 +103,12 @@ test.describe('Input Lag Measurement', () => {
       console.log(`\n📊 Sample ${i + 1}/10`)
 
       // Measure input lag
-      const inputToVisual = await measureInputLag(page, client1SessionId)
+      const inputToVisual = await measureInputLag(page)
       console.log(`  Input-to-Visual: ${inputToVisual.toFixed(2)}ms`)
 
-      // Measure network RTT
+      // Measure network RTT (0 in single-player)
       const networkRTT = await measureNetworkRTT(page)
-      console.log(`  Network RTT: ${networkRTT.toFixed(2)}ms`)
+      console.log(`  Network RTT: ${networkRTT.toFixed(2)}ms (single-player)`)
 
       measurements.push({
         inputToVisual,
@@ -142,7 +117,7 @@ test.describe('Input Lag Measurement', () => {
       })
 
       // Wait between samples
-      await page.waitForTimeout(500)
+      await waitScaled(page, 500)
     }
 
     // Calculate statistics

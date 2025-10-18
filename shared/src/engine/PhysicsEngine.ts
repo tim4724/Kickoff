@@ -6,6 +6,7 @@
 
 import type { EnginePlayerData, EngineBallData, PhysicsConfig, EnginePlayerInput } from './types'
 import type { Team } from '../types'
+import { gameClock } from './GameClock'
 
 export class PhysicsEngine {
   private config: PhysicsConfig
@@ -42,7 +43,7 @@ export class PhysicsEngine {
     )
 
     // Update state (preserve 'kicking' if still active)
-    const now = Date.now()
+    const now = gameClock.now()
     if (player.kickingUntil && now < player.kickingUntil) {
       // Keep kicking state, but update direction if moving
       const moving = Math.abs(input.movement.x) > 0.1 || Math.abs(input.movement.y) > 0.1
@@ -171,7 +172,7 @@ export class PhysicsEngine {
     if (ball.pressureLevel >= this.config.pressureThreshold) {
       // Check capture lockout
       const timeSinceCapture =
-        Date.now() - (this.lastPossessionGainTime.get(possessor.id) || 0)
+        gameClock.now() - (this.lastPossessionGainTime.get(possessor.id) || 0)
       if (timeSinceCapture < this.config.captureLockoutMs) {
         return
       }
@@ -179,15 +180,15 @@ export class PhysicsEngine {
       // Transfer to nearest opponent
       if (nearestOpponent) {
         const opponent = nearestOpponent as EnginePlayerData
-        this.lastPossessionLossTime.set(possessor.id, Date.now())
+        this.lastPossessionLossTime.set(possessor.id, gameClock.now())
         ball.possessedBy = opponent.id
-        this.lastPossessionGainTime.set(opponent.id, Date.now())
+        this.lastPossessionGainTime.set(opponent.id, gameClock.now())
         ball.pressureLevel = 0
       } else {
         // Release if no opponent nearby
         ball.possessedBy = ''
         ball.pressureLevel = 0
-        this.lastPossessionLossTime.set(possessor.id, Date.now())
+        this.lastPossessionLossTime.set(possessor.id, gameClock.now())
       }
     }
   }
@@ -207,7 +208,7 @@ export class PhysicsEngine {
         const releaseThreshold = this.config.possessionRadius + 10
         if (dist > releaseThreshold) {
           ball.possessedBy = ''
-          this.lastPossessionLossTime.set(possessor.id, Date.now())
+          this.lastPossessionLossTime.set(possessor.id, gameClock.now())
         } else {
           // Apply magnetism - ball sticks in front of player
           const offsetDistance = 25
@@ -224,7 +225,7 @@ export class PhysicsEngine {
     // Check for new possession if ball is free
     if (ball.possessedBy === '') {
       const SHOT_IMMUNITY_MS = 300
-      const timeSinceShot = Date.now() - (ball.lastShotTime || 0)
+      const timeSinceShot = gameClock.now() - (ball.lastShotTime || 0)
       const hasImmunity = timeSinceShot < SHOT_IMMUNITY_MS
 
       players.forEach((player) => {
@@ -239,11 +240,11 @@ export class PhysicsEngine {
 
         if (dist < this.config.possessionRadius) {
           // Check loss lockout
-          const timeSinceLoss = Date.now() - (this.lastPossessionLossTime.get(player.id) || 0)
+          const timeSinceLoss = gameClock.now() - (this.lastPossessionLossTime.get(player.id) || 0)
           if (timeSinceLoss < this.config.lossLockoutMs) return
 
           ball.possessedBy = player.id
-          this.lastPossessionGainTime.set(player.id, Date.now())
+          this.lastPossessionGainTime.set(player.id, gameClock.now())
         }
       })
     }
@@ -270,13 +271,13 @@ export class PhysicsEngine {
       ball.velocityY = dy * speed
       ball.possessedBy = ''
 
-      ball.lastShotTime = Date.now()
+      ball.lastShotTime = gameClock.now()
       ball.lastShooter = player.id
 
-      this.lastPossessionLossTime.set(player.id, Date.now())
+      this.lastPossessionLossTime.set(player.id, gameClock.now())
 
       player.state = 'kicking'
-      player.kickingUntil = Date.now() + 300
+      player.kickingUntil = gameClock.now() + 300
     } else {
       // Try to gain possession
       const dx = ball.x - player.x
@@ -284,7 +285,7 @@ export class PhysicsEngine {
       const dist = Math.sqrt(dx * dx + dy * dy)
 
       const SHOT_IMMUNITY_MS = 300
-      const timeSinceShot = Date.now() - (ball.lastShotTime || 0)
+      const timeSinceShot = gameClock.now() - (ball.lastShotTime || 0)
       const hasImmunity = timeSinceShot < SHOT_IMMUNITY_MS
       const isShooter = player.id === ball.lastShooter
 
@@ -293,11 +294,11 @@ export class PhysicsEngine {
         ball.possessedBy === '' &&
         !(hasImmunity && isShooter)
       ) {
-        const timeSinceLoss = Date.now() - (this.lastPossessionLossTime.get(player.id) || 0)
+        const timeSinceLoss = gameClock.now() - (this.lastPossessionLossTime.get(player.id) || 0)
         if (timeSinceLoss < this.config.lossLockoutMs) return
 
         ball.possessedBy = player.id
-        this.lastPossessionGainTime.set(player.id, Date.now())
+        this.lastPossessionGainTime.set(player.id, gameClock.now())
       }
     }
   }

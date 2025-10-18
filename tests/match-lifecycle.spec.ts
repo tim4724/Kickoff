@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
+import { waitScaled } from './helpers/time-control'
 
 /**
  * Test Suite: Match Lifecycle and Phase Transitions
@@ -39,7 +40,7 @@ test.describe('Match Lifecycle', () => {
     // Client 1 connects first
     console.log('📤 Step 1: Client 1 connecting...')
     await client1.goto(CLIENT_URL)
-    await client1.waitForTimeout(2000)
+    await waitScaled(client1, 2000)
 
     const phase1 = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -53,7 +54,7 @@ test.describe('Match Lifecycle', () => {
     // Client 2 connects
     console.log('\n📤 Step 2: Client 2 connecting...')
     await client2.goto(CLIENT_URL)
-    await client2.waitForTimeout(2000)
+    await waitScaled(client2, 2000)
 
     // Match should transition to 'playing'
     const phase2 = await client1.evaluate(() => {
@@ -72,7 +73,7 @@ test.describe('Match Lifecycle', () => {
       return state?.matchTime || 0
     })
 
-    await client1.waitForTimeout(2000)
+    await waitScaled(client1, 2000)
 
     const timer2 = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
@@ -108,8 +109,8 @@ test.describe('Match Lifecycle', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     // Force match to end by scoring enough goals or manipulating state
@@ -117,13 +118,13 @@ test.describe('Match Lifecycle', () => {
 
     // Position player near goal and shoot
     await client1.keyboard.down('ArrowRight')
-    await client1.waitForTimeout(3000)
+    await waitScaled(client1, 3000)
     await client1.keyboard.up('ArrowRight')
-    await client1.waitForTimeout(200)
+    await waitScaled(client1, 200)
 
     // Try to shoot at goal
     await client1.keyboard.press('Space')
-    await client1.waitForTimeout(3000)
+    await waitScaled(client1, 3000)
 
     // Check if goal was scored
     const scoreState = await client1.evaluate(() => {
@@ -154,9 +155,9 @@ test.describe('Match Lifecycle', () => {
       })
 
       await client1.keyboard.down('ArrowRight')
-      await client1.waitForTimeout(1000)
+      await waitScaled(client1, 1000)
       await client1.keyboard.up('ArrowRight')
-      await client1.waitForTimeout(200)
+      await waitScaled(client1, 200)
 
       const positionAfter = await client1.evaluate(() => {
         const scene = (window as any).__gameControls?.scene
@@ -198,8 +199,8 @@ test.describe('Match Lifecycle', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     // Get initial state
@@ -223,9 +224,9 @@ test.describe('Match Lifecycle', () => {
     // Move ball and player
     console.log('\n📤 Moving player to change game state...')
     await client1.keyboard.down('ArrowRight')
-    await client1.waitForTimeout(2000)
+    await waitScaled(client1, 2000)
     await client1.keyboard.up('ArrowRight')
-    await client1.waitForTimeout(500)
+    await waitScaled(client1, 500)
 
     // Get modified state
     const modifiedState = await client1.evaluate(() => {
@@ -256,8 +257,8 @@ test.describe('Match Lifecycle', () => {
     ])
 
     await Promise.all([
-      client1.waitForTimeout(3000),
-      client2.waitForTimeout(3000)
+      waitScaled(client1, 3000),
+      waitScaled(client2, 3000)
     ])
 
     // Get reset state
@@ -309,8 +310,8 @@ test.describe('Match Lifecycle', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      client1.waitForTimeout(2000),
-      client2.waitForTimeout(2000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     // Verify playing phase
@@ -328,7 +329,7 @@ test.describe('Match Lifecycle', () => {
     await client2.close()
     await context2.close()
 
-    await client1.waitForTimeout(1000)
+    await waitScaled(client1, 1000)
 
     // Check phase
     const waitingPhase = await client1.evaluate(() => {
