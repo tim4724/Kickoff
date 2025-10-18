@@ -250,13 +250,17 @@ tests/
 
 ## Documentation References
 
+### Main Documentation
 - **ARCHITECTURE.md** - Detailed technical architecture
 - **QUICKSTART.md** - Development guide
 - **SPECIFICATION.md** - Complete product spec
-- **claudedocs/BALL_CAPTURE_MECHANISM.md** - Possession system details
-- **claudedocs/SHOOTING_IMPLEMENTATION_RESULTS.md** - Shooting mechanics
-- **claudedocs/LAG_OPTIMIZATION_SUMMARY.md** - Performance optimization (85% lag reduction)
-- **claudedocs/TEST_SUMMARY.md** - Latest test results
+- **TESTING.md** - Testing guide (multi-worker, time acceleration, test helpers)
+
+### Implementation Details (claudedocs/)
+- **BALL_CAPTURE_MECHANISM.md** - Possession system details
+- **SHOOTING_IMPLEMENTATION_RESULTS.md** - Shooting mechanics
+- **LAG_OPTIMIZATION_SUMMARY.md** - Performance optimization (85% lag reduction, 55ms achieved)
+- **TEST_SUMMARY.md** - Latest test results
 
 ## Server URLs
 - **Client**: http://localhost:5173
