@@ -259,7 +259,9 @@ export class GameScene extends BaseGameScene {
   private async connectToMultiplayer() {
     try {
       const hostname = window.location.hostname
-      const serverUrl = `ws://${hostname}:3000`
+      // Use environment variable for server port (3000 for dev, 3001 for test)
+      const serverPort = import.meta.env.VITE_SERVER_PORT || '3000'
+      const serverUrl = `ws://${hostname}:${serverPort}`
 
       this.networkManager = new NetworkManager({
         serverUrl,

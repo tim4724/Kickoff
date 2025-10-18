@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test Suite: Two-Player Room Joining and Team Assignment
@@ -15,7 +16,7 @@ import { waitScaled } from './helpers/time-control'
  * These tests ensure proper team balancing and match initialization.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 const BLUE_COLOR = 26367      // 0x0066ff
 const RED_COLOR = 16729156    // 0xff4444
 

@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupSinglePlayerTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test: Player Movement Speed
@@ -11,7 +12,7 @@ import { waitScaled } from './helpers/time-control'
  * Expected: Player moves at expected speed when input is applied.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 /**
  * Helper: Get player position

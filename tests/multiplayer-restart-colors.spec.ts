@@ -1,6 +1,7 @@
 import { test, expect, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test Suite: Multiplayer Color Assignment After Restart
@@ -10,7 +11,7 @@ import { waitScaled } from './helpers/time-control'
  * both clients would sometimes get the same color after restart.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 const SCREENSHOT_DIR = './test-results/restart-colors'
 
 const BLUE_COLOR = 26367      // 0x0066ff

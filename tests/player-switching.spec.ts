@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test Suite: Player Switching Mechanics
  * Tests manual switching, auto-switching, visual feedback, and AI teammate control
  */
+
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 /**
  * Test 1: Basic player switching cycles through all teammates
@@ -12,7 +15,7 @@ import { waitScaled } from './helpers/time-control'
 test('cycles through all 3 teammates correctly', async ({ page }) => {
   const testRoom = `test_cycle_${Date.now()}`
 
-  await page.goto(`http://localhost:5173/?room=${testRoom}`)
+  await page.goto(`${CLIENT_URL}/?room=${testRoom}`)
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
@@ -89,7 +92,7 @@ test('cycles through all 3 teammates correctly', async ({ page }) => {
 test('updates visual borders when switching players', async ({ page }) => {
   const testRoom = `test_borders_${Date.now()}`
 
-  await page.goto(`http://localhost:5173/?room=${testRoom}`)
+  await page.goto(`${CLIENT_URL}/?room=${testRoom}`)
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
@@ -168,7 +171,7 @@ test('updates visual borders when switching players', async ({ page }) => {
 test('can switch to AI teammate', async ({ page }) => {
   const testRoom = `test_ai_control_${Date.now()}`
 
-  await page.goto(`http://localhost:5173/?room=${testRoom}`)
+  await page.goto(`${CLIENT_URL}/?room=${testRoom}`)
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
@@ -239,7 +242,7 @@ test('can switch to AI teammate', async ({ page }) => {
 test('space key switches players when not having ball', async ({ page }) => {
   const testRoom = `test_space_switch_${Date.now()}`
 
-  await page.goto(`http://localhost:5173/?room=${testRoom}`)
+  await page.goto(`${CLIENT_URL}/?room=${testRoom}`)
   await page.waitForSelector('canvas', { timeout: 10000 })
 
   // Wait for menu to render, then click Multiplayer button (canvas coordinates)
@@ -251,33 +254,27 @@ test('space key switches players when not having ball', async ({ page }) => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.65)
   }
 
-  // Wait longer for game initialization with retry logic
-  let beforeSwitch = null
-  let retries = 0
-  const maxRetries = 10
-
-  while (retries < maxRetries && !beforeSwitch) {
-    await waitScaled(page, 1000)
-
-    beforeSwitch = await page.evaluate(() => {
+  // Wait for game initialization
+  await page.waitForFunction(
+    () => {
       const gameScene = (window as any).__gameControls?.scene
-      if (!gameScene) return null
+      if (!gameScene) return false
 
       const state = gameScene.getGameState()
-      if (!state) return null
+      return state && state.ball && gameScene.controlledPlayerId
+    },
+    { timeout: 10000 }
+  )
 
-      return {
-        controlled: gameScene.controlledPlayerId,
-        hasBall: state.ball.possessedBy === gameScene.controlledPlayerId
-      }
-    })
+  const beforeSwitch = await page.evaluate(() => {
+    const gameScene = (window as any).__gameControls?.scene
+    const state = gameScene.getGameState()
 
-    retries++
-  }
-
-  if (!beforeSwitch) {
-    throw new Error('Game not initialized after 10 seconds')
-  }
+    return {
+      controlled: gameScene.controlledPlayerId,
+      hasBall: state.ball.possessedBy === gameScene.controlledPlayerId
+    }
+  })
 
   console.log('Before switch:', beforeSwitch)
 

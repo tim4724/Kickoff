@@ -22,10 +22,11 @@ npm run dev:shared             # Shared types watch mode
 
 ### Testing
 ```bash
-# Run tests with parallel workers (default production mode)
-npm run test:e2e                                    # All E2E tests (2 workers)
-npm run test:e2e -- --workers=4                     # Custom worker count
+# Run tests with auto-started test servers (recommended)
+npm run test:e2e                                    # All E2E tests (4 workers)
+npm run test:e2e -- --workers=8                     # Custom worker count
 npx playwright test --project=stable-tests          # Only stable tests
+npx playwright test --project=physics-tests         # Only physics tests
 
 # Interactive/Debug modes
 npm run test:e2e:ui                                 # Playwright UI (single worker)
@@ -43,10 +44,12 @@ npm run test:e2e:report         # View HTML report
 ```
 
 **Important Testing Notes**:
+- **Test servers auto-start** on ports 3001 (server) and 5174 (client) via Playwright `webServer` configuration
 - Tests use **isolated rooms** for parallel execution (each worker gets unique room)
-- Default 2 workers provides good balance of speed and reliability
+- Default 4 workers provides good balance of speed and reliability
 - Test helpers in `tests/helpers/room-utils.ts` provide isolation utilities
 - Single worker mode (`--workers=1`) for debugging flaky tests
+- Test servers run independently from development servers (no interference)
 
 ### Building
 ```bash
@@ -149,9 +152,41 @@ MATCH_DURATION: 120         // Match length (seconds)
 
 ## Testing Architecture
 
+### Test Server Auto-Start
+Tests automatically start dedicated test servers on isolated ports to prevent interference with development:
+
+**Configuration** (`playwright.config.ts`):
+```typescript
+webServer: [
+  {
+    command: 'cd server && PORT=3001 npm run dev',
+    port: 3001,
+    timeout: 120000,
+    reuseExistingServer: !process.env.CI,
+  },
+  {
+    command: 'cd client && VITE_PORT=5174 npm run dev',
+    port: 5174,
+    timeout: 120000,
+    reuseExistingServer: !process.env.CI,
+  },
+]
+```
+
+**Port Isolation**:
+- Development: `localhost:3000` (server), `localhost:5173` (client)
+- Testing: `localhost:3001` (server), `localhost:5174` (client)
+- Dynamic port detection in `client/src/scenes/GameScene.ts:connectToMultiplayer()`
+
+**Benefits**:
+- No manual server startup required
+- Zero interference with development servers
+- Automatic cleanup on test completion
+- CI/CD ready (starts fresh servers every time)
+
 ### Test Philosophy
 - **Isolated rooms**: Each test/worker gets unique room to prevent interference
-- **Parallel execution**: 2+ workers for speed, single worker for debugging
+- **Parallel execution**: 4+ workers for speed, single worker for debugging
 - **Server state verification**: Tests query server state, not just client rendering
 - **Helper utilities**: `tests/helpers/room-utils.ts` for room isolation
 

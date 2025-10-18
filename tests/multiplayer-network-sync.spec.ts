@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Socca2 Multiplayer Network Synchronization Test Suite
@@ -15,8 +16,8 @@ import { waitScaled } from './helpers/time-control'
  * network architecture is working correctly.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
-const SERVER_URL = 'http://localhost:3000'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
+const SERVER_URL = TEST_ENV.SERVER_URL
 const SCREENSHOT_DIR = './test-results/network-sync'
 
 // Network timing constants
@@ -317,25 +318,63 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
 
     console.log(`\n📤 Moving toward ball: direction (${normalizedX.toFixed(2)}, ${normalizedY.toFixed(2)})`)
 
-    // Move in increments until within possession radius (max 30 seconds total)
-    const MAX_ITERATIONS = 6
-    const MOVE_DURATION = 5000 // 5 seconds per iteration
-    let iteration = 0
+    // Move toward ball in short bursts until we get possession
+    // This avoids the timeout issue where sendMovementInput releases the joystick after duration
+    let hasPossession = false
+    let attempts = 0
+    const MAX_ATTEMPTS = 20 // 20 attempts * 1.5s each = 30s max
 
-    while (distance >= 30 && iteration < MAX_ITERATIONS) {
-      iteration++
-      console.log(`\n📤 Movement iteration ${iteration}/${MAX_ITERATIONS}, distance: ${distance.toFixed(1)}px`)
+    while (!hasPossession && attempts < MAX_ATTEMPTS) {
+      attempts++
 
-      await sendMovementInput(client1, normalizedX, normalizedY, MOVE_DURATION)
+      // Move for 1 second
+      await sendMovementInput(client1, normalizedX, normalizedY, 1000)
 
-      // Check new distance
-      ballState = await getServerBallState(client1)
-      playerState = await getServerPlayerState(client1, client1SessionId)
+      // Check if we have possession or are close enough
+      const checkResult = await client1.evaluate((sid) => {
+        const scene = (window as any).__gameControls?.scene
+        if (!scene) return { hasPossession: false, distance: 999 }
 
-      const newDx = ballState.x - playerState.x
-      const newDy = ballState.y - playerState.y
-      distance = Math.sqrt(newDx * newDx + newDy * newDy)
+        const state = scene.networkManager.getState()
+        const ballState = state.ball
+        const playerState = state.players.get(sid)
+
+        if (!ballState || !playerState) return { hasPossession: false, distance: 999 }
+
+        const dx = ballState.x - playerState.x
+        const dy = ballState.y - playerState.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        return {
+          hasPossession: ballState.possessedBy === sid || distance < 30,
+          distance,
+          ballX: ballState.x,
+          ballY: ballState.y,
+          playerX: playerState.x,
+          playerY: playerState.y
+        }
+      }, client1SessionId)
+
+      console.log(`  Attempt ${attempts}: Distance=${checkResult.distance.toFixed(1)}px, Player=(${checkResult.playerX?.toFixed(1)}, ${checkResult.playerY?.toFixed(1)}), Ball=(${checkResult.ballX?.toFixed(1)}, ${checkResult.ballY?.toFixed(1)})`)
+
+      if (checkResult.hasPossession) {
+        hasPossession = true
+        console.log(`  ✅ Possession gained after ${attempts} attempts`)
+        break
+      }
     }
+
+    if (!hasPossession) {
+      throw new Error(`Failed to gain possession after ${attempts} attempts (${attempts * 1.5}s)`)
+    }
+
+    // Get final state
+    ballState = await getServerBallState(client1)
+    playerState = await getServerPlayerState(client1, client1SessionId)
+
+    const finalDx = ballState.x - playerState.x
+    const finalDy = ballState.y - playerState.y
+    distance = Math.sqrt(finalDx * finalDx + finalDy * finalDy)
 
     console.log(`\n✅ Final distance to ball: ${distance.toFixed(1)}px (possession radius: 30px)`)
     console.log(`Ball possessed by: "${ballState.possessedBy}"`)

@@ -47,7 +47,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5174', // Test port (dev uses 5173)
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -127,11 +127,29 @@ export default defineConfig({
     },
   ],
 
-  // Note: Dev servers must be running before tests
-  // Run: npm run dev
-  //
+  // Auto-start test servers with isolated ports
+  webServer: [
+    {
+      command: 'npm run dev:shared',
+      timeout: 60 * 1000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: 'npm run dev:client:test',
+      url: 'http://localhost:5174',
+      timeout: 120 * 1000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: 'npm run dev:server:test',
+      url: 'http://localhost:3001/health',
+      timeout: 60 * 1000,
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
+
   // Test commands:
-  // - npm run test:e2e                 # Run all tests
+  // - npm run test:e2e                 # Run all tests (auto-starts servers)
   // - npm run test:e2e:ui              # Run with UI mode
   // - npm run test:e2e:report          # View last report
   // - npm run clean:test               # Clean test artifacts

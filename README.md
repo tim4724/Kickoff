@@ -98,10 +98,15 @@ npm run dev              # Both client + server
 npm run dev:client       # Client only (port 5173)
 npm run dev:server       # Server only (port 3000)
 
-# Testing
-npx playwright test                    # Run all E2E tests
-npx playwright test --ui              # Interactive test UI
-npx playwright test tests/lag-measurement.spec.ts  # Lag test
+# Testing (test servers auto-start on ports 3001/5174)
+npm run test:e2e                      # Run all E2E tests (4 workers)
+npm run test:e2e:ui                   # Interactive test UI
+npm run test:e2e:headed               # See browser during tests
+npm run test:e2e:debug                # Debug mode with breakpoints
+npm run test:physics                  # Physics-only tests
+npm run test:stable                   # Stable tests only
+npm run clean:test                    # Remove test artifacts
+npm run test:e2e:report               # View HTML report
 
 # Building
 npm run build           # Build for production

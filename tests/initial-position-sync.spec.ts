@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test: Initial Player Position Synchronization
@@ -10,7 +11,7 @@ import { waitScaled } from './helpers/time-control'
  * same initial player positions when the match begins.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 const SCREENSHOT_DIR = './test-results/position-sync'
 
 /**

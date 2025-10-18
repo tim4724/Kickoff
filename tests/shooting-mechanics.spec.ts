@@ -1,6 +1,7 @@
 import { test, expect, Page, Browser } from '@playwright/test'
 import { setupSinglePlayerTest, setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from './config/test-env'
 
 /**
  * Shooting Mechanics Test Suite
@@ -15,7 +16,7 @@ import { waitScaled } from './helpers/time-control'
  * - Goal scoring integration
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 const SHOOT_SPEED = 2000 // max shoot speed from GAME_CONFIG
 const MIN_SHOOT_SPEED = 800 // min shoot speed from GAME_CONFIG
 const DEFAULT_POWER = 0.8 // 80% of max speed

@@ -1,6 +1,7 @@
 import { test, expect, Browser } from '@playwright/test'
 import { setTestRoomId } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Room Selection Test Suite
@@ -9,7 +10,7 @@ import { waitScaled } from './helpers/time-control'
  * rooms are properly isolated from each other.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 test.describe('Room Selection', () => {
   test('Clients can choose which room to join', async ({ browser }, testInfo) => {

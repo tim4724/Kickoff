@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test Suite: Game Over Screen Display
@@ -14,7 +15,7 @@ import { waitScaled } from './helpers/time-control'
  * - All scenarios handled correctly
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 test.describe('Game Over Screen', () => {
   test('Shows correct winner text when Blue team wins', async ({ browser }, testInfo) => {

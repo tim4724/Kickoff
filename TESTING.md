@@ -3,21 +3,69 @@
 ## Quick Start
 
 ```bash
-# Run all tests (recommended: 1 worker for stability)
-npm run test:e2e -- --workers=1
+# Run all tests (test servers auto-start on ports 3001/5174)
+npm run test:e2e                  # Default: 4 workers
+npm run test:e2e -- --workers=8   # Max parallelism
 
 # Run specific test suites
 npm run test:stable    # Stable core feature tests
 npm run test:physics   # Physics and gameplay tests
 
-# Run with UI (interactive mode)
-npm run test:e2e:ui
+# Interactive modes
+npm run test:e2e:ui                # Playwright UI (single worker)
+npm run test:e2e:headed            # See browser during tests
+npm run test:e2e:debug             # Debug mode with breakpoints
 
-# View latest test report
-npm run test:e2e:report
+# Test management
+npm run clean:test                 # Remove test artifacts
+npm run test:e2e:report            # View HTML report
 ```
 
+**Note**: Test servers automatically start on dedicated ports (3001/5174) to avoid interfering with development servers (3000/5173).
+
 ## Test Infrastructure
+
+### Test Server Auto-Start
+
+Tests automatically start dedicated test servers on isolated ports via Playwright's `webServer` configuration:
+
+**Port Isolation**:
+- **Development**: `http://localhost:3000` (server), `http://localhost:5173` (client)
+- **Testing**: `http://localhost:3001` (server), `http://localhost:5174` (client)
+
+**Configuration** (`playwright.config.ts`):
+```typescript
+webServer: [
+  {
+    command: 'cd server && PORT=3001 npm run dev',
+    port: 3001,
+    timeout: 120000,
+    reuseExistingServer: !process.env.CI,
+  },
+  {
+    command: 'cd client && VITE_PORT=5174 npm run dev',
+    port: 5174,
+    timeout: 120000,
+    reuseExistingServer: !process.env.CI,
+  },
+]
+```
+
+**Benefits**:
+- ✅ No manual server startup required
+- ✅ Zero interference with development servers
+- ✅ Automatic cleanup on test completion
+- ✅ CI/CD ready (starts fresh servers every time)
+- ✅ Port conflict prevention (isolated test ports)
+
+**Client Port Detection** (`client/src/scenes/GameScene.ts`):
+```typescript
+private async connectToMultiplayer() {
+  const port = window.location.port === '5174' ? 3001 : 3000
+  const serverUrl = `ws://${hostname}:${port}`
+  // Automatically connects to correct server
+}
+```
 
 ### Time Control System
 
@@ -232,12 +280,22 @@ Time acceleration is automatically applied to all tests via `tests/global-setup.
 ## Troubleshooting
 
 ### Tests Timeout
-- **Solution**: Ensure dev server is running (`npm run dev`)
-- **Check**: `curl http://localhost:5173` and `curl http://localhost:3000/health`
+- **Cause**: Test servers failed to start
+- **Solution**: Test servers auto-start automatically. If they fail:
+  1. Check ports 3001 and 5174 are available
+  2. Kill conflicting processes: `lsof -ti:3001 -ti:5174 | xargs kill`
+  3. Re-run tests: `npm run test:e2e`
+- **Verify**: `curl http://localhost:5174` and `curl http://localhost:3001/health`
 
 ### Connection Failures
 - **Symptom**: `ERR_CONNECTION_RESET` or `Failed to fetch`
-- **Solution**: Restart dev environment: `pkill -9 -f "node|tsx|vite" && npm run dev`
+- **Cause**: Test server startup timeout or port conflict
+- **Solution**: Clean restart test servers:
+  ```bash
+  pkill -9 -f "vite.*5174|tsx.*3001"  # Kill test servers
+  npm run clean:test                   # Clean artifacts
+  npm run test:e2e                     # Auto-start fresh servers
+  ```
 
 ### Flaky Tests
 - **Solution**: Use 1 worker (`--workers=1`)

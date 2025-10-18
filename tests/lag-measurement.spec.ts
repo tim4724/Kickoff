@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupSinglePlayerTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Input Lag Measurement Test
@@ -15,7 +16,7 @@ import { waitScaled } from './helpers/time-control'
  * This test should be run BEFORE and AFTER each optimization to compare results.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 interface LatencyMeasurement {
   inputToVisual: number
@@ -30,7 +31,7 @@ interface LatencyMeasurement {
 async function measureInputLag(page: Page): Promise<number> {
   const startTime = Date.now()
 
-  // Get initial position (single-player mode)
+  // Get initial position and send input (single-player mode)
   const initialPos = await page.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
     return { x: scene.player.x, y: scene.player.y }
@@ -42,39 +43,34 @@ async function measureInputLag(page: Page): Promise<number> {
     return controls.test.directMove(1, 0, 100) // Move right for 100ms
   })
 
-  // Poll for position change (check every 1ms)
-  let moved = false
-  let lag = 0
+  // Wait for position change using waitForFunction (deterministic)
+  try {
+    await page.waitForFunction(
+      ({ initialX, initialY }) => {
+        const scene = (window as any).__gameControls?.scene
+        if (!scene?.player) return false
 
-  for (let i = 0; i < 500; i++) { // Max 500ms
-    await waitScaled(page, 1)
+        const deltaX = Math.abs(scene.player.x - initialX)
+        const deltaY = Math.abs(scene.player.y - initialY)
 
-    const currentPos = await page.evaluate(() => {
-      const scene = (window as any).__gameControls?.scene
-      return { x: scene.player.x, y: scene.player.y }
-    })
+        return deltaX > 2 || deltaY > 2
+      },
+      { initialX: initialPos.x, initialY: initialPos.y },
+      { timeout: 500, polling: 1 }
+    )
 
-    const deltaX = Math.abs(currentPos.x - initialPos.x)
-    const deltaY = Math.abs(currentPos.y - initialPos.y)
+    const lag = Date.now() - startTime
 
-    if (deltaX > 2 || deltaY > 2) {
-      lag = Date.now() - startTime
-      moved = true
-      break
-    }
-  }
+    // Wait for input to complete
+    await inputPromise
 
-  // Wait for input to complete (if not moved yet)
-  if (!moved) {
+    return lag
+  } catch (error) {
+    // Timeout - no movement detected
     await inputPromise
     console.warn('⚠️ No movement detected within 500ms')
     return 500
   }
-
-  // Cancel ongoing movement
-  await inputPromise
-
-  return lag
 }
 
 /**

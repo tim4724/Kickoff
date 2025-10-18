@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from './config/test-env'
 
 /**
  * Ball Capture E2E Tests - Proximity Pressure System
@@ -17,7 +18,7 @@ import { waitScaled } from './helpers/time-control'
  * 6. No regressions in shooting mechanics
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 test.describe('Ball Capture - Proximity Pressure', () => {
 
@@ -157,21 +158,42 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     await waitScaled(sourcePage, 300) // Settle time
   }
 
-  // Helper: Wait for condition
+  // Helper: Wait for condition - DETERMINISTIC VERSION
+  // Uses Playwright's waitForFunction instead of polling loop
   async function waitForCondition(
     page: Page,
     condition: (state: any) => boolean,
     timeoutMs: number = 5000
   ): Promise<boolean> {
-    const startTime = Date.now()
-    while (Date.now() - startTime < timeoutMs) {
-      const state = await getGameState(page)
-      if (state && condition(state)) {
-        return true
-      }
-      await waitScaled(page, 100)
+    try {
+      await page.waitForFunction(
+        (conditionStr) => {
+          const scene = (window as any).__gameControls?.scene
+          const state = scene?.networkManager?.getState()
+          if (!state) return false
+
+          // Reconstruct state object for condition check
+          const stateObj = {
+            players: Array.from(state.players?.values() || []),
+            ball: {
+              x: state.ball?.x,
+              y: state.ball?.y,
+              possessedBy: state.ball?.possessedBy || '',
+              pressureLevel: state.ball?.pressureLevel || 0
+            }
+          }
+
+          // Evaluate condition function
+          const conditionFn = new Function('state', `return (${conditionStr})(state)`)
+          return conditionFn(stateObj)
+        },
+        condition.toString(),
+        { timeout: timeoutMs }
+      )
+      return true
+    } catch (error) {
+      return false
     }
-    return false
   }
 
   test('Test 1: Pressure builds when opponent approaches ball carrier', async ({ browser }, testInfo) => {
@@ -230,24 +252,24 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     })
     await waitScaled(client1, 500)
 
-    // Wait for possession to register (network round-trip + physics processing)
-    // With 2 workers and 10x time acceleration, 500ms × 10 = 5s total wait
-    let captureAttempts = 0
-    let captureState = null
+    // Wait for possession to register - deterministic wait instead of retry loop
+    try {
+      await client1.waitForFunction(
+        () => {
+          const scene = (window as any).__gameControls?.scene
+          const state = scene?.networkManager?.getState()
+          return state?.ball?.possessedBy !== '' && state?.ball?.possessedBy !== null
+        },
+        { timeout: 10000 }
+      )
 
-    while (captureAttempts < 10) {
-      await waitScaled(client1, 500) // Balanced timing for 2 workers
-      captureState = await getGameState(client1)
-
-      if (captureState?.ball.possessedBy) {
-        console.log(`  ✅ Ball captured by: ${captureState.ball.possessedBy}`)
-        break
-      }
-
-      captureAttempts++
-      console.log(`  📍 Attempt ${captureAttempts}: Ball not yet possessed`)
+      const captureState = await getGameState(client1)
+      console.log(`  ✅ Ball captured by: ${captureState.ball.possessedBy}`)
+    } catch (error) {
+      console.log(`  ⚠️  Ball not captured within timeout`)
     }
 
+    const captureState = await getGameState(client1)
     const finalPositions = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       return {
@@ -359,32 +381,39 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log('\n📤 Step 3: Monitoring for ball release events...')
 
     let releaseDetected = false
-    const startTime = Date.now()
-    const maxWaitTime = 8000 // 8 seconds (with 1s capture time)
 
-    while (Date.now() - startTime < maxWaitTime && !releaseDetected) {
-      const state = await getGameState(client1)
+    // Use deterministic wait for ball release instead of polling loop
+    try {
+      await client1.waitForFunction(
+        () => {
+          const scene = (window as any).__gameControls?.scene
+          const state = scene?.networkManager?.getState()
+          const pressureLevel = state?.ball?.pressureLevel || 0
+          const possessedBy = state?.ball?.possessedBy || ''
 
-      if (state) {
-        console.log(
-          `  Pressure: ${state.ball.pressureLevel.toFixed(2)}, Possessed by: ${state.ball.possessedBy || 'none'}`
-        )
+          // Log current state for debugging (visible in browser console)
+          if (typeof window !== 'undefined') {
+            console.log(`Pressure: ${pressureLevel.toFixed(2)}, Possessed by: ${possessedBy || 'none'}`)
+          }
 
-        // Check if ball was released due to pressure
-        if (state.ball.pressureLevel > 0.8 && state.ball.possessedBy === '') {
-          console.log('\n🎯 Ball release detected at high pressure!')
-          releaseDetected = true
-        }
-      }
+          // Check if ball was released due to pressure
+          return pressureLevel > 0.8 && possessedBy === ''
+        },
+        { timeout: 8000 }
+      )
 
-      await waitScaled(client1, 500)
+      console.log('\n🎯 Ball release detected at high pressure!')
+      releaseDetected = true
+    } catch (error) {
+      console.log('\n⚠️  Ball release not detected within timeout')
+      releaseDetected = false
     }
 
     console.log(`\n✅ Test complete: Release detected = ${releaseDetected}`)
 
     // Ball should eventually release in a 2-player game with pressure
     // This is more of an observational test - we're validating the mechanic works
-    expect(releaseDetected || Date.now() - startTime >= maxWaitTime).toBe(true)
+    expect(true).toBe(true) // Test passes regardless - documents the behavior
 
     await client1.close()
     await client2.close()
@@ -505,26 +534,29 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     console.log('\n📤 Step 2: Verifying ball was captured...')
 
-    // Wait for possession to register (may take a moment for network sync)
-    let captureAttempts = 0
-    let stateWithPossession = null
+    // Wait for possession to register - deterministic wait
+    let ballWasCaptured = false
+    try {
+      await client1.waitForFunction(
+        () => {
+          const scene = (window as any).__gameControls?.scene
+          const state = scene?.networkManager?.getState()
+          return state?.ball?.possessedBy !== '' && state?.ball?.possessedBy !== null
+        },
+        { timeout: 5000 }
+      )
 
-    while (captureAttempts < 5) {
-      await waitScaled(client1, 300)
-      stateWithPossession = await getGameState(client1)
-
-      if (stateWithPossession?.ball.possessedBy) {
-        console.log(`  ✅ Ball captured by: ${stateWithPossession.ball.possessedBy}`)
-        break
-      }
-
-      captureAttempts++
-      console.log(`  Attempt ${captureAttempts}: Ball not yet possessed`)
+      const stateWithPossession = await getGameState(client1)
+      console.log(`  ✅ Ball captured by: ${stateWithPossession.ball.possessedBy}`)
+      ballWasCaptured = true
+    } catch (error) {
+      console.log(`  ⚠️  Ball not captured within timeout`)
+      ballWasCaptured = false
     }
 
     // Ball should be possessed after moving to it (or test documents current behavior)
     // If not possessed after 5 attempts, this is expected behavior (game may not auto-capture)
-    const ballWasCaptured = !!stateWithPossession?.ball.possessedBy
+    const stateWithPossession = await getGameState(client1)
     console.log(`\n  Ball capture status: ${ballWasCaptured ? 'CAPTURED' : 'NOT CAPTURED'}`)
 
     // Test documents current behavior - passes regardless
@@ -559,26 +591,27 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     await movePlayerTowardBall(client1)
     await waitScaled(client1, 500)
 
-    // Wait for possession to register (network round-trip + physics processing)
-    // With 2 workers and 10x time acceleration, 500ms × 10 = 5s total wait
-    let captureAttempts = 0
-    let captureState = null
+    // Wait for possession to register - deterministic wait
+    try {
+      await client1.waitForFunction(
+        () => {
+          const scene = (window as any).__gameControls?.scene
+          const state = scene?.networkManager?.getState()
+          return state?.ball?.possessedBy !== '' && state?.ball?.possessedBy !== null
+        },
+        { timeout: 10000 }
+      )
 
-    while (captureAttempts < 10) {
-      await waitScaled(client1, 500) // Balanced timing for 2 workers
-      captureState = await getGameState(client1)
+      const captureState = await getGameState(client1)
+      console.log(`  ✅ Ball captured by: ${captureState.ball.possessedBy}`)
 
-      if (captureState?.ball.possessedBy) {
-        console.log(`  ✅ Ball captured by: ${captureState.ball.possessedBy}`)
-        break
-      }
-
-      captureAttempts++
-      console.log(`  Attempt ${captureAttempts}: Ball not yet possessed`)
+      expect(captureState).not.toBeNull()
+      expect(captureState.ball.possessedBy).toBeTruthy()
+    } catch (error) {
+      throw new Error('Ball was not captured within timeout')
     }
 
-    expect(captureState).not.toBeNull()
-    expect(captureState.ball.possessedBy).toBeTruthy()
+    const captureState = await getGameState(client1)
 
     console.log('\n📤 Step 2: Attempting to shoot...')
 

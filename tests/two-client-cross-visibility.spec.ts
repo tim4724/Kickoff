@@ -1,6 +1,7 @@
 import { test, expect, Page, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test: Two-Client Cross-Visibility Synchronization
@@ -18,7 +19,7 @@ import { waitScaled } from './helpers/time-control'
  *           that Client 1's server authoritative position shows
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 /**
  * Helper: Get local player position and server state
