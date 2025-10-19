@@ -61,6 +61,7 @@ export const GAME_CONFIG = {
   SHOOT_SPEED: 2000, // max shoot speed (at full power after 1 second)
   MIN_SHOOT_SPEED: 800, // min shoot speed (at minimum power)
   POSSESSION_RADIUS: 70, // increased from 50 for easier ball capture
+  POSSESSION_BALL_OFFSET: 25, // distance ball is positioned in front of player during possession
 
   // Field boundaries and goals
   FIELD_MARGIN: 40, // px from edge (field line position)

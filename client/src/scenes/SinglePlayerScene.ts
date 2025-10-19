@@ -103,7 +103,9 @@ export class SinglePlayerScene extends BaseGameScene {
                 this.gameEngine.queueInput(this.myPlayerId, {
                   movement: { x: normalizedX, y: normalizedY },
                   action: false,
-                  power: undefined
+                  actionPower: undefined,
+                  timestamp: Date.now(),
+                  playerId: this.myPlayerId
                 })
               }
               iterations++

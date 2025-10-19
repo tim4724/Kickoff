@@ -101,11 +101,11 @@ export class GameEngine {
         const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.36)
         const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.19)
 
-        const human: EnginePlayerData = {
+        const player1: EnginePlayerData = {
           id: sessionId,
           team,
-          isHuman: true,
-          isControlled: true,
+          isHuman: isHuman,
+          isControlled: isHuman,
           x: forwardX,
           y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5),
           velocityX: 0,
@@ -115,7 +115,7 @@ export class GameEngine {
           role: 'forward',
         }
 
-        const bot1: EnginePlayerData = {
+        const player2: EnginePlayerData = {
           id: `${sessionId}-bot1`,
           team,
           isHuman: false,
@@ -129,7 +129,7 @@ export class GameEngine {
           role: 'defender',
         }
 
-        const bot2: EnginePlayerData = {
+        const player3: EnginePlayerData = {
           id: `${sessionId}-bot2`,
           team,
           isHuman: false,
@@ -143,19 +143,19 @@ export class GameEngine {
           role: 'defender',
         }
 
-      this.state.players.set(sessionId, human)
-      this.state.players.set(`${sessionId}-bot1`, bot1)
-      this.state.players.set(`${sessionId}-bot2`, bot2)
+      this.state.players.set(sessionId, player1)
+      this.state.players.set(`${sessionId}-bot1`, player2)
+      this.state.players.set(`${sessionId}-bot2`, player3)
     } else {
       // Red team
       const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.64)
       const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.81)
 
-      const human: EnginePlayerData = {
+      const player1: EnginePlayerData = {
         id: sessionId,
         team,
-        isHuman: true,
-        isControlled: true,
+        isHuman: isHuman,
+        isControlled: isHuman,
         x: forwardX,
         y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5),
         velocityX: 0,
@@ -165,7 +165,7 @@ export class GameEngine {
         role: 'forward',
       }
 
-      const bot1: EnginePlayerData = {
+      const player2: EnginePlayerData = {
         id: `${sessionId}-bot1`,
         team,
         isHuman: false,
@@ -179,7 +179,7 @@ export class GameEngine {
         role: 'defender',
       }
 
-      const bot2: EnginePlayerData = {
+      const player3: EnginePlayerData = {
         id: `${sessionId}-bot2`,
         team,
         isHuman: false,
@@ -193,9 +193,9 @@ export class GameEngine {
         role: 'defender',
       }
 
-      this.state.players.set(sessionId, human)
-      this.state.players.set(`${sessionId}-bot1`, bot1)
-      this.state.players.set(`${sessionId}-bot2`, bot2)
+      this.state.players.set(sessionId, player1)
+      this.state.players.set(`${sessionId}-bot1`, player2)
+      this.state.players.set(`${sessionId}-bot2`, player3)
     }
   }
 

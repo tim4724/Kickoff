@@ -32,12 +32,16 @@ export class GameClock {
   private mockTime: number = 0
   private lastRealTime: number = 0
 
+  // Scaled time tracking (for real-time mode with time scale)
+  private scaledTime: number = 0
+
   // Scheduled timers
   private nextTimerId: number = 1
   private timers: Map<number, ScheduledTimer> = new Map()
 
   private constructor() {
     this.lastRealTime = this.getRealTime()
+    this.scaledTime = 0
   }
 
   static getInstance(): GameClock {
@@ -54,17 +58,23 @@ export class GameClock {
     if (this.useMock) {
       return this.mockTime
     }
-    return this.getRealTime()
+
+    // In real-time mode, update scaled time
+    const currentRealTime = this.getRealTime()
+    const realDelta = currentRealTime - this.lastRealTime
+    this.lastRealTime = currentRealTime
+    this.scaledTime += realDelta * this.timeScale
+
+    return this.scaledTime
   }
 
   /**
    * Get elapsed time since last call (for delta time calculations)
+   * @deprecated Use now() directly for time-based calculations
    */
   getDeltaTime(): number {
     const currentTime = this.now()
-    const delta = currentTime - this.lastRealTime
-    this.lastRealTime = currentTime
-    return delta * this.timeScale
+    return currentTime - this.scaledTime
   }
 
   /**
@@ -148,6 +158,7 @@ export class GameClock {
     this.useMock = false
     this.timers.clear()
     this.lastRealTime = this.getRealTime()
+    this.scaledTime = 0
     console.log('🕐 GameClock: Real time enabled')
   }
 
@@ -196,6 +207,7 @@ export class GameClock {
    */
   reset(): void {
     this.mockTime = 0
+    this.scaledTime = 0
     this.lastRealTime = this.getRealTime()
     this.timers.clear()
     this.timeScale = 1.0

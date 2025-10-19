@@ -1,0 +1,84 @@
+/**
+ * SpreadPositionStrategy - Calculate optimal spread positions for receiving passes
+ *
+ * Uses PassEvaluator to position players at optimal "pass-to-space" locations.
+ * Shared logic used by both DefensiveStrategy and OffensiveStrategy.
+ *
+ * Approach:
+ * 1. Use PassEvaluator to generate and score candidate positions
+ * 2. Assign each player to their best available position
+ * 3. Ensure spacing by preferring positions not already taken
+ */
+
+import { Vector2D, PlayerRole } from '../types'
+import { PlayerData, GAME_CONFIG } from '../../../../shared/src/types'
+import { PassEvaluator } from '../utils/PassEvaluator'
+
+export class SpreadPositionStrategy {
+  /**
+   * Calculate spread positions for receiving passes
+   * Uses PassEvaluator to find optimal pass-to-space positions
+   *
+   * @param offensivePlayers - Players to position for receiving passes
+   * @param ballTarget - Where ball will be (or is)
+   * @param opponents - Opponent players
+   * @param ourGoal - Our goal position (to determine forward direction)
+   * @returns Map of player ID to role assignment
+   */
+  static getSpreadPassReceivePositions(
+    offensivePlayers: PlayerData[],
+    ballTarget: Vector2D,
+    opponents: PlayerData[],
+    ourGoal: Vector2D
+  ): Map<string, PlayerRole> {
+    const roles = new Map<string, PlayerRole>()
+
+    if (offensivePlayers.length === 0) {
+      return roles
+    }
+
+    // Determine opponent goal (for forward direction in PassEvaluator)
+    const opponentGoal: Vector2D = {
+      x: ourGoal.x === 0 ? GAME_CONFIG.FIELD_WIDTH : 0,
+      y: GAME_CONFIG.FIELD_HEIGHT / 2,
+    }
+
+    // Use PassEvaluator to find optimal pass-to-space positions
+    const passOptions = PassEvaluator.evaluatePassOptions(
+      ballTarget,
+      offensivePlayers,
+      opponents,
+      opponentGoal
+    )
+
+    // Track assigned players to avoid duplicates
+    const assignedPlayers = new Set<string>()
+
+    // Assign each player to their best available position
+    for (const option of passOptions) {
+      if (assignedPlayers.has(option.teammate.id)) {
+        // This player already has a position - skip to next option
+        continue
+      }
+
+      // Assign this player to this position
+      roles.set(option.teammate.id, {
+        goal: 'receivePass-spread',
+        target: option.position,
+      })
+      assignedPlayers.add(option.teammate.id)
+    }
+
+    // Fallback: any players without positions stay at current position
+    for (const player of offensivePlayers) {
+      if (!assignedPlayers.has(player.id)) {
+        roles.set(player.id, {
+          goal: 'receivePass-spread',
+          target: player.position,
+        })
+      }
+    }
+
+    return roles
+  }
+}
