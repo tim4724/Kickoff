@@ -73,7 +73,6 @@ export class NetworkManager {
   constructor(config: NetworkConfig) {
     this.config = config
     this.client = new Client(config.serverUrl)
-    console.log('[NetworkManager] Initialized with server:', config.serverUrl)
   }
 
   /**
@@ -85,14 +84,12 @@ export class NetworkManager {
     const urlParams = new URLSearchParams(window.location.search)
     const urlRoomId = urlParams.get('roomId')
     if (urlRoomId) {
-      console.log('[NetworkManager] Using room from URL parameter:', urlRoomId)
       return urlRoomId
     }
 
     // Check window variable for test isolation
     const testRoomId = (window as any).__testRoomId
     if (testRoomId) {
-      console.log('[NetworkManager] Using test room:', testRoomId)
       return testRoomId
     }
 
@@ -105,8 +102,6 @@ export class NetworkManager {
    */
   async connect(): Promise<boolean> {
     try {
-      console.log('[NetworkManager] Connecting to match room:', this.config.roomName)
-
       // Suppress console errors during Colyseus connection (schema deserialization warnings)
       const originalError = console.error
       const filteredError = (...args: any[]) => {
@@ -129,13 +124,11 @@ export class NetworkManager {
       const testTimeScale = (window as any).__testTimeScale
       if (testTimeScale) {
         options.timeScale = testTimeScale
-        console.log('[NetworkManager] Test time scale:', testTimeScale)
       }
 
       // ALWAYS pass roomName for filterBy to work correctly
       // Tests: unique room ID for isolation + time scale
       // Production: use config room name for matchmaking
-      console.log('[NetworkManager] Joining room:', roomName, 'with options:', options)
       this.room = await this.client.joinOrCreate('match', options)
 
       // Restore console.error
@@ -143,8 +136,6 @@ export class NetworkManager {
 
       this.sessionId = this.room.sessionId
       this.connected = true
-
-      console.log('[NetworkManager] Connected! Session ID:', this.sessionId)
 
       // Handle room errors
       this.room.onError((code, message) => {
@@ -154,7 +145,6 @@ export class NetworkManager {
 
       // Handle room leave
       this.room.onLeave((code) => {
-        console.log('[NetworkManager] Left room with code:', code)
         this.connected = false
       })
 
@@ -177,7 +167,6 @@ export class NetworkManager {
    */
   disconnect(): void {
     if (this.room) {
-      console.log('[NetworkManager] Disconnecting...')
       this.room.leave()
       this.connected = false
       this.room = undefined
@@ -286,19 +275,12 @@ export class NetworkManager {
     })
 
     // Listen for players joining
-    console.log('[NetworkManager] Setting up onAdd listener for future players')
     this.room.state.players.onAdd((player: any, key: string) => {
       try {
-        console.log(`[NetworkManager] 🔔 onAdd fired for player ${key}, my session: ${this.sessionId}`)
-
         // Ignore our own player (we're not a remote player)
         if (key === this.sessionId) {
-          console.log('[NetworkManager] Ignoring own player in onAdd:', key)
           return
         }
-
-        console.log('[NetworkManager] ✅ Player joined (not self):', key, 'team:', player.team)
-        console.log('[NetworkManager] playerJoin callback exists:', !!this.onPlayerJoin)
 
         this.onPlayerJoin?.({
           id: player.id || key,
@@ -318,7 +300,6 @@ export class NetworkManager {
     // Listen for players leaving
     this.room.state.players.onRemove((_player: any, key: string) => {
       try {
-        console.log('[NetworkManager] Player left:', key)
         this.onPlayerLeave?.(key)
       } catch (error) {
         console.error('[NetworkManager] Error in player leave:', error)
@@ -334,7 +315,6 @@ export class NetworkManager {
 
     // Player ready event - confirms player is fully initialized on server
     this.room.onMessage('player_ready', (message) => {
-      console.log('[NetworkManager] Player ready!', message)
       // Update sessionId from server confirmation (though it should already match)
       this.sessionId = message.sessionId
       this.onPlayerReady?.(message.sessionId, message.team)
@@ -342,19 +322,16 @@ export class NetworkManager {
 
     // Match start event
     this.room.onMessage('match_start', (message) => {
-      console.log('[NetworkManager] Match starting!', message)
       this.onMatchStart?.(message.duration)
     })
 
     // Match end event
     this.room.onMessage('match_end', (message) => {
-      console.log('[NetworkManager] Match ended!', message)
       this.onMatchEnd?.(message.winner, message.scoreBlue, message.scoreRed)
     })
 
     // Goal scored event (optional - can also track via state changes)
     this.room.onMessage('goal_scored', (message) => {
-      console.log('[NetworkManager] Goal scored!', message)
       this.onGoalScored?.(message.team, message.scoreBlue, message.scoreRed)
     })
   }
@@ -443,10 +420,8 @@ export class NetworkManager {
       return
     }
 
-    console.log('[NetworkManager] Checking for existing players in room')
     this.room.state.players.forEach((player: any, key: string) => {
       if (key !== this.sessionId) {
-        console.log('[NetworkManager] Found existing player:', key, 'team:', player.team)
         this.onPlayerJoin?.({
           id: player.id || key,
           team: player.team || 'blue',

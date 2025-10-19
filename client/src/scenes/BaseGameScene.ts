@@ -37,6 +37,12 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
   // Controls
   protected cursors!: Phaser.Types.Input.Keyboard.CursorKeys
+  protected wasd!: {
+    w: Phaser.Input.Keyboard.Key
+    a: Phaser.Input.Keyboard.Key
+    s: Phaser.Input.Keyboard.Key
+    d: Phaser.Input.Keyboard.Key
+  }
 
   // State
   protected myPlayerId: string = 'player1'

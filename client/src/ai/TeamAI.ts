@@ -17,13 +17,15 @@ export class TeamAI {
   private lastPossessingTeam: Team | null // Track which team had ball last
   private defensiveStrategy: DefensiveStrategy
   private offensiveStrategy: OffensiveStrategy
+  private onReceivePassCallback?: (playerId: string) => void
 
-  constructor(teamId: Team, playerIds: string[]) {
+  constructor(teamId: Team, playerIds: string[], onReceivePass?: (playerId: string) => void) {
     this.teamId = teamId
     this.players = playerIds.map(id => new AIPlayer(id))
     this.lastPossessingTeam = null
     this.defensiveStrategy = new DefensiveStrategy(teamId)
     this.offensiveStrategy = new OffensiveStrategy(teamId)
+    this.onReceivePassCallback = onReceivePass
   }
 
   public update(gameState: AIGameState): Map<string, AIDecision> {
@@ -52,6 +54,11 @@ export class TeamAI {
       const aiPlayer = this.players.find(p => p.getPlayerId() === playerId)
       if (aiPlayer) {
         aiPlayer.setGoal(role.goal, role.target, role.shootPower)
+
+        // Trigger control handover when AI sets receive-pass goal
+        if (role.goal === 'receive-pass' && this.onReceivePassCallback) {
+          this.onReceivePassCallback(playerId)
+        }
       }
     })
 

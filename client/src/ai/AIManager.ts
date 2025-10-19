@@ -13,6 +13,7 @@ export class AIManager {
   private teamAIs: Map<Team, TeamAI>
   private enabled: boolean
   private applyDecisionCallback?: (playerId: string, decision: AIDecision) => void
+  private onReceivePassCallback?: (playerId: string) => void
 
   constructor() {
     this.teamAIs = new Map()
@@ -25,20 +26,23 @@ export class AIManager {
    * @param bluePlayerIds - Array of player IDs for blue team that should be AI-controlled
    * @param redPlayerIds - Array of player IDs for red team that should be AI-controlled
    * @param applyDecisionCallback - Callback to apply AI decisions (optional)
+   * @param onReceivePass - Callback when a player is assigned receive-pass goal (optional)
    */
   public initialize(
     bluePlayerIds: string[],
     redPlayerIds: string[],
-    applyDecisionCallback?: (playerId: string, decision: AIDecision) => void
+    applyDecisionCallback?: (playerId: string, decision: AIDecision) => void,
+    onReceivePass?: (playerId: string) => void
   ): void {
     this.cleanup()
     this.applyDecisionCallback = applyDecisionCallback
+    this.onReceivePassCallback = onReceivePass
 
     if (bluePlayerIds.length > 0) {
-      this.teamAIs.set('blue', new TeamAI('blue', bluePlayerIds))
+      this.teamAIs.set('blue', new TeamAI('blue', bluePlayerIds, onReceivePass))
     }
     if (redPlayerIds.length > 0) {
-      this.teamAIs.set('red', new TeamAI('red', redPlayerIds))
+      this.teamAIs.set('red', new TeamAI('red', redPlayerIds, onReceivePass))
     }
 
     this.enabled = true

@@ -42,7 +42,8 @@ export class SinglePlayerScene extends BaseGameScene {
     this.aiManager.initialize(
       ['player1', 'player1-bot1', 'player1-bot2'], // Blue team (human + 2 AI teammates)
       ['player2', 'player2-bot1', 'player2-bot2'], // Red team (3 AI opponents)
-      (playerId, decision) => this.applyAIDecision(playerId, decision)
+      (playerId, decision) => this.applyAIDecision(playerId, decision),
+      (playerId) => this.onAIReceivePassAssigned(playerId) // Auto-switch to pass recipient
     )
 
     console.log('🤖 SinglePlayer mode: Human player with AI teammates vs AI opponents')
@@ -312,6 +313,27 @@ export class SinglePlayerScene extends BaseGameScene {
 
     // Update player borders to show who is controlled
     this.updatePlayerBorders()
+  }
+
+  /**
+   * Auto-switch handler when AI assigns receive-pass goal
+   */
+  private onAIReceivePassAssigned(playerId: string) {
+    const engineState = this.gameEngine.getState()
+    const player = engineState.players.get(playerId)
+
+    // Only switch if it's a blue team player (human team)
+    if (!player || player.team !== 'blue') {
+      return
+    }
+
+    // Only switch if not already controlling this player
+    if (this.controlledPlayerId === playerId) {
+      return
+    }
+
+    this.switchToPlayer(playerId)
+    console.log(`⚽ Auto-switched to pass recipient: ${playerId}`)
   }
 
   /**

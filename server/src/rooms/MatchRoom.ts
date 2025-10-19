@@ -65,8 +65,6 @@ export class MatchRoom extends Room<GameState> {
   }
 
   async onJoin(client: Client, options: any) {
-    console.log(`Player joined: ${client.sessionId}`)
-
     // Add player to game state (wait for completion to ensure atomic team assignment)
     const playerInfo = await this.state.addPlayer(client.sessionId)
 
@@ -94,16 +92,11 @@ export class MatchRoom extends Room<GameState> {
 
     // Start match when both teams exist (either 2 human players or 1 human + AI)
     if (hasBlueTeam && hasRedTeam) {
-      if (humanPlayerCount === 2) {
-        console.log('🎮 Two players connected, starting multiplayer match!')
-      } else {
-        console.log('🎮 Single player with AI opponents, starting match!')
-      }
+      const mode = humanPlayerCount === 2 ? 'multiplayer' : 'single-player with AI'
+      console.log(`🎮 Starting ${mode} match (${humanPlayerCount} human players)`)
       this.startMatch()
     } else if (humanPlayerCount === 1) {
       // Wait for GameState to create AI opponents, then check again
-      console.log('⏱️ Waiting for AI opponents or second player...')
-
       // Small delay to allow AI creation, then check if match should start
       setTimeout(() => {
         let hasBlue = false
@@ -113,7 +106,6 @@ export class MatchRoom extends Room<GameState> {
           if (player.team === 'red') hasRed = true
         })
         if (hasBlue && hasRed && this.state.phase === 'waiting') {
-          console.log('🤖 AI opponents created, starting single-player match!')
           this.startMatch()
         }
       }, 100)
@@ -148,8 +140,6 @@ export class MatchRoom extends Room<GameState> {
   }
 
   private startMatch() {
-    console.log('🎮 Match starting!')
-
     // Call GameState's startMatch() which handles team creation and engine startup
     this.state.startMatch()
 

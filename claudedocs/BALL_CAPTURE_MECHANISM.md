@@ -43,7 +43,7 @@ updateBallPossession() {
 ```
 
 **Key Parameters:**
-- `POSSESSION_RADIUS: 50px` - Distance to gain possession
+- `POSSESSION_RADIUS: 45px` - Distance to gain possession
 - `SHOT_IMMUNITY_MS: 300ms` - Prevents shooter from immediate re-capture
 - **Magnetism offset:** 25px in front of player in facing direction
 
@@ -65,8 +65,8 @@ pressure = opponentsNearby  // Simple count
 
 | Condition | Rate | Formula |
 |-----------|------|---------|
-| **Buildup** (opponents near ball) | +1.0/sec per opponent | `pressure += 1.0 × dt × opponentsNearby` |
-| **Decay** (no opponents) | -1.2/sec | `pressure -= 1.2 × dt` |
+| **Buildup** (opponents near ball) | +2.0/sec per opponent | `pressure += 2.0 × dt × opponentsNearby` |
+| **Decay** (no opponents) | -3.0/sec | `pressure -= 3.0 × dt` |
 
 **Release Threshold:**
 ```typescript
@@ -76,7 +76,7 @@ if (pressureLevel >= 1.0) {
 }
 ```
 
-**Pressure Radius:** 40px from ball position (not from player position)
+**Pressure Radius:** 45px from ball position (not from player position)
 
 **Important:** Since the ball is positioned 25px in front of the player (magnetism), opponents can be closer to the ball than to the possessor player. Pressure is based on proximity to the ball itself.
 
@@ -84,9 +84,9 @@ if (pressureLevel >= 1.0) {
 
 | Opponents | Time to Release |
 |-----------|-----------------|
-| 1 | ~1.0 second |
-| 2 | ~0.5 seconds |
-| 3 | ~0.33 seconds |
+| 1 | ~0.5 seconds |
+| 2 | ~0.25 seconds |
+| 3 | ~0.17 seconds |
 
 **Console Logging:**
 - Logs pressure changes when delta > 5%
@@ -144,7 +144,7 @@ const ballY = player.y + sin(player.direction) × 25
 - Ball velocity zeroed out: `velocityX = 0, velocityY = 0`
 
 **Max Distance Check:**
-- If player-ball distance > 50px → Release possession
+- If player-ball distance > 45px → Release possession
 - Prevents exploits from rapid movement
 
 ---
@@ -243,7 +243,7 @@ if (!possessor) {
 ### 2. **Distance Check**
 ```typescript
 // Prevent possession at extreme distances
-if (dist > 50) {
+if (dist > 45) {
   ball.possessedBy = ''  // Force release
 }
 ```
@@ -294,11 +294,13 @@ if (hasImmunity && isShooter) {
 From `shared/src/types.ts`:
 
 ```typescript
-POSSESSION_RADIUS: 50           // Capture distance
-PRESSURE_RADIUS: 40             // Pressure application distance
-PRESSURE_BUILDUP_RATE: 1.0      // Pressure/sec per opponent
-PRESSURE_DECAY_RATE: 1.2        // Pressure decay/sec
+POSSESSION_RADIUS: 45           // Capture distance
+PRESSURE_RADIUS: 45             // Pressure application distance (matches possession radius)
+PRESSURE_BUILDUP_RATE: 2.0      // Pressure/sec per opponent (~0.5s with 1 opponent)
+PRESSURE_DECAY_RATE: 3.0        // Pressure decay/sec when no opponents near
 PRESSURE_RELEASE_THRESHOLD: 1.0 // Auto-release level (100%)
+CAPTURE_LOCKOUT_MS: 300         // Can't lose possession for 300ms after capturing
+LOSS_LOCKOUT_MS: 300            // Can't capture for 300ms after losing possession
 ```
 
 **Tunable for gameplay balance:**
@@ -347,11 +349,12 @@ PRESSURE_RELEASE_THRESHOLD: 1.0 // Auto-release level (100%)
 
 ## Summary
 
-The ball capture mechanism is a **time-based proximity system** with three key features:
+The ball capture mechanism is a **time-based proximity system** with key features:
 
-1. **Automatic capture** within 50px radius
-2. **Pressure dynamics** that force turnovers (1 second under single-opponent pressure)
+1. **Automatic capture** within 45px radius
+2. **Pressure dynamics** that force turnovers (~0.5 seconds under single-opponent pressure)
 3. **Shoot immunity** preventing immediate re-capture (300ms window)
+4. **Lockout periods** preventing rapid possession changes (300ms after capture/loss)
 
 The system prioritizes **responsive gameplay** over simulation realism, using continuous pressure accumulation rather than discrete tackle events. Ball magnetism ensures visual clarity, while the color interpolation system provides real-time debugging feedback.
 

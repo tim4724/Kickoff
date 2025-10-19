@@ -220,7 +220,6 @@ export class GameState extends Schema {
     this.matchTime = state.matchTime
 
     // DON'T sync phase - room controls phase lifecycle (waiting/playing/ended)
-    // this.phase = state.phase
   }
 
   /**
