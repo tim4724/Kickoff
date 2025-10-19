@@ -5,6 +5,8 @@ import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '../ai'
+import { InterceptionCalculator } from '../ai/utils/InterceptionCalculator'
+import type { Vector2D } from '@shared/types'
 
 /**
  * Single Player Scene
@@ -42,8 +44,7 @@ export class SinglePlayerScene extends BaseGameScene {
     this.aiManager.initialize(
       ['player1', 'player1-bot1', 'player1-bot2'], // Blue team (human + 2 AI teammates)
       ['player2', 'player2-bot1', 'player2-bot2'], // Red team (3 AI opponents)
-      (playerId, decision) => this.applyAIDecision(playerId, decision),
-      (playerId) => this.onAIReceivePassAssigned(playerId) // Auto-switch to pass recipient
+      (playerId, decision) => this.applyAIDecision(playerId, decision)
     )
 
     console.log('🤖 SinglePlayer mode: Human player with AI teammates vs AI opponents')
@@ -167,11 +168,19 @@ export class SinglePlayerScene extends BaseGameScene {
       movement.x = joystickInput.x
       movement.y = joystickInput.y
     } else if (this.cursors) {
+      // Arrow keys
       if (this.cursors.left.isDown) movement.x = -1
       else if (this.cursors.right.isDown) movement.x = 1
 
       if (this.cursors.up.isDown) movement.y = -1
       else if (this.cursors.down.isDown) movement.y = 1
+
+      // WASD keys (override arrow keys if pressed)
+      if (this.wasd.a.isDown) movement.x = -1
+      else if (this.wasd.d.isDown) movement.x = 1
+
+      if (this.wasd.w.isDown) movement.y = -1
+      else if (this.wasd.s.isDown) movement.y = 1
 
       const length = Math.sqrt(movement.x * movement.x + movement.y * movement.y)
       if (length > 0) {
@@ -204,6 +213,59 @@ export class SinglePlayerScene extends BaseGameScene {
       actionPower: power,
       timestamp: Date.now(),
     })
+
+    // Auto-switching is handled by handleAutoSwitch() when ball becomes loose
+  }
+
+  /**
+   * Auto-switch to the teammate with best chance to intercept the ball
+   */
+  private autoSwitchToBestInterceptor(): void {
+    const engineState = this.gameEngine.getState()
+    const ball = engineState.ball
+
+    // Get all blue team players (human team) INCLUDING the current player
+    const blueTeamPlayers: EnginePlayerData[] = []
+    engineState.players.forEach((player, playerId) => {
+      if (player.team === 'blue') {
+        blueTeamPlayers.push(player)
+      }
+    })
+
+    if (blueTeamPlayers.length === 0) return
+
+    // Convert to format InterceptionCalculator expects
+    const teammates = blueTeamPlayers.map(p => ({
+      id: p.id,
+      position: { x: p.x, y: p.y } as Vector2D,
+      velocity: { x: p.velocityX, y: p.velocityY } as Vector2D,
+    }))
+
+    // Create ball prediction function
+    const predictBallPosition = (t: number): Vector2D => {
+      return InterceptionCalculator.simulateBallPosition(
+        { x: ball.x, y: ball.y },
+        { x: ball.velocityX, y: ball.velocityY },
+        t
+      )
+    }
+
+    // Calculate best interceptor
+    const { interceptor } = InterceptionCalculator.calculateInterception(
+      teammates,
+      predictBallPosition,
+      { x: ball.x, y: ball.y }
+    )
+
+    // Only switch if the best interceptor is NOT the current player
+    if (interceptor.id === this.controlledPlayerId) {
+      console.log(`⚽ Current player is best interceptor, staying in control: ${interceptor.id}`)
+      return
+    }
+
+    // Switch to the best interceptor
+    this.switchToPlayer(interceptor.id)
+    console.log(`⚽ Auto-switched to best interceptor: ${interceptor.id}`)
   }
 
   protected cleanupGameState(): void {
@@ -266,7 +328,21 @@ export class SinglePlayerScene extends BaseGameScene {
         console.log(`⚽ Auto-switched to ball carrier: ${ballPossessor}`)
       }
       this.lastBallPossessor = ballPossessor
-    } else if (!ballPossessor) {
+    } else if (!ballPossessor && this.lastBallPossessor) {
+      // Ball became loose - check if opponent shot/lost possession
+      const lastPlayer = engineState.players.get(this.lastBallPossessor)
+
+      // If last possessor was red team (opponent), switch to best interceptor
+      if (lastPlayer && lastPlayer.team === 'red') {
+        console.log(`⚽ Opponent lost possession, switching to best interceptor`)
+        this.autoSwitchToBestInterceptor()
+      }
+      // If last possessor was blue team (us) and ball is loose, also switch to best interceptor
+      else if (lastPlayer && lastPlayer.team === 'blue') {
+        console.log(`⚽ Ball loose after blue team possession, switching to best interceptor`)
+        this.autoSwitchToBestInterceptor()
+      }
+
       this.lastBallPossessor = ''
     }
   }
@@ -313,27 +389,6 @@ export class SinglePlayerScene extends BaseGameScene {
 
     // Update player borders to show who is controlled
     this.updatePlayerBorders()
-  }
-
-  /**
-   * Auto-switch handler when AI assigns receive-pass goal
-   */
-  private onAIReceivePassAssigned(playerId: string) {
-    const engineState = this.gameEngine.getState()
-    const player = engineState.players.get(playerId)
-
-    // Only switch if it's a blue team player (human team)
-    if (!player || player.team !== 'blue') {
-      return
-    }
-
-    // Only switch if not already controlling this player
-    if (this.controlledPlayerId === playerId) {
-      return
-    }
-
-    this.switchToPlayer(playerId)
-    console.log(`⚽ Auto-switched to pass recipient: ${playerId}`)
   }
 
   /**

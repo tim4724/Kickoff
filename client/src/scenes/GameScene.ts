@@ -48,11 +48,19 @@ export class GameScene extends BaseGameScene {
       movement.x = joystickInput.x
       movement.y = joystickInput.y
     } else if (this.cursors) {
+      // Arrow keys
       if (this.cursors.left.isDown) movement.x = -1
       else if (this.cursors.right.isDown) movement.x = 1
 
       if (this.cursors.up.isDown) movement.y = -1
       else if (this.cursors.down.isDown) movement.y = 1
+
+      // WASD keys (override arrow keys if pressed)
+      if (this.wasd.a.isDown) movement.x = -1
+      else if (this.wasd.d.isDown) movement.x = 1
+
+      if (this.wasd.w.isDown) movement.y = -1
+      else if (this.wasd.s.isDown) movement.y = 1
 
       const length = Math.sqrt(movement.x * movement.x + movement.y * movement.y)
       if (length > 0) {

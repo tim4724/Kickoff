@@ -130,7 +130,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     const controlsText = this.isMobile
       ? 'Touch Joystick to Move • Tap Button to Shoot/Switch'
-      : 'Arrow Keys to Move • Space to Shoot/Switch'
+      : 'WASD/Arrows to Move • Space to Shoot/Switch'
 
     this.controlsHint = this.add.text(width / 2, height - 30, controlsText, {
       fontSize: '16px',
@@ -145,6 +145,14 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
   protected setupInput() {
     this.cursors = this.input.keyboard!.createCursorKeys()
+
+    // Add WASD keys for movement
+    this.wasd = {
+      w: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+    }
 
     this.input.keyboard!.on('keydown-SPACE', () => {
       const state = this.getGameState()
