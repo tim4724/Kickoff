@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test'
-
-const CLIENT_URL = 'http://localhost:5173'
 import { setupIsolatedTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 const GAME_WIDTH = 1920
 const GAME_HEIGHT = 1080
 
 test.describe('Game Field Rendering', () => {
   test('16:9 aspect ratio (1920x1080) - no letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
-    await page.goto('http://localhost:5173/')
+    await page.goto(CLIENT_URL)
 
     // Wait for game to initialize
     await waitScaled(page, 2000)
@@ -33,7 +33,7 @@ test.describe('Game Field Rendering', () => {
 
   test('Wider than 16:9 (2560x1080) - vertical letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 2560, height: 1080 })
-    await page.goto('http://localhost:5173/')
+    await page.goto(CLIENT_URL)
 
     await waitScaled(page, 2000)
     await page.screenshot({ path: 'test-results/field-2560x1080.png' })
@@ -63,7 +63,7 @@ test.describe('Game Field Rendering', () => {
 
   test('Taller than 16:9 (1920x1200) - horizontal letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 1200 })
-    await page.goto('http://localhost:5173/')
+    await page.goto(CLIENT_URL)
 
     await waitScaled(page, 2000)
     await page.screenshot({ path: 'test-results/field-1920x1200.png' })
@@ -93,7 +93,7 @@ test.describe('Game Field Rendering', () => {
 
   test('Mobile portrait (390x844) - horizontal letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('http://localhost:5173/')
+    await page.goto(CLIENT_URL)
 
     await waitScaled(page, 2000)
     await page.screenshot({ path: 'test-results/field-390x844.png' })
@@ -118,7 +118,7 @@ test.describe('Game Field Rendering', () => {
 
   test('Mobile landscape (844x390) - vertical letterboxing', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 844, height: 390 })
-    await page.goto('http://localhost:5173/')
+    await page.goto(CLIENT_URL)
 
     await waitScaled(page, 2000)
     await page.screenshot({ path: 'test-results/field-844x390.png' })
@@ -152,7 +152,7 @@ test.describe('Game Field Rendering', () => {
 
     for (const size of sizes) {
       await page.setViewportSize({ width: size.width, height: size.height })
-      await page.goto('http://localhost:5173/')
+      await page.goto(CLIENT_URL)
       await waitScaled(page, 2000)
 
       // Take screenshot for visual verification
@@ -186,7 +186,7 @@ test.describe('Game Field Rendering', () => {
   test('Verify letterbox areas are present', async ({ page }, testInfo) => {
     // Test with wider screen (vertical letterboxing)
     await page.setViewportSize({ width: 2560, height: 1080 })
-    await page.goto('http://localhost:5173/')
+    await page.goto(CLIENT_URL)
     await waitScaled(page, 2000)
 
     const hasLetterbox = await page.evaluate(() => {
@@ -205,7 +205,7 @@ test.describe('Game Field Rendering', () => {
 
   test('Verify UI elements are in viewport coordinates', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
-    await page.goto('http://localhost:5173/')
+    await page.goto(CLIENT_URL)
     await waitScaled(page, 2000)
 
     // Check score text position (should be at viewport top center)

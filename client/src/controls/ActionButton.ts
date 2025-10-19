@@ -8,7 +8,7 @@ export class ActionButton {
   private scene: Phaser.Scene
   private button!: Phaser.GameObjects.Arc
   private label!: Phaser.GameObjects.Text
-  private pointer: Phaser.Input.Pointer | null = null
+  private pointerId: number = -1 // Track pointer ID for multi-touch
 
   private x: number
   private y: number
@@ -76,18 +76,24 @@ export class ActionButton {
 
   private setupInput() {
     this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Skip if button already pressed by different pointer
+      if (this.isPressed && this.pointerId !== pointer.id) {
+        return
+      }
+
       // ZONE CHECK: Only activate in right half of screen
       if (pointer.x < this.screenWidth / 2) {
         return // Left half = joystick territory
       }
 
       // Activate on any touch in right half (entire right side is action button)
-      this.pointer = pointer
+      this.pointerId = pointer.id
       this.onPress()
     })
 
     this.scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (this.pointer === pointer && this.isPressed) {
+      // Only respond to our tracked pointer
+      if (pointer.id === this.pointerId && this.isPressed) {
         this.onRelease()
       }
     })
@@ -124,7 +130,7 @@ export class ActionButton {
       this.onReleaseCallback(power)
     }
 
-    this.pointer = null
+    this.pointerId = -1
   }
 
   /**
@@ -242,7 +248,7 @@ export class ActionButton {
     }
 
     this.isPressed = false
-    this.pointer = null
+    this.pointerId = -1
   }
 
   /**

@@ -5,6 +5,36 @@ export class MenuScene extends Phaser.Scene {
     super({ key: 'MenuScene' })
   }
 
+  /**
+   * Request fullscreen using Phaser's Scale Manager (mobile only)
+   * Note: iOS Safari does NOT support fullscreen API - user must install as PWA
+   * Android browsers support this when triggered by user interaction
+   */
+  private requestFullscreen(): void {
+    // Only request fullscreen on mobile devices
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    if (!isMobile) {
+      console.log('💻 Desktop detected - skipping fullscreen request')
+      return
+    }
+
+    // Check if fullscreen is supported
+    if (!this.scale.fullscreen.available) {
+      console.log('📱 Fullscreen API not available (iOS requires PWA installation)')
+      return
+    }
+
+    // Check if already in fullscreen
+    if (this.scale.isFullscreen) {
+      console.log('📱 Already in fullscreen mode')
+      return
+    }
+
+    // Use Phaser's scale manager to request fullscreen
+    this.scale.startFullscreen()
+    console.log('📱 Fullscreen mode requested')
+  }
+
   create() {
     const width = this.scale.width
     const height = this.scale.height
@@ -93,19 +123,23 @@ export class MenuScene extends Phaser.Scene {
       aiOnlyButton.setFillStyle(0xffaa00)
     })
 
-    // Button click handlers
-    singlePlayerButton.on('pointerdown', () => {
+    // Button click handlers - Using 'pointerup' for touch device compatibility
+    // Note: Touch devices require 'pointerup' for fullscreen requests to work
+    singlePlayerButton.on('pointerup', () => {
       console.log('🎮 Starting Single Player mode')
+      this.requestFullscreen()
       this.scene.start('SinglePlayerScene')
     })
 
-    multiplayerButton.on('pointerdown', () => {
+    multiplayerButton.on('pointerup', () => {
       console.log('🌐 Starting Multiplayer mode')
+      this.requestFullscreen()
       this.scene.start('GameScene')
     })
 
-    aiOnlyButton.on('pointerdown', () => {
+    aiOnlyButton.on('pointerup', () => {
       console.log('🤖 Starting AI-Only mode')
+      this.requestFullscreen()
       this.scene.start('AIOnlyScene')
     })
 

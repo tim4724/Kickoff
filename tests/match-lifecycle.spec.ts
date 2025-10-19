@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test Suite: Match Lifecycle and Phase Transitions
@@ -14,7 +15,7 @@ import { waitScaled } from './helpers/time-control'
  * These tests prevent bugs related to game state management and transitions.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 test.describe('Match Lifecycle', () => {
   test('Match starts when two players connect', async ({ browser }, testInfo) => {

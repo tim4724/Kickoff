@@ -101,11 +101,11 @@ export class GameEngine {
         const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.36)
         const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.19)
 
-        const human: EnginePlayerData = {
+        const player1: EnginePlayerData = {
           id: sessionId,
           team,
-          isHuman: true,
-          isControlled: true,
+          isHuman: isHuman,
+          isControlled: isHuman,
           x: forwardX,
           y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5),
           velocityX: 0,
@@ -115,7 +115,7 @@ export class GameEngine {
           role: 'forward',
         }
 
-        const bot1: EnginePlayerData = {
+        const player2: EnginePlayerData = {
           id: `${sessionId}-bot1`,
           team,
           isHuman: false,
@@ -129,7 +129,7 @@ export class GameEngine {
           role: 'defender',
         }
 
-        const bot2: EnginePlayerData = {
+        const player3: EnginePlayerData = {
           id: `${sessionId}-bot2`,
           team,
           isHuman: false,
@@ -143,19 +143,19 @@ export class GameEngine {
           role: 'defender',
         }
 
-      this.state.players.set(sessionId, human)
-      this.state.players.set(`${sessionId}-bot1`, bot1)
-      this.state.players.set(`${sessionId}-bot2`, bot2)
+      this.state.players.set(sessionId, player1)
+      this.state.players.set(`${sessionId}-bot1`, player2)
+      this.state.players.set(`${sessionId}-bot2`, player3)
     } else {
       // Red team
       const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.64)
       const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.81)
 
-      const human: EnginePlayerData = {
+      const player1: EnginePlayerData = {
         id: sessionId,
         team,
-        isHuman: true,
-        isControlled: true,
+        isHuman: isHuman,
+        isControlled: isHuman,
         x: forwardX,
         y: Math.round(GAME_CONFIG.FIELD_HEIGHT * 0.5),
         velocityX: 0,
@@ -165,7 +165,7 @@ export class GameEngine {
         role: 'forward',
       }
 
-      const bot1: EnginePlayerData = {
+      const player2: EnginePlayerData = {
         id: `${sessionId}-bot1`,
         team,
         isHuman: false,
@@ -179,7 +179,7 @@ export class GameEngine {
         role: 'defender',
       }
 
-      const bot2: EnginePlayerData = {
+      const player3: EnginePlayerData = {
         id: `${sessionId}-bot2`,
         team,
         isHuman: false,
@@ -193,9 +193,9 @@ export class GameEngine {
         role: 'defender',
       }
 
-      this.state.players.set(sessionId, human)
-      this.state.players.set(`${sessionId}-bot1`, bot1)
-      this.state.players.set(`${sessionId}-bot2`, bot2)
+      this.state.players.set(sessionId, player1)
+      this.state.players.set(`${sessionId}-bot1`, player2)
+      this.state.players.set(`${sessionId}-bot2`, player3)
     }
   }
 
@@ -257,16 +257,36 @@ export class GameEngine {
     this.state.players.forEach((player) => {
       const queue = this.inputQueues.get(player.id)
       if (queue && queue.length > 0) {
-        // Process latest input
-        const input = queue[queue.length - 1]
+        // Merge all queued inputs: use latest movement, but preserve any action
+        const mergedInput: EnginePlayerInput = {
+          movement: { x: 0, y: 0 },
+          action: false,
+          actionPower: 0,
+          timestamp: Date.now(),
+        }
+
+        // Use latest movement
+        const latestInput = queue[queue.length - 1]
+        mergedInput.movement = latestInput.movement
+        mergedInput.timestamp = latestInput.timestamp
+
+        // Check if ANY queued input has action=true
+        for (const input of queue) {
+          if (input.action) {
+            mergedInput.action = true
+            mergedInput.actionPower = input.actionPower
+            break // First action wins
+          }
+        }
+
         this.inputQueues.set(player.id, [])
 
         // Update player
-        this.physics.processPlayerInput(player, input, dt)
+        this.physics.processPlayerInput(player, mergedInput, dt)
 
         // Handle action
-        if (input.action) {
-          this.physics.handlePlayerAction(player, this.state.ball, input.actionPower)
+        if (mergedInput.action) {
+          this.physics.handlePlayerAction(player, this.state.ball, mergedInput.actionPower)
         }
       }
     })
@@ -277,6 +297,18 @@ export class GameEngine {
    */
   update(deltaTime: number): void {
     if (this.state.phase !== 'playing') return
+
+    // Pause physics during goal reset
+    if (this.goalScored) {
+      // Still update timer during pause
+      const dt = deltaTime / 1000
+      this.state.matchTime -= dt
+      if (this.state.matchTime <= 0) {
+        this.state.matchTime = 0
+        this.handleMatchEnd()
+      }
+      return
+    }
 
     // Accumulate time for physics
     this.physicsAccumulator += deltaTime
@@ -349,9 +381,14 @@ export class GameEngine {
       this.state.scoreRed++
     }
 
-    // Reset players immediately
+    // Reset players and ball immediately
     this.physics.resetPlayers(
       this.state.players,
+      GAME_CONFIG.FIELD_WIDTH,
+      GAME_CONFIG.FIELD_HEIGHT
+    )
+    this.physics.resetBall(
+      this.state.ball,
       GAME_CONFIG.FIELD_WIDTH,
       GAME_CONFIG.FIELD_HEIGHT
     )
@@ -366,16 +403,11 @@ export class GameEngine {
       gameClock.clearTimeout(this.goalResetTimerId)
     }
 
-    // Reset ball after delay using GameClock
+    // Pause for 2 seconds before resuming play
     this.goalResetTimerId = gameClock.setTimeout(() => {
-      this.physics.resetBall(
-        this.state.ball,
-        GAME_CONFIG.FIELD_WIDTH,
-        GAME_CONFIG.FIELD_HEIGHT
-      )
       this.goalScored = false
       this.goalResetTimerId = undefined
-    }, 1000)
+    }, 2000)
   }
 
   /**

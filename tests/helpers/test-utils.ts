@@ -94,26 +94,43 @@ export async function movePlayer(
 }
 
 /**
- * Gain ball possession (retry up to maxAttempts times)
+ * Gain ball possession - uses deterministic condition waiting
+ * instead of retry loops for better reliability under load
  */
 export async function gainPossession(
   client: Page,
-  maxAttempts: number = 10
+  timeoutMs: number = 10000
 ): Promise<boolean> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const state = await getServerState(client)
-    const sessionId = await getSessionId(client)
+  const sessionId = await getSessionId(client)
 
-    if (state.ball.possessedBy === sessionId) {
-      return true
-    }
-
-    // Move toward ball (much longer duration for CPU-throttled parallel workers)
-    // With 10x time acceleration and 8 workers, we need 3000ms game time = 300ms real time
-    await movePlayer(client, 'ArrowRight', 3000)
+  // Check if already have possession
+  const currentState = await getServerState(client)
+  if (currentState.ball.possessedBy === sessionId) {
+    return true
   }
 
-  return false
+  // Move toward ball and wait for possession condition
+  await client.keyboard.down('ArrowRight')
+
+  try {
+    // Wait for possession to be gained (deterministic condition)
+    await client.waitForFunction(
+      (sid) => {
+        const scene = (window as any).__gameControls?.scene
+        const state = scene?.networkManager?.getState()
+        return state?.ball?.possessedBy === sid
+      },
+      sessionId,
+      { timeout: timeoutMs }
+    )
+
+    await client.keyboard.up('ArrowRight')
+    await waitScaled(client, 100) // Small buffer for state to settle
+    return true
+  } catch (error) {
+    await client.keyboard.up('ArrowRight')
+    return false
+  }
 }
 
 /**

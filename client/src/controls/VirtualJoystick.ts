@@ -7,7 +7,7 @@ export class VirtualJoystick {
   private scene: Phaser.Scene
   private base!: Phaser.GameObjects.Arc
   private stick!: Phaser.GameObjects.Arc
-  private pointer: Phaser.Input.Pointer | null = null
+  private pointerId: number = -1 // Track pointer ID for multi-touch
 
   private baseX: number = 0
   private baseY: number = 0
@@ -63,6 +63,11 @@ export class VirtualJoystick {
   private setupInput() {
     // Listen for touch/click - spawn joystick at touch position in left half
     this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Skip if joystick already active with different pointer
+      if (this.isActive && this.pointerId !== pointer.id) {
+        return
+      }
+
       // ZONE CHECK: Only activate in left half of screen
       if (pointer.x >= this.screenWidth / 2) {
         return // Right half = button territory
@@ -80,20 +85,22 @@ export class VirtualJoystick {
       // Reposition visual elements to spawn point
       this.repositionJoystick(this.baseX, this.baseY)
 
-      // Activate joystick
-      this.pointer = pointer
+      // Activate joystick and track pointer ID
+      this.pointerId = pointer.id
       this.isActive = true
       this.setVisible(true)
     })
 
     this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (this.pointer === pointer && this.isActive) {
+      // Only respond to our tracked pointer
+      if (this.isActive && pointer.id === this.pointerId) {
         this.updateStickPosition(pointer.x, pointer.y)
       }
     })
 
     this.scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (this.pointer === pointer) {
+      // Only respond to our tracked pointer
+      if (pointer.id === this.pointerId) {
         this.reset()
       }
     })
@@ -134,7 +141,7 @@ export class VirtualJoystick {
   }
 
   private reset() {
-    this.pointer = null
+    this.pointerId = -1
     this.isActive = false
     this.stick.x = this.baseX
     this.stick.y = this.baseY

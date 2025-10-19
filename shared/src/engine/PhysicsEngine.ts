@@ -6,6 +6,7 @@
 
 import type { EnginePlayerData, EngineBallData, PhysicsConfig, EnginePlayerInput } from './types'
 import type { Team } from '../types'
+import { GAME_CONFIG } from '../types'
 import { gameClock } from './GameClock'
 
 export class PhysicsEngine {
@@ -15,6 +16,66 @@ export class PhysicsEngine {
 
   constructor(config: PhysicsConfig) {
     this.config = config
+  }
+
+  /**
+   * Simulate one physics step for the ball (static helper for AI)
+   * Returns new position and velocity after applying friction and bounces
+   */
+  static simulateBallStep(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    dt: number,
+    config: {
+      ballFriction: number
+      fieldWidth: number
+      fieldHeight: number
+      fieldMargin: number
+      goalYMin: number
+      goalYMax: number
+    }
+  ): { x: number; y: number; vx: number; vy: number } {
+    const bounceCoef = -0.8
+
+    // Apply friction
+    vx *= config.ballFriction
+    vy *= config.ballFriction
+
+    // Stop if too slow
+    if (Math.abs(vx) < 1 && Math.abs(vy) < 1) {
+      return { x, y, vx: 0, vy: 0 }
+    }
+
+    // Update position
+    x += vx * dt
+    y += vy * dt
+
+    // Bounce off left/right boundaries (exclude goal zones)
+    if (x <= config.fieldMargin && (y < config.goalYMin || y > config.goalYMax)) {
+      vx *= bounceCoef
+      x = config.fieldMargin
+    }
+    if (
+      x >= config.fieldWidth - config.fieldMargin &&
+      (y < config.goalYMin || y > config.goalYMax)
+    ) {
+      vx *= bounceCoef
+      x = config.fieldWidth - config.fieldMargin
+    }
+
+    // Bounce off top/bottom boundaries
+    if (y <= config.fieldMargin) {
+      vy *= bounceCoef
+      y = config.fieldMargin
+    }
+    if (y >= config.fieldHeight - config.fieldMargin) {
+      vy *= bounceCoef
+      y = config.fieldHeight - config.fieldMargin
+    }
+
+    return { x, y, vx, vy }
   }
 
   /**
@@ -74,44 +135,20 @@ export class PhysicsEngine {
 
     // Only update if not possessed
     if (ball.possessedBy === '') {
-      // Apply friction
-      ball.velocityX *= this.config.ballFriction
-      ball.velocityY *= this.config.ballFriction
+      // Use static helper for physics simulation
+      const result = PhysicsEngine.simulateBallStep(
+        ball.x,
+        ball.y,
+        ball.velocityX,
+        ball.velocityY,
+        dt,
+        this.config
+      )
 
-      // Stop if too slow
-      if (Math.abs(ball.velocityX) < 1 && Math.abs(ball.velocityY) < 1) {
-        ball.velocityX = 0
-        ball.velocityY = 0
-      }
-
-      // Update position
-      ball.x += ball.velocityX * dt
-      ball.y += ball.velocityY * dt
-
-      // Bounce off boundaries (exclude goal zones)
-      const margin = this.config.fieldMargin
-
-      // Left/right boundaries (exclude goal zones)
-      if (
-        ball.x <= margin &&
-        (ball.y < this.config.goalYMin || ball.y > this.config.goalYMax)
-      ) {
-        ball.velocityX *= -0.8
-        ball.x = margin
-      }
-      if (
-        ball.x >= this.config.fieldWidth - margin &&
-        (ball.y < this.config.goalYMin || ball.y > this.config.goalYMax)
-      ) {
-        ball.velocityX *= -0.8
-        ball.x = this.config.fieldWidth - margin
-      }
-
-      // Top/bottom boundaries
-      if (ball.y <= margin || ball.y >= this.config.fieldHeight - margin) {
-        ball.velocityY *= -0.8
-        ball.y = Math.max(margin, Math.min(this.config.fieldHeight - margin, ball.y))
-      }
+      ball.x = result.x
+      ball.y = result.y
+      ball.velocityX = result.vx
+      ball.velocityY = result.vy
     }
   }
 
@@ -211,9 +248,8 @@ export class PhysicsEngine {
           this.lastPossessionLossTime.set(possessor.id, gameClock.now())
         } else {
           // Apply magnetism - ball sticks in front of player
-          const offsetDistance = 25
-          ball.x = possessor.x + Math.cos(possessor.direction) * offsetDistance
-          ball.y = possessor.y + Math.sin(possessor.direction) * offsetDistance
+          ball.x = possessor.x + Math.cos(possessor.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET
+          ball.y = possessor.y + Math.sin(possessor.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET
           ball.velocityX = 0
           ball.velocityY = 0
         }

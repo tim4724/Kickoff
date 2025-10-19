@@ -21,6 +21,10 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
+  input: {
+    // Enable multi-touch for simultaneous joystick + action button
+    activePointers: 2, // Support 2 simultaneous touches minimum
+  },
   scene: [MenuScene, GameScene, SinglePlayerScene, AIOnlyScene],
 }
 

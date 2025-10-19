@@ -20,8 +20,11 @@ npm run dev
 ```
 socca2/
 ├── client/          # Phaser 3 game client (TypeScript + Vite)
+│   └── src/ai/      # AI system for bot players (3v3 gameplay)
 ├── server/          # Colyseus multiplayer server (Node.js)
-├── tests/           # Playwright E2E tests
+├── shared/          # Shared game engine and physics
+│   └── src/engine/  # GameEngine, PhysicsEngine, GameClock
+├── tests/           # Playwright E2E tests (79-80 tests)
 └── claudedocs/      # Technical documentation and analysis
 ```
 
@@ -41,20 +44,22 @@ socca2/
 - [MVP_ROADMAP.md](MVP_ROADMAP.md) - Development roadmap and progress
 
 ### Recent Work
-- [TEST_SUMMARY.md](TEST_SUMMARY.md) - Latest test results
+- [claudedocs/TEST_SUMMARY.md](claudedocs/TEST_SUMMARY.md) - Latest test results (79-80 tests, 98-100% pass rate)
+- [claudedocs/TEST_IMPROVEMENT_FINAL_SUMMARY.md](claudedocs/TEST_IMPROVEMENT_FINAL_SUMMARY.md) - GameClock integration and 10x time acceleration
 - [claudedocs/LAG_OPTIMIZATION_SUMMARY.md](claudedocs/LAG_OPTIMIZATION_SUMMARY.md) - Input lag optimization (85% reduction achieved)
+- [client/src/ai/AI_STRUCTURE.md](client/src/ai/AI_STRUCTURE.md) - AI system architecture
 
 ### Archive
 - Historical sprint reports and analysis: `claudedocs/archive/`
 
 ## Current Status
 
-### ✅ Completed (Weeks 1-6)
+### ✅ Completed (Weeks 1-7)
 
 **Core Multiplayer:**
 - Client-server architecture with Colyseus
 - Real-time position synchronization (<20px delta)
-- Two-player matchmaking with team assignment
+- 3v3 gameplay (1 human + 2 AI bots per team)
 - Professional-grade input responsiveness (55ms lag)
 
 **Player Controls:**
@@ -64,10 +69,19 @@ socca2/
 - Responsive movement with client prediction
 
 **Game Physics:**
-- Ball physics and movement
-- Player-ball interactions
+- Ball physics and movement with pressure system
+- Ball possession with capture/release mechanics
+- Shooting with variable power (0-1 second hold)
+- Goal detection and scoring
 - Field boundaries and collision
 - Unified 1920x1080 coordinate system across client/server
+
+**AI System (3v3 Gameplay):**
+- Hierarchical AI architecture (AIManager → TeamAI → AIPlayer)
+- Strategy-based behavior (Offensive, Defensive, HasBall, SpreadPosition)
+- Smart utilities (InterceptionCalculator, PassEvaluator)
+- AI-only testing mode (AIOnlyScene for 6v6 bot matches)
+- Comprehensive AI test suite (13 tests)
 
 **Rendering System:**
 - Dual camera architecture (game + UI)
@@ -76,17 +90,19 @@ socca2/
 - Tested on 5 viewport sizes (16:9, ultrawide, portrait, landscape)
 
 **Testing:**
-- 20 passing E2E tests (Playwright)
+- 79-80 passing E2E tests (Playwright)
+- 98-100% pass rate with 4 parallel workers
+- GameClock-based 10x time acceleration (87.5% faster tests)
+- Test suite runs in ~2.5 minutes (down from 20 minutes)
 - Automated lag measurement
 - Position synchronization validation
 
-### 🚧 Next Up (Week 7+)
+### 🚧 Next Up (Week 8+)
 
 **Priority Features:**
-- Ball possession mechanics (magnetism + indicators)
-- Ball kicking system
-- Goal detection and scoring
 - Match timer and victory conditions
+- Game over screen improvements
+- AI tuning and balancing
 
 See [MVP_ROADMAP.md](MVP_ROADMAP.md) for detailed development plan.
 
@@ -98,10 +114,15 @@ npm run dev              # Both client + server
 npm run dev:client       # Client only (port 5173)
 npm run dev:server       # Server only (port 3000)
 
-# Testing
-npx playwright test                    # Run all E2E tests
-npx playwright test --ui              # Interactive test UI
-npx playwright test tests/lag-measurement.spec.ts  # Lag test
+# Testing (test servers auto-start on ports 3001/5174)
+npm run test:e2e                      # Run all E2E tests (4 workers)
+npm run test:e2e:ui                   # Interactive test UI
+npm run test:e2e:headed               # See browser during tests
+npm run test:e2e:debug                # Debug mode with breakpoints
+npm run test:physics                  # Physics-only tests
+npm run test:stable                   # Stable tests only
+npm run clean:test                    # Remove test artifacts
+npm run test:e2e:report               # View HTML report
 
 # Building
 npm run build           # Build for production
@@ -111,7 +132,8 @@ npm run build           # Build for production
 
 **Input Lag:** 55ms average (professional-grade, <100ms threshold)
 **Network RTT:** <2ms (local network)
-**Test Coverage:** 20 E2E tests covering core multiplayer functionality
+**Test Coverage:** 79-80 E2E tests covering core multiplayer functionality
+**Test Speed:** ~2.5 minutes with 10x time acceleration (87.5% faster than real-time)
 
 ## License
 

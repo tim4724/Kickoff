@@ -17,8 +17,9 @@ export class CameraManager {
     this.gameCamera = scene.cameras.main
     this.gameCamera.setBounds(0, 0, GAME_CONFIG.FIELD_WIDTH, GAME_CONFIG.FIELD_HEIGHT)
 
-    // Create UI camera
+    // Create UI camera (covers full screen for controls)
     this.uiCamera = scene.cameras.add(0, 0, scene.scale.width, scene.scale.height)
+    this.uiCamera.setViewport(0, 0, scene.scale.width, scene.scale.height)
 
     // Set initial viewport
     this.updateGameCameraViewport()
@@ -71,7 +72,11 @@ export class CameraManager {
   }
 
   private onResize(gameSize: Phaser.Structs.Size): void {
+    // Update UI camera to cover full screen
+    this.uiCamera.setViewport(0, 0, gameSize.width, gameSize.height)
     this.uiCamera.setSize(gameSize.width, gameSize.height)
+
+    // Update game camera viewport with letterboxing
     this.updateGameCameraViewport()
   }
 

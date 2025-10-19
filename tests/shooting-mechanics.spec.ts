@@ -1,6 +1,7 @@
 import { test, expect, Page, Browser } from '@playwright/test'
 import { setupSinglePlayerTest, setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from './config/test-env'
 
 /**
  * Shooting Mechanics Test Suite
@@ -15,7 +16,7 @@ import { waitScaled } from './helpers/time-control'
  * - Goal scoring integration
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 const SHOOT_SPEED = 2000 // max shoot speed from GAME_CONFIG
 const MIN_SHOOT_SPEED = 800 // min shoot speed from GAME_CONFIG
 const DEFAULT_POWER = 0.8 // 80% of max speed
@@ -671,5 +672,59 @@ test.describe('Shooting Mechanics', () => {
     }
 
     console.log('\n✅ TEST 7 PASSED: Shooting at goal integration works correctly')
+  })
+
+  test('Test 8: Shooting while moving with keyboard', async ({ page }, testInfo) => {
+    console.log('\n🧪 TEST 8: Shooting While Moving With Keyboard')
+    console.log('='.repeat(70))
+
+    await setupSinglePlayerTest(page, CLIENT_URL)
+    console.log('✅ Single-player scene loaded')
+
+    // Gain possession
+    console.log('\n📤 Step 1: Gaining possession...')
+    const hasPossession = await gainPossession(page)
+    expect(hasPossession).toBe(true)
+
+    const ballBefore = await getBallState(page)
+    const playerBefore = await getPlayerState(page)
+    console.log(`  Ball possessed by: ${ballBefore.possessedBy}`)
+    console.log(`  Player position: (${playerBefore.x.toFixed(1)}, ${playerBefore.y.toFixed(1)})`)
+
+    // Press and hold right arrow key to start moving
+    console.log('\n➡️  Step 2: Pressing right arrow key to move...')
+    await page.keyboard.down('ArrowRight')
+    await waitScaled(page, 100) // Wait for movement to start
+
+    // While moving, shoot
+    console.log('\n⚽ Step 3: Shooting while moving right...')
+    await page.keyboard.press('Space')
+    await waitScaled(page, 200) // Wait for shoot to register
+
+    // Release arrow key
+    await page.keyboard.up('ArrowRight')
+    await waitScaled(page, 100)
+
+    const ballAfter = await getBallState(page)
+    const playerAfter = await getPlayerState(page)
+
+    console.log(`  Ball velocity after shoot: (${ballAfter.velocityX.toFixed(1)}, ${ballAfter.velocityY.toFixed(1)})`)
+    console.log(`  Ball possessed by: ${ballAfter.possessedBy || 'none'}`)
+    console.log(`  Player state: ${playerAfter.state}`)
+
+    // Calculate ball velocity magnitude
+    const velocity = calculateVelocityMagnitude(ballAfter.velocityX, ballAfter.velocityY)
+    console.log(`  Velocity magnitude: ${velocity.toFixed(1)} px/s (expected >${MIN_SHOOT_SPEED})`)
+
+    // Assertions
+    // Ball should either be moving fast OR player should have kicked (proving shot was processed)
+    const ballWasShot = velocity > MIN_SHOOT_SPEED || playerAfter.state === 'kicking'
+    expect(ballWasShot).toBe(true)
+
+    // Ball should have moved or been released from possession
+    const ballReleased = ballAfter.possessedBy !== ballBefore.possessedBy || velocity > 0
+    expect(ballReleased).toBe(true)
+
+    console.log('\n✅ TEST 8 PASSED: Can shoot while moving with keyboard')
   })
 })

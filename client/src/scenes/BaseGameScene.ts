@@ -89,7 +89,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.player = this.add.circle(
       GAME_CONFIG.FIELD_WIDTH / 2,
       GAME_CONFIG.FIELD_HEIGHT / 2,
-      30,
+      36, // 20% larger than original (30 * 1.2)
       this.playerTeamColor
     )
     this.player.setStrokeStyle(
@@ -211,11 +211,12 @@ export abstract class BaseGameScene extends Phaser.Scene {
         ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
         : VISUAL_CONSTANTS.PLAYER_RED_COLOR
 
-    const remotePlayer = this.add.circle(playerState.x, playerState.y, 30, color)
+    const remotePlayer = this.add.circle(playerState.x, playerState.y, 36, color) // 20% larger (30 * 1.2)
     remotePlayer.setStrokeStyle(
       VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
       VISUAL_CONSTANTS.BORDER_COLOR
     )
+    remotePlayer.setAlpha(0.8) // Start with 80% opacity (non-controlled by default)
     // Ensure circle is filled (setStrokeStyle can clear isFilled flag)
     remotePlayer.isFilled = true
     remotePlayer.setDepth(10)
@@ -231,12 +232,14 @@ export abstract class BaseGameScene extends Phaser.Scene {
         VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER,
         VISUAL_CONSTANTS.BORDER_COLOR
       )
+      this.player.setAlpha(1.0) // Full opacity for controlled player
       this.player.isFilled = true // Restore fill after setStrokeStyle
     } else {
       this.player.setStrokeStyle(
         VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
         VISUAL_CONSTANTS.BORDER_COLOR
       )
+      this.player.setAlpha(0.8) // 80% opacity for non-controlled players
       this.player.isFilled = true // Restore fill after setStrokeStyle
     }
 
@@ -246,12 +249,14 @@ export abstract class BaseGameScene extends Phaser.Scene {
           VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER,
           VISUAL_CONSTANTS.BORDER_COLOR
         )
+        playerSprite.setAlpha(1.0) // Full opacity for controlled player
         playerSprite.isFilled = true // Restore fill after setStrokeStyle
       } else {
         playerSprite.setStrokeStyle(
           VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
           VISUAL_CONSTANTS.BORDER_COLOR
         )
+        playerSprite.setAlpha(0.8) // 80% opacity for non-controlled players
         playerSprite.isFilled = true // Restore fill after setStrokeStyle
       }
     })

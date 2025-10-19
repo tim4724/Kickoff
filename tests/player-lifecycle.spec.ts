@@ -1,6 +1,7 @@
 import { test, expect, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Test Suite: Player Lifecycle Management
@@ -14,7 +15,7 @@ import { waitScaled } from './helpers/time-control'
  * These tests prevent regressions related to stale connections and cleanup issues.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 const BLUE_COLOR = 26367      // 0x0066ff
 const RED_COLOR = 16729156    // 0xff4444
 
@@ -57,26 +58,24 @@ test.describe('Player Lifecycle Management', () => {
     const moveKey = team1 === 'blue' ? 'ArrowRight' : 'ArrowLeft'
     console.log(`  Client 1 is ${team1} team, moving ${team1 === 'blue' ? 'right' : 'left'}`)
 
-    // Move in short bursts until possession is gained
-    let attempts = 0
-    let hasPossession = false
+    // Start moving toward ball
+    await client1.keyboard.down(moveKey)
 
-    while (!hasPossession && attempts < 15) {
-      await client1.keyboard.down(moveKey)
-      await waitScaled(client1, 300) // Move in 300ms bursts (increased from 200ms)
-      await client1.keyboard.up(moveKey)
-      await waitScaled(client1, 200) // Wait longer between bursts
-
-      const check = await client1.evaluate((sid) => {
+    // Wait for possession to be gained
+    await client1.waitForFunction(
+      ({ sessionId }) => {
         const state = (window as any).__gameControls?.scene?.networkManager?.getState()
-        return state?.ball?.possessedBy === sid
-      }, session1)
+        return state?.ball?.possessedBy === sessionId
+      },
+      { sessionId: session1 },
+      { timeout: 10000 }
+    )
 
-      hasPossession = check
-      attempts++
-    }
+    // Stop movement
+    await client1.keyboard.up(moveKey)
 
-    await waitScaled(client1, 500) // Stabilize after gaining possession (increased from 300ms)
+    // Stabilize after gaining possession
+    await waitScaled(client1, 500)
 
     const ballState = await client1.evaluate((sid) => {
       const scene = (window as any).__gameControls?.scene

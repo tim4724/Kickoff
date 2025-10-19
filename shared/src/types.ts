@@ -55,12 +55,13 @@ export const GAME_CONFIG = {
   FIELD_HEIGHT: 1080,
 
   // Physics
-  PLAYER_SPEED: 450, // pixels per second (reduced for better control)
+  PLAYER_SPEED: 284, // pixels per second (10% slower: 315 * 0.9 ≈ 284)
   BALL_RADIUS: 15, // ball visual radius (30x30 ellipse / 2)
   BALL_FRICTION: 0.98,
-  SHOOT_SPEED: 2000, // max shoot speed (at full power after 1 second)
-  MIN_SHOOT_SPEED: 800, // min shoot speed (at minimum power)
-  POSSESSION_RADIUS: 70, // increased from 50 for easier ball capture
+  SHOOT_SPEED: 1440, // max shoot speed at full power (10% slower: 1600 * 0.9)
+  MIN_SHOOT_SPEED: 720, // min shoot speed (10% slower: 800 * 0.9)
+  POSSESSION_RADIUS: 45, // reduced for less magnetic ball capture (requires more precise positioning)
+  POSSESSION_BALL_OFFSET: 25, // distance ball is positioned in front of player during possession
 
   // Field boundaries and goals
   FIELD_MARGIN: 40, // px from edge (field line position)
@@ -74,7 +75,7 @@ export const GAME_CONFIG = {
   MATCH_DURATION: 120, // seconds (2 minutes)
 
   // Ball capture / pressure system
-  PRESSURE_RADIUS: 70, // distance at which opponent applies pressure
+  PRESSURE_RADIUS: 45, // distance at which opponent applies pressure (matches possession radius)
   PRESSURE_BUILDUP_RATE: 2, // pressure per second per opponent (~0.5s to capture with 1 opponent)
   PRESSURE_DECAY_RATE: 3, // pressure decay per second when no opponents near
   PRESSURE_RELEASE_THRESHOLD: 1.0, // pressure level that causes ball release (100%)

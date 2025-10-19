@@ -10,11 +10,15 @@ export default defineConfig({
   },
   define: {
     'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV !== 'production'),
+    // Pass server port to client code (for test vs dev environments)
+    'import.meta.env.VITE_SERVER_PORT': JSON.stringify(
+      process.env.VITE_SERVER_PORT || '3000'
+    ),
   },
   server: {
-    port: 5173,
+    port: process.env.VITE_PORT ? parseInt(process.env.VITE_PORT) : 5173,
     host: '0.0.0.0',
-    open: true,
+    open: !process.env.VITE_PORT, // Don't auto-open when using custom port (test mode)
     // Configure for parallel test execution
     hmr: {
       overlay: false, // Disable error overlay for cleaner tests

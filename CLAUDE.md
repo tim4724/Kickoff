@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Socca2** is a fast-paced multiplayer arcade soccer game for mobile web. It's a real-time 2v2 (human + AI bots) soccer game built with Phaser 3 (client) and Colyseus (multiplayer server).
+**Socca2** is a fast-paced multiplayer arcade soccer game for mobile web. It's a real-time 3v3 soccer game (human + 2 AI bots per team) built with Phaser 3 (client) and Colyseus (multiplayer server).
 
-- **Current State**: Core multiplayer working with 100% E2E test pass rate
+- **Current State**: Core multiplayer working with 98-100% E2E test pass rate (79-80 tests)
 - **Key Achievement**: 55ms input lag (professional-grade, <100ms threshold)
 - **Architecture**: Client-server with authoritative server, client prediction, and fixed timestep physics
+- **AI System**: Comprehensive AI system with strategy-based behavior for 3v3 gameplay
 
 ## Essential Commands
 
@@ -22,10 +23,11 @@ npm run dev:shared             # Shared types watch mode
 
 ### Testing
 ```bash
-# Run tests with parallel workers (default production mode)
-npm run test:e2e                                    # All E2E tests (2 workers)
-npm run test:e2e -- --workers=4                     # Custom worker count
+# Run tests with auto-started test servers (recommended)
+npm run test:e2e                                    # All E2E tests (4 workers)
+npm run test:e2e -- --workers=8                     # Custom worker count
 npx playwright test --project=stable-tests          # Only stable tests
+npx playwright test --project=physics-tests         # Only physics tests
 
 # Interactive/Debug modes
 npm run test:e2e:ui                                 # Playwright UI (single worker)
@@ -43,10 +45,12 @@ npm run test:e2e:report         # View HTML report
 ```
 
 **Important Testing Notes**:
+- **Test servers auto-start** on ports 3001 (server) and 5174 (client) via Playwright `webServer` configuration
 - Tests use **isolated rooms** for parallel execution (each worker gets unique room)
-- Default 2 workers provides good balance of speed and reliability
+- Default 4 workers provides good balance of speed and reliability
 - Test helpers in `tests/helpers/room-utils.ts` provide isolation utilities
 - Single worker mode (`--workers=1`) for debugging flaky tests
+- Test servers run independently from development servers (no interference)
 
 ### Building
 ```bash
@@ -77,7 +81,15 @@ socca2/
 │   ├── src/scenes/
 │   │   ├── BaseGameScene.ts      # Shared game logic base class
 │   │   ├── GameScene.ts          # Multiplayer scene (extends Base)
-│   │   └── SinglePlayerScene.ts  # Single-player mode
+│   │   ├── SinglePlayerScene.ts  # Single-player mode
+│   │   └── AIOnlyScene.ts        # AI vs AI development mode
+│   ├── src/ai/                   # AI system for bot players
+│   │   ├── AIManager.ts          # Multi-team AI coordinator
+│   │   ├── TeamAI.ts             # Team-level strategy coordinator
+│   │   ├── AIPlayer.ts           # Individual bot decision-making
+│   │   ├── strategies/           # Behavior strategies (offensive, defensive, etc.)
+│   │   ├── utils/                # InterceptionCalculator, PassEvaluator
+│   │   └── types.ts              # AI interfaces and types
 │   ├── src/controls/             # Virtual joystick & action button
 │   ├── src/network/              # NetworkManager for Colyseus
 │   └── src/utils/                # CameraManager, FieldRenderer, BallRenderer
@@ -85,8 +97,12 @@ socca2/
 │   ├── src/rooms/MatchRoom.ts    # Game room with fixed timestep (60Hz)
 │   └── src/schema/GameState.ts   # Authoritative state (@colyseus/schema)
 ├── shared/              # Shared types & constants
+│   ├── src/engine/               # Game engine (shared physics + logic)
+│   │   ├── GameEngine.ts         # Complete game loop orchestrator
+│   │   ├── PhysicsEngine.ts      # Ball physics, possession, goals
+│   │   └── GameClock.ts          # Time management with acceleration
 │   └── src/types.ts              # GAME_CONFIG constants & interfaces
-└── tests/               # Playwright E2E tests (18 test files)
+└── tests/               # Playwright E2E tests (20 test files, 79-80 tests)
 ```
 
 ### Key Technical Patterns
@@ -131,6 +147,17 @@ Ball possession uses proximity-based capture with pressure mechanics:
 - Requires possession to shoot (enforced server-side)
 - See `claudedocs/SHOOTING_IMPLEMENTATION_RESULTS.md`
 
+#### 6. AI System (3v3 Gameplay)
+The AI system controls bot players for realistic 3v3 soccer gameplay:
+- **Architecture**: Hierarchical decision-making (AIManager → TeamAI → AIPlayer)
+- **Team Composition**: Each team has 1 human-controlled player + 2 AI bots
+- **Player Roles**: Forward (attacking) and Defender (defensive) roles per team
+- **Strategy-Based**: Multiple strategies (Offensive, Defensive, HasBall, SpreadPosition)
+- **Utilities**: InterceptionCalculator for smart ball prediction, PassEvaluator for passing decisions
+- **AI-Only Mode**: Dedicated scene (`AIOnlyScene.ts`) for AI vs AI testing and tuning
+- **Test Coverage**: Comprehensive AI test suite (`tests/ai-gameplay-flow.spec.ts`, 481 lines)
+- See `client/src/ai/AI_STRUCTURE.md` for architecture details
+
 ## Configuration Constants
 
 All gameplay constants live in `shared/src/types.ts` under `GAME_CONFIG`:
@@ -149,9 +176,41 @@ MATCH_DURATION: 120         // Match length (seconds)
 
 ## Testing Architecture
 
+### Test Server Auto-Start
+Tests automatically start dedicated test servers on isolated ports to prevent interference with development:
+
+**Configuration** (`playwright.config.ts`):
+```typescript
+webServer: [
+  {
+    command: 'cd server && PORT=3001 npm run dev',
+    port: 3001,
+    timeout: 120000,
+    reuseExistingServer: !process.env.CI,
+  },
+  {
+    command: 'cd client && VITE_PORT=5174 npm run dev',
+    port: 5174,
+    timeout: 120000,
+    reuseExistingServer: !process.env.CI,
+  },
+]
+```
+
+**Port Isolation**:
+- Development: `localhost:3000` (server), `localhost:5173` (client)
+- Testing: `localhost:3001` (server), `localhost:5174` (client)
+- Dynamic port detection in `client/src/scenes/GameScene.ts:connectToMultiplayer()`
+
+**Benefits**:
+- No manual server startup required
+- Zero interference with development servers
+- Automatic cleanup on test completion
+- CI/CD ready (starts fresh servers every time)
+
 ### Test Philosophy
 - **Isolated rooms**: Each test/worker gets unique room to prevent interference
-- **Parallel execution**: 2+ workers for speed, single worker for debugging
+- **Parallel execution**: 4+ workers for speed, single worker for debugging
 - **Server state verification**: Tests query server state, not just client rendering
 - **Helper utilities**: `tests/helpers/room-utils.ts` for room isolation
 
@@ -159,12 +218,17 @@ MATCH_DURATION: 120         // Match length (seconds)
 ```
 tests/
 ├── helpers/
-│   └── room-utils.ts              # setupIsolatedTest, setupMultiClientTest
+│   ├── room-utils.ts              # setupIsolatedTest, setupMultiClientTest
+│   ├── test-utils.ts              # Common test utilities
+│   └── time-control.ts            # waitScaled for time acceleration
+├── config/
+│   └── test-env.ts                # Test environment configuration
 ├── core-features-regression.spec.ts    # Core gameplay sanity checks
 ├── shooting-mechanics.spec.ts          # Shooting feature tests (7 tests)
-├── ball-capture.spec.ts                # Possession mechanics tests
+├── ball-capture.spec.ts                # Possession mechanics tests (17 tests)
 ├── multiplayer-network-sync.spec.ts    # Network synchronization
 ├── lag-measurement.spec.ts             # Performance benchmarking
+├── ai-gameplay-flow.spec.ts            # AI system comprehensive tests (13 tests)
 └── ... (13 more test files)
 ```
 
@@ -201,9 +265,19 @@ tests/
 ### Adding New Features
 1. Define constants in `shared/src/types.ts` (GAME_CONFIG)
 2. Implement server logic in `server/src/schema/GameState.ts` or `MatchRoom.ts`
+   - For shared logic, implement in `shared/src/engine/GameEngine.ts` or `PhysicsEngine.ts`
 3. Update client in `client/src/scenes/BaseGameScene.ts` or `GameScene.ts`
-4. Write E2E tests in `tests/` using isolated room pattern
-5. Document in `claudedocs/` if significant
+4. If AI behavior needs updating, modify strategies in `client/src/ai/strategies/`
+5. Write E2E tests in `tests/` using isolated room pattern and `waitScaled()` for time
+6. Document in `claudedocs/` if significant
+
+### Working with AI System
+1. **AI Manager**: Central coordinator in `client/src/ai/AIManager.ts`
+2. **Team Strategies**: Modify team-level behavior in `client/src/ai/TeamAI.ts`
+3. **Individual AI**: Bot decision-making in `client/src/ai/AIPlayer.ts`
+4. **Strategy Patterns**: Add/modify in `client/src/ai/strategies/` directory
+5. **Testing AI**: Use `AIOnlyScene` for isolated AI testing (6v6 bot matches)
+6. **AI Test Suite**: Run `npx playwright test ai-gameplay-flow` for AI-specific tests
 
 ### Debugging Multiplayer Issues
 1. Check server logs: `npm run dev:server` shows physics/network events
@@ -220,6 +294,8 @@ tests/
 - Client prediction eliminates perceived input lag (55ms measured)
 - Ball uses interpolation (lerp factor 0.3) for smooth rendering
 - Remote players use interpolation (lerp factor 0.5) for smooth movement
+- **Time Acceleration**: GameClock enables 10x test acceleration (87.5% faster tests)
+- Test suite runs in ~2.5 minutes (down from 20 minutes) with 4 parallel workers
 
 ## Common Gotchas
 
@@ -248,6 +324,18 @@ tests/
    - Pressure system creates realistic ball contests
    - Don't implement client-side possession logic; trust server
 
+6. **Time Acceleration (Tests)**
+   - Always use `waitScaled()` instead of `page.waitForTimeout()` in tests
+   - GameClock manages 10x acceleration across client and server
+   - Test helpers in `tests/helpers/time-control.ts` handle time conversion
+   - AI tests need proper time scaling to work correctly at 10x speed
+
+7. **3v3 Team Composition**
+   - Each team always has 3 players (1 human + 2 AI bots)
+   - GameEngine automatically creates bot players when human joins
+   - Bot IDs follow pattern: `{sessionId}-bot1`, `{sessionId}-bot2`
+   - Player roles: 1 forward (attacking), 2 defenders (defensive positions)
+
 ## Documentation References
 
 ### Main Documentation
@@ -260,7 +348,14 @@ tests/
 - **BALL_CAPTURE_MECHANISM.md** - Possession system details
 - **SHOOTING_IMPLEMENTATION_RESULTS.md** - Shooting mechanics
 - **LAG_OPTIMIZATION_SUMMARY.md** - Performance optimization (85% lag reduction, 55ms achieved)
-- **TEST_SUMMARY.md** - Latest test results
+- **TEST_SUMMARY.md** - Latest test results (79-80 tests, 98-100% pass rate)
+- **TEST_IMPROVEMENT_FINAL_SUMMARY.md** - GameClock integration and 10x acceleration
+- **TEST_SERVER_AUTO_START.md** - Automated test server setup
+- **PORT_ISOLATION_AND_TEST_FIXES.md** - Port isolation strategy
+
+### AI System Documentation
+- **client/src/ai/AI_STRUCTURE.md** - Complete AI architecture and file structure
+- **tests/ai-gameplay-flow.spec.ts** - Comprehensive AI test suite (481 lines)
 
 ## Server URLs
 - **Client**: http://localhost:5173

@@ -1,9 +1,11 @@
 import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
-import type { EnginePlayerData } from '@shared'
+import type { EnginePlayerData, EnginePlayerInput } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { AIDebugRenderer } from '../utils/AIDebugRenderer'
+import { AIManager } from '../ai'
+import { gameClock as GameClock } from '@shared/engine/GameClock'
 
 /**
  * AI-Only Scene
@@ -12,6 +14,7 @@ import { AIDebugRenderer } from '../utils/AIDebugRenderer'
  */
 export class AIOnlyScene extends BaseGameScene {
   private gameEngine!: GameEngine
+  private aiManager!: AIManager
   private aiDebugRenderer!: AIDebugRenderer
   private debugEnabled: boolean = true
   private paused: boolean = false
@@ -46,13 +49,22 @@ export class AIOnlyScene extends BaseGameScene {
     })
 
     // Add AI-only teams (all players are AI-controlled)
-    // Blue team: 2 AI players
+    // Blue team: 3 equal AI players
     this.gameEngine.addPlayer('ai-blue-team', 'blue', false)
 
-    // Red team: 2 AI players
+    // Red team: 3 equal AI players
     this.gameEngine.addPlayer('ai-red-team', 'red', false)
 
-    console.log('🤖 AI-Only mode: 4 AI players created (2 blue, 2 red)')
+    console.log('🤖 AI-Only mode: 6 AI players created (3 blue, 3 red)')
+
+    // Initialize AI system
+    // Game engine creates 3 equal players per team
+    this.aiManager = new AIManager()
+    this.aiManager.initialize(
+      ['ai-blue-team', 'ai-blue-team-bot1', 'ai-blue-team-bot2'],
+      ['ai-red-team', 'ai-red-team-bot1', 'ai-red-team-bot2'],
+      (playerId, decision) => this.applyAIDecision(playerId, decision)
+    )
 
     // Set up callbacks
     this.gameEngine.onGoal((event: { team: 'blue' | 'red'; time: number }) => {
@@ -83,6 +95,27 @@ export class AIOnlyScene extends BaseGameScene {
 
     // Enable spectator camera controls
     this.setupSpectatorControls()
+
+    // Set initial GameClock time scale to match game speed
+    GameClock.setTimeScale(this.gameSpeed)
+
+    // Expose controls for testing (development only)
+    if (typeof window !== 'undefined' && import.meta.env.DEV) {
+      ;(window as any).__gameControls = {
+        scene: this,
+        test: {
+          getState: () => ({
+            paused: this.paused,
+            gameSpeed: this.gameSpeed,
+            debugEnabled: this.debugEnabled,
+          }),
+        },
+      }
+      // Expose GameClock for time control in tests
+      ;(window as any).GameClock = GameClock
+      console.log('🧪 Testing API exposed: window.__gameControls')
+      console.log('🕐 GameClock exposed for time control')
+    }
   }
 
   protected getGameState(): any {
@@ -91,6 +124,11 @@ export class AIOnlyScene extends BaseGameScene {
 
   protected updateGameState(delta: number): void {
     // No human input - all players are AI-controlled
+
+    // Update AI and apply decisions
+    if (!this.paused) {
+      this.updateAI()
+    }
 
     // Apply pause and game speed
     if (!this.paused) {
@@ -175,6 +213,10 @@ export class AIOnlyScene extends BaseGameScene {
    */
   private adjustGameSpeed(delta: number): void {
     this.gameSpeed = Math.max(0.01, Math.min(1.0, this.gameSpeed + delta))
+
+    // Sync GameClock time scale with game speed
+    GameClock.setTimeScale(this.gameSpeed)
+
     this.updateSpeedDisplay()
     console.log(`⏩ Game Speed: ${this.gameSpeed.toFixed(2)}x`)
   }
@@ -214,11 +256,12 @@ export class AIOnlyScene extends BaseGameScene {
         this.player.setFillStyle(color)
         this.player.isFilled = true
         this.playerTeamColor = color
-        // In AI-only mode, use thin border (no human control indicator)
+        // In AI-only mode, use no border and 80% opacity (no human control)
         this.player.setStrokeStyle(
           VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
           VISUAL_CONSTANTS.BORDER_COLOR
         )
+        this.player.setAlpha(0.8) // 80% opacity (no human control)
         this.player.isFilled = true
         // Store reference so we can update it
         this.myPlayerId = playerId
@@ -270,11 +313,12 @@ export class AIOnlyScene extends BaseGameScene {
    * Override updatePlayerBorders to prevent human control indicator in AI-only mode
    */
   protected updatePlayerBorders(): void {
-    // In AI-only mode, ALL players should have thin borders (no human control)
+    // In AI-only mode, ALL players should have no borders and 80% opacity (no human control)
     this.player.setStrokeStyle(
       VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
       VISUAL_CONSTANTS.BORDER_COLOR
     )
+    this.player.setAlpha(0.8) // 80% opacity (no human control)
     this.player.isFilled = true
 
     this.remotePlayers.forEach((playerSprite) => {
@@ -282,8 +326,77 @@ export class AIOnlyScene extends BaseGameScene {
         VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
         VISUAL_CONSTANTS.BORDER_COLOR
       )
+      playerSprite.setAlpha(0.8) // 80% opacity (no human control)
       playerSprite.isFilled = true
     })
+  }
+
+  /**
+   * Update AI and apply decisions to game engine
+   */
+  private updateAI() {
+    const engineState = this.gameEngine.getState()
+
+    // Convert GameEngineState to GameStateData format
+    const gameStateData = this.convertEngineStateToGameStateData(engineState)
+
+    // Update AI Manager (this will call TeamAI.update() which calls each AIPlayer.update())
+    this.aiManager.update(gameStateData)
+  }
+
+  /**
+   * Apply AI decision by queuing input to game engine
+   */
+  private applyAIDecision(playerId: string, decision: any) {
+
+    const input: EnginePlayerInput = {
+      movement: {
+        x: decision.moveX,
+        y: decision.moveY,
+      },
+      action: decision.shootPower !== null,
+      actionPower: decision.shootPower ?? 0,
+      timestamp: Date.now(),
+      playerId: playerId,
+    }
+
+    this.gameEngine.queueInput(playerId, input)
+  }
+
+  /**
+   * Convert GameEngineState to GameStateData format for AI
+   */
+  private convertEngineStateToGameStateData(engineState: any): any {
+    // Convert players map
+    const playersMap = new Map()
+    engineState.players.forEach((player: EnginePlayerData, playerId: string) => {
+      playersMap.set(playerId, {
+        id: player.id,
+        team: player.team,
+        isHuman: player.isHuman,
+        isControlled: player.isControlled,
+        position: { x: player.x, y: player.y },
+        velocity: { x: player.velocityX, y: player.velocityY },
+        state: player.state,
+        direction: player.direction,
+      })
+    })
+
+    // Convert ball
+    const ball = {
+      position: { x: engineState.ball.x, y: engineState.ball.y },
+      velocity: { x: engineState.ball.velocityX, y: engineState.ball.velocityY },
+      possessedBy: engineState.ball.possessedBy,
+    }
+
+    return {
+      players: playersMap,
+      ball: ball,
+      scoreBlue: engineState.scoreBlue,
+      scoreRed: engineState.scoreRed,
+      matchTime: engineState.matchTime,
+      phase: engineState.phase,
+    }
   }
 
   /**
@@ -291,42 +404,15 @@ export class AIOnlyScene extends BaseGameScene {
    */
   private updateAIDebug() {
     const state = this.gameEngine.getState()
-    const ball = state.ball
 
     state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
-      // In AI-only mode, show debug for ALL players (all are AI-controlled)
+      // Get AI player instance from AIManager
+      const teamAI = this.aiManager.getTeamAI(playerData.team)
+      const aiPlayer = teamAI?.getPlayer(playerId)
 
-      // Determine AI goal text based on role
-      let goalText = ''
-      if (playerData.role === 'defender') {
-        if (ball.possessedBy === playerId) {
-          goalText = 'DEFEND: HAS BALL'
-        } else {
-          const distToBall = Math.sqrt(
-            (ball.x - playerData.x) ** 2 + (ball.y - playerData.y) ** 2
-          )
-          if (distToBall < 300) {
-            goalText = 'DEFEND: CHASE BALL'
-          } else {
-            goalText = 'DEFEND: POSITION'
-          }
-        }
-      } else {
-        // Forward
-        if (ball.possessedBy === playerId) {
-          const goalX = playerData.team === 'blue' ? GAME_CONFIG.FIELD_WIDTH : 0
-          const distToGoal = Math.sqrt(
-            (goalX - ball.x) ** 2 + (GAME_CONFIG.FIELD_HEIGHT / 2 - ball.y) ** 2
-          )
-          if (distToGoal < 500) {
-            goalText = 'FORWARD: SHOOT'
-          } else {
-            goalText = 'FORWARD: DRIBBLE'
-          }
-        } else {
-          goalText = 'FORWARD: CHASE BALL'
-        }
-      }
+      // Get goal text from AIPlayer (debug label)
+      const goal = aiPlayer?.getGoal()
+      let goalText = goal ? goal.toUpperCase() : ''
 
       // Update goal label
       this.aiDebugRenderer.updatePlayerLabel(
@@ -336,31 +422,17 @@ export class AIOnlyScene extends BaseGameScene {
         playerData.team
       )
 
-      // Determine target position
-      let targetX = ball.x
-      let targetY = ball.y
-
-      if (playerData.role === 'defender' && ball.possessedBy !== playerId) {
-        const distToBall = Math.sqrt(
-          (ball.x - playerData.x) ** 2 + (ball.y - playerData.y) ** 2
+      // Get target position from AIPlayer
+      const targetPos = aiPlayer?.getTargetPosition()
+      if (targetPos) {
+        // Draw target line to AI's actual target position
+        this.aiDebugRenderer.updateTargetLine(
+          playerId,
+          { x: playerData.x, y: playerData.y },
+          targetPos,
+          playerData.team
         )
-        if (distToBall >= 300) {
-          // Return to defensive position
-          targetX =
-            playerData.team === 'blue'
-              ? GAME_CONFIG.FIELD_WIDTH * 0.19
-              : GAME_CONFIG.FIELD_WIDTH * 0.81
-          targetY = playerData.y // Maintain vertical lane
-        }
       }
-
-      // Draw target line
-      this.aiDebugRenderer.updateTargetLine(
-        playerId,
-        { x: playerData.x, y: playerData.y },
-        { x: targetX, y: targetY },
-        playerData.team
-      )
     })
   }
 }

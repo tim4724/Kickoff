@@ -1,6 +1,7 @@
 import { test, expect, Page, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Socca2 Multiplayer End-to-End Test Suite
@@ -15,8 +16,8 @@ import { waitScaled } from './helpers/time-control'
  * This test focuses on visual verification through screenshots and console logs.
  */
 
-const CLIENT_URL = 'http://localhost:5173'
-const SERVER_URL = 'http://localhost:3000'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
+const SERVER_URL = TEST_ENV.SERVER_URL
 const SCREENSHOT_DIR = './test-results/multiplayer'
 
 // Helper function to setup two clients with isolated room

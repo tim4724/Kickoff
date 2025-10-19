@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest, setupIsolatedTest, setupSinglePlayerTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { TEST_ENV } from "./config/test-env"
 
 /**
  * Core Features Regression Test Suite
@@ -12,7 +13,7 @@ import { waitScaled } from './helpers/time-control'
  * - Run on every commit
  */
 
-const CLIENT_URL = 'http://localhost:5173'
+const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 test.describe('Core Features Regression Suite', () => {
   test('1. Single client can connect and initialize', async ({ page }, testInfo) => {

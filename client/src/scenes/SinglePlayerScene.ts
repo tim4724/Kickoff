@@ -1,22 +1,33 @@
 import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
-import type { EnginePlayerData } from '@shared'
+import type { EnginePlayerData, EnginePlayerInput } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
+import { AIManager } from '../ai'
 
 /**
  * Single Player Scene
  * Extends BaseGameScene to provide local GameEngine-based gameplay with AI opponents
+ * Features:
+ * - AI teammates for human player
+ * - AI opponents
+ * - Auto-switching to ball carrier
+ * - Manual switching with action button (short press)
  */
 export class SinglePlayerScene extends BaseGameScene {
   private gameEngine!: GameEngine
+  private aiManager!: AIManager
+  private lastBallPossessor: string = ''
 
   constructor() {
     super({ key: 'SinglePlayerScene' })
   }
 
   protected initializeGameState(): void {
+    // Set GameClock to normal speed (1.0x) to prevent state pollution from other scenes
+    GameClock.setTimeScale(1.0)
+
     // Initialize game engine
     this.gameEngine = new GameEngine({
       matchDuration: GAME_CONFIG.MATCH_DURATION,
@@ -24,7 +35,17 @@ export class SinglePlayerScene extends BaseGameScene {
 
     // Add players (3v3: 3 players per team)
     this.gameEngine.addPlayer('player1', 'blue', true) // Human controlled team
-    this.gameEngine.addPlayer('player2', 'red', false) // Non-human controlled team
+    this.gameEngine.addPlayer('player2', 'red', false) // AI controlled team
+
+    // Initialize AI system for both teams
+    this.aiManager = new AIManager()
+    this.aiManager.initialize(
+      ['player1', 'player1-bot1', 'player1-bot2'], // Blue team (human + 2 AI teammates)
+      ['player2', 'player2-bot1', 'player2-bot2'], // Red team (3 AI opponents)
+      (playerId, decision) => this.applyAIDecision(playerId, decision)
+    )
+
+    console.log('🤖 SinglePlayer mode: Human player with AI teammates vs AI opponents')
 
     // Set up callbacks
     this.gameEngine.onGoal((event: { team: 'blue' | 'red'; time: number }) => {
@@ -103,7 +124,9 @@ export class SinglePlayerScene extends BaseGameScene {
                 this.gameEngine.queueInput(this.myPlayerId, {
                   movement: { x: normalizedX, y: normalizedY },
                   action: false,
-                  power: undefined
+                  actionPower: undefined,
+                  timestamp: Date.now(),
+                  playerId: this.myPlayerId
                 })
               }
               iterations++
@@ -129,7 +152,13 @@ export class SinglePlayerScene extends BaseGameScene {
   }
 
   protected updateGameState(delta: number): void {
-    // Get input from joystick or keyboard
+    // Auto-switch to ball carrier if ball possession changed
+    this.handleAutoSwitch()
+
+    // Update AI for all non-controlled players
+    this.updateAI()
+
+    // Get input from joystick or keyboard for controlled player
     const movement = { x: 0, y: 0 }
 
     if (this.joystick && this.joystick.isPressed()) {
@@ -154,7 +183,6 @@ export class SinglePlayerScene extends BaseGameScene {
     if (Math.abs(movement.x) > 0.01 || Math.abs(movement.y) > 0.01) {
       this.gameEngine.queueInput(this.controlledPlayerId, {
         movement,
-        action: false,
         timestamp: Date.now(),
       })
     }
@@ -167,6 +195,8 @@ export class SinglePlayerScene extends BaseGameScene {
   }
 
   protected handleShootAction(power: number): void {
+    // Shoot with variable power
+    // (BaseGameScene already checks hasBall before calling this method)
     this.gameEngine.queueInput(this.controlledPlayerId, {
       movement: { x: 0, y: 0 },
       action: true,
@@ -177,6 +207,147 @@ export class SinglePlayerScene extends BaseGameScene {
 
   protected cleanupGameState(): void {
     // GameEngine cleanup (if needed in future)
+  }
+
+  /**
+   * Update AI and apply decisions to game engine
+   */
+  private updateAI() {
+    const engineState = this.gameEngine.getState()
+
+    // Convert GameEngineState to GameStateData format
+    const gameStateData = this.convertEngineStateToGameStateData(engineState)
+
+    // Update AI Manager (this will call TeamAI.update() which calls each AIPlayer.update())
+    this.aiManager.update(gameStateData)
+  }
+
+  /**
+   * Apply AI decision by queuing input to game engine
+   * Only applies if the player is NOT human-controlled
+   */
+  private applyAIDecision(playerId: string, decision: any) {
+    const engineState = this.gameEngine.getState()
+    const player = engineState.players.get(playerId)
+
+    // Don't apply AI to human-controlled player
+    if (player && player.isControlled) {
+      return
+    }
+
+    const input: EnginePlayerInput = {
+      movement: {
+        x: decision.moveX,
+        y: decision.moveY,
+      },
+      action: decision.shootPower !== null,
+      actionPower: decision.shootPower ?? 0,
+      timestamp: Date.now(),
+      playerId: playerId,
+    }
+
+    this.gameEngine.queueInput(playerId, input)
+  }
+
+  /**
+   * Auto-switch to ball carrier when possession changes
+   */
+  private handleAutoSwitch() {
+    const engineState = this.gameEngine.getState()
+    const ballPossessor = engineState.ball.possessedBy
+
+    // Check if possession changed and belongs to blue team (human team)
+    if (ballPossessor && ballPossessor !== this.lastBallPossessor) {
+      const player = engineState.players.get(ballPossessor)
+      if (player && player.team === 'blue') {
+        // Switch to the ball carrier
+        this.switchToPlayer(ballPossessor)
+        console.log(`⚽ Auto-switched to ball carrier: ${ballPossessor}`)
+      }
+      this.lastBallPossessor = ballPossessor
+    } else if (!ballPossessor) {
+      this.lastBallPossessor = ''
+    }
+  }
+
+  /**
+   * Switch to next teammate (manual switching)
+   */
+  protected switchToNextTeammate() {
+    const engineState = this.gameEngine.getState()
+    const blueTeamPlayers: string[] = []
+
+    // Collect all blue team players
+    engineState.players.forEach((player, playerId) => {
+      if (player.team === 'blue') {
+        blueTeamPlayers.push(playerId)
+      }
+    })
+
+    if (blueTeamPlayers.length === 0) return
+
+    // Find current controlled player index
+    const currentIndex = blueTeamPlayers.indexOf(this.controlledPlayerId)
+    const nextIndex = (currentIndex + 1) % blueTeamPlayers.length
+    const nextPlayerId = blueTeamPlayers[nextIndex]
+
+    this.switchToPlayer(nextPlayerId)
+    console.log(`🔄 Manual switch to: ${nextPlayerId}`)
+  }
+
+  /**
+   * Switch control to a specific player
+   */
+  private switchToPlayer(playerId: string) {
+    const engineState = this.gameEngine.getState()
+    const player = engineState.players.get(playerId)
+
+    if (!player || player.team !== 'blue') {
+      return
+    }
+
+    // Update controlled player
+    this.controlledPlayerId = playerId
+    this.gameEngine.setPlayerControl(this.myPlayerId, playerId)
+
+    // Update player borders to show who is controlled
+    this.updatePlayerBorders()
+  }
+
+  /**
+   * Convert GameEngineState to GameStateData format for AI
+   */
+  private convertEngineStateToGameStateData(engineState: any): any {
+    // Convert players map
+    const playersMap = new Map()
+    engineState.players.forEach((player: EnginePlayerData, playerId: string) => {
+      playersMap.set(playerId, {
+        id: player.id,
+        team: player.team,
+        isHuman: player.isHuman,
+        isControlled: player.isControlled,
+        position: { x: player.x, y: player.y },
+        velocity: { x: player.velocityX, y: player.velocityY },
+        state: player.state,
+        direction: player.direction,
+      })
+    })
+
+    // Convert ball
+    const ball = {
+      position: { x: engineState.ball.x, y: engineState.ball.y },
+      velocity: { x: engineState.ball.velocityX, y: engineState.ball.velocityY },
+      possessedBy: engineState.ball.possessedBy,
+    }
+
+    return {
+      players: playersMap,
+      ball: ball,
+      scoreBlue: engineState.scoreBlue,
+      scoreRed: engineState.scoreRed,
+      matchTime: engineState.matchTime,
+      phase: engineState.phase,
+    }
   }
 
   private syncPlayersFromEngine() {
