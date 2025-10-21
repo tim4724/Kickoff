@@ -72,18 +72,27 @@ async function setupAIOnlyTest(page: Page, url: string): Promise<void> {
     return scene?.scene?.key === 'AIOnlyScene' && scene?.player
   }, { timeout: 10000 })
 
-  // Set game speed to 1.0 for normal gameplay (default is 0.05)
+  // Set GameClock to 1.0x speed for this test (normal real-time gameplay)
+  // This overrides any time acceleration from other tests
   await page.evaluate(() => {
+    const GameClock = (window as any).GameClock
+    if (GameClock) {
+      GameClock.setTimeScale(1.0)
+      console.log('⏰ GameClock set to 1.0x (real-time)')
+    }
+
+    // Also set scene gameSpeed for AIOnlyScene
     const scene = (window as any).__gameControls?.scene
     if (scene && 'gameSpeed' in scene) {
       scene.gameSpeed = 1.0
+      console.log('🎮 Scene gameSpeed set to 1.0')
     }
   })
 
   // Small delay for scene initialization
   await waitScaled(page, 500)
 
-  console.log('🤖 AI-Only scene initialized (game speed set to 1.0)')
+  console.log('🤖 AI-Only scene initialized (time scale: 1.0x real-time)')
 }
 
 /**

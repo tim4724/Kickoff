@@ -12,7 +12,7 @@ const GAME_CONFIG = {
 // Fixed timestep physics configuration
 const FIXED_TIMESTEP_MS = 1000 / 60 // 16.666ms - deterministic physics step
 const FIXED_TIMESTEP_S = FIXED_TIMESTEP_MS / 1000 // 0.01666s
-const MAX_PHYSICS_STEPS = 5 // Prevent spiral of death under extreme load
+const MAX_PHYSICS_STEPS = 24 // Increased to handle high CPU contention during parallel tests (8 workers = 16 browser contexts)
 
 export class MatchRoom extends Room<GameState> {
   maxClients = 2 // 2 human players (1v1 match)

@@ -12,6 +12,30 @@ export const BLUE_COLOR = 26367      // 0x0066ff
 export const RED_COLOR = 16729156    // 0xff4444
 
 /**
+ * Disable AI for single-player tests (prevents AI from interfering)
+ */
+export async function disableAI(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const controls = (window as any).__gameControls
+    if (controls?.test?.setAIEnabled) {
+      controls.test.setAIEnabled(false)
+    }
+  })
+}
+
+/**
+ * Disable auto-switching for single-player tests (prevents switching to AI players)
+ */
+export async function disableAutoSwitch(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const controls = (window as any).__gameControls
+    if (controls?.test?.setAutoSwitchEnabled) {
+      controls.test.setAutoSwitchEnabled(false)
+    }
+  })
+}
+
+/**
  * Get player's team color
  */
 export async function getPlayerColor(client: Page): Promise<number> {
@@ -129,6 +153,59 @@ export async function gainPossession(
     return true
   } catch (error) {
     await client.keyboard.up('ArrowRight')
+    return false
+  }
+}
+
+/**
+ * Move toward ball and wait for possession (deterministic, handles CPU throttling)
+ * Calculates direction toward ball and holds key until possession is gained
+ */
+export async function moveTowardBallAndCapture(
+  client: Page,
+  timeoutMs: number = 10000
+): Promise<boolean> {
+  const sessionId = await getSessionId(client)
+
+  // Check if already have possession
+  const currentState = await getServerState(client)
+  if (currentState.ball.possessedBy === sessionId) {
+    return true
+  }
+
+  // Calculate direction to ball
+  const playerPos = await getPlayerPosition(client)
+  const dx = currentState.ball.x - playerPos.x
+  const dy = currentState.ball.y - playerPos.y
+  const horizontal = Math.abs(dx) > Math.abs(dy)
+
+  // Determine key to press
+  const key = horizontal
+    ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft')
+    : (dy > 0 ? 'ArrowDown' : 'ArrowUp')
+
+  // Start moving toward ball
+  await client.keyboard.down(key)
+
+  try {
+    // Wait for possession condition (deterministic)
+    await client.waitForFunction(
+      (sid) => {
+        const scene = (window as any).__gameControls?.scene
+        const state = scene?.networkManager?.getState()
+        return state?.ball?.possessedBy === sid
+      },
+      sessionId,
+      { timeout: timeoutMs }
+    )
+
+    // Release key immediately when possession gained
+    await client.keyboard.up(key)
+    await waitScaled(client, 100) // Small buffer for state to settle
+    return true
+  } catch (error) {
+    // Release key on timeout
+    await client.keyboard.up(key)
     return false
   }
 }

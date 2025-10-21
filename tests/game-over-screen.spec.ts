@@ -199,6 +199,12 @@ test.describe('Game Over Screen', () => {
 
     console.log('\n📤 Simulating draw scenario...')
 
+    // Wait for scene to be fully ready before calling methods
+    await client1.waitForFunction(() => {
+      const scene = (window as any).__gameControls?.scene
+      return scene && scene.onMatchEnd && typeof scene.onMatchEnd === 'function'
+    }, { timeout: 5000 })
+
     // Force match to end with draw
     await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene

@@ -1,7 +1,10 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { waitForBallPossession } from './helpers/deterministic-wait-utils'
+import { moveTowardBallAndCapture, disableAI } from './helpers/test-utils'
 import { TEST_ENV } from './config/test-env'
+import { GAME_CONFIG } from '../shared/src/types'
 
 /**
  * Ball Capture E2E Tests - Proximity Pressure System
@@ -62,10 +65,10 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     const distance = Math.sqrt(dx * dx + dy * dy)
 
     // Calculate movement time needed
-    // Actual speed appears to be ~465 px/s (from core test: 232.5px in 500ms)
-    // Using conservative estimate with 100% extra buffer to ensure arrival
-    const effectiveSpeed = 400 // px/s (conservative to ensure full movement)
-    const timeMs = Math.ceil((distance / effectiveSpeed) * 1000 * 2.0)
+    // Use actual player speed from game config (284 px/s)
+    // Apply 2.5x buffer for acceleration, network latency, and safety margin
+    const effectiveSpeed = GAME_CONFIG.PLAYER_SPEED // Import actual speed from game config
+    const timeMs = Math.ceil((distance / effectiveSpeed) * 1000 * 2.5)
 
     // Determine primary direction to press
     const horizontal = Math.abs(dx) > Math.abs(dy)
@@ -197,8 +200,8 @@ test.describe('Ball Capture - Proximity Pressure', () => {
   }
 
   test('Test 1: Pressure builds when opponent approaches ball carrier', async ({ browser }, testInfo) => {
-    const context1 = await browser.newContext()
-    const context2 = await browser.newContext()
+    const context1 = await browser.newContext({ recordVideo: { dir: 'test-results/videos/' } })
+    const context2 = await browser.newContext({ recordVideo: { dir: 'test-results/videos/' } })
     const client1 = await context1.newPage()
     const client2 = await context2.newPage()
 
@@ -207,6 +210,9 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     // Wait for game to load
     await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
+
+    // Disable AI to prevent bot interference with ball capture
+    await Promise.all([disableAI(client1), disableAI(client2)])
 
     console.log('\n🧪 TEST 1: Pressure Buildup from Opponent Proximity\n')
     console.log('='.repeat(70))
@@ -240,32 +246,11 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log(`  Distance to ball: ${distance.toFixed(0)}px`)
 
     console.log('\n📤 Step 2: Move player to capture ball...')
-    // Move client1's player toward the ball using keyboard
-    await movePlayerTowardBall(client1)
-    await waitScaled(client1, 500)
-
-    // Try moving a bit more to ensure possession (in case we're at edge of possession radius)
-    // This is especially important under high concurrency (4+ workers)
-    // Use deterministic input method (unaffected by RAF throttling with 8 workers)
-    await client1.evaluate(async () => {
-      await (window as any).__gameControls.test.movePlayerDirect(1, 0, 2000)
-    })
-    await waitScaled(client1, 500)
-
-    // Wait for possession to register - deterministic wait instead of retry loop
-    try {
-      await client1.waitForFunction(
-        () => {
-          const scene = (window as any).__gameControls?.scene
-          const state = scene?.networkManager?.getState()
-          return state?.ball?.possessedBy !== '' && state?.ball?.possessedBy !== null
-        },
-        { timeout: 10000 }
-      )
-
-      const captureState = await getGameState(client1)
-      console.log(`  ✅ Ball captured by: ${captureState.ball.possessedBy}`)
-    } catch (error) {
+    // Use deterministic helper that handles CPU throttling
+    const captured = await moveTowardBallAndCapture(client1, 10000)
+    if (captured) {
+      console.log(`  ✅ Ball captured successfully`)
+    } else {
       console.log(`  ⚠️  Ball not captured within timeout`)
     }
 
@@ -283,7 +268,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
       Math.pow(captureState.ball.x - finalPositions.player.x, 2) +
       Math.pow(captureState.ball.y - finalPositions.player.y, 2)
     )
-    console.log(`  Final distance to ball: ${finalDist.toFixed(0)}px (possession radius: 50px)`)
+    console.log(`  Final distance to ball: ${finalDist.toFixed(0)}px (possession radius: ${GAME_CONFIG.POSSESSION_RADIUS}px)`)
     console.log(`  Ball now possessed by: ${captureState?.ball.possessedBy || 'none'}`)
 
     // Verify ball was captured
@@ -310,14 +295,14 @@ test.describe('Ball Capture - Proximity Pressure', () => {
       }
     })
 
-    const possessor = positions.players.find(p => p.id === positions.ball.possessedBy)
+    const currentPossessor = positions.players.find(p => p.id === positions.ball.possessedBy)
     const opponent = positions.players.find(p => p.id !== positions.ball.possessedBy)
 
-    if (possessor && opponent) {
-      const dx = opponent.x - possessor.x
-      const dy = opponent.y - possessor.y
+    if (currentPossessor && opponent) {
+      const dx = opponent.x - currentPossessor.x
+      const dy = opponent.y - currentPossessor.y
       const playerDist = Math.sqrt(dx * dx + dy * dy)
-      console.log(`  Possessor at: (${possessor.x.toFixed(0)}, ${possessor.y.toFixed(0)})`)
+      console.log(`  Possessor at: (${currentPossessor.x.toFixed(0)}, ${currentPossessor.y.toFixed(0)})`)
       console.log(`  Opponent at: (${opponent.x.toFixed(0)}, ${opponent.y.toFixed(0)})`)
       console.log(`  Distance between players: ${playerDist.toFixed(0)}px (pressure radius: 40px)`)
     }
@@ -569,8 +554,8 @@ test.describe('Ball Capture - Proximity Pressure', () => {
   })
 
   test('Test 5: No regression - shooting still works', async ({ browser }, testInfo) => {
-    const context1 = await browser.newContext()
-    const context2 = await browser.newContext()
+    const context1 = await browser.newContext({ recordVideo: { dir: 'test-results/videos/' } })
+    const context2 = await browser.newContext({ recordVideo: { dir: 'test-results/videos/' } })
     const client1 = await context1.newPage()
     const client2 = await context2.newPage()
 
@@ -584,30 +569,16 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log('='.repeat(70))
 
     console.log('\n📤 Step 1: Move player to capture ball...')
-    await movePlayerTowardBall(client1)
-    await waitScaled(client1, 500)
 
-    // Try moving a bit more to ensure possession (in case we're at edge of possession radius)
-    await movePlayerTowardBall(client1)
-    await waitScaled(client1, 500)
-
-    // Wait for possession to register - deterministic wait
-    try {
-      await client1.waitForFunction(
-        () => {
-          const scene = (window as any).__gameControls?.scene
-          const state = scene?.networkManager?.getState()
-          return state?.ball?.possessedBy !== '' && state?.ball?.possessedBy !== null
-        },
-        { timeout: 10000 }
-      )
+    // Use deterministic helper that handles CPU throttling
+    const captured = await moveTowardBallAndCapture(client1, 10000)
+    if (captured) {
+      console.log(`  ✅ Ball captured successfully`)
 
       const captureState = await getGameState(client1)
-      console.log(`  ✅ Ball captured by: ${captureState.ball.possessedBy}`)
-
       expect(captureState).not.toBeNull()
       expect(captureState.ball.possessedBy).toBeTruthy()
-    } catch (error) {
+    } else {
       throw new Error('Ball was not captured within timeout')
     }
 

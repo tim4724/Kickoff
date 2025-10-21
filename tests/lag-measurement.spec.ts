@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupSinglePlayerTest } from './helpers/room-utils'
-import { waitScaled } from './helpers/time-control'
+import { waitScaled, setTimeScale } from './helpers/time-control'
 import { TEST_ENV } from "./config/test-env"
 
 /**
@@ -85,7 +85,10 @@ async function measureNetworkRTT(page: Page): Promise<number> {
 test.describe('Input Lag Measurement', () => {
   test('Measure Baseline Input Lag (10 samples)', async ({ page }) => {
     await setupSinglePlayerTest(page, CLIENT_URL)
-    console.log('🎮 Single-player mode initialized')
+
+    // Disable 10x time acceleration for accurate real-time lag measurement
+    await setTimeScale(page, 1)
+    console.log('🎮 Single-player mode initialized (real-time, no acceleration)')
 
     // Small buffer after scene starts
     await waitScaled(page, 500)

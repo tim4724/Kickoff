@@ -4,8 +4,8 @@
 
 export const VISUAL_CONSTANTS = {
   // Player border widths
-  CONTROLLED_PLAYER_BORDER: 8, // 2x thicker for better visibility
-  UNCONTROLLED_PLAYER_BORDER: 0, // No border for non-controlled players
+  CONTROLLED_PLAYER_BORDER: 4, // Thicker border for controlled player
+  UNCONTROLLED_PLAYER_BORDER: 2, // Thin border for uncontrolled players (better visibility)
 
   // Interpolation factors
   BALL_LERP_FACTOR: 0.3,

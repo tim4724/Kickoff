@@ -2,6 +2,7 @@ import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
 import { TEST_ENV } from "./config/test-env"
+import { GAME_CONFIG } from '../shared/src/types'
 
 /**
  * Socca2 Multiplayer Network Synchronization Test Suite
@@ -376,11 +377,11 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     const finalDy = ballState.y - playerState.y
     distance = Math.sqrt(finalDx * finalDx + finalDy * finalDy)
 
-    console.log(`\n✅ Final distance to ball: ${distance.toFixed(1)}px (possession radius: 30px)`)
+    console.log(`\n✅ Final distance to ball: ${distance.toFixed(1)}px (possession radius: ${GAME_CONFIG.POSSESSION_RADIUS}px)`)
     console.log(`Ball possessed by: "${ballState.possessedBy}"`)
 
     // Verify possession
-    expect(distance).toBeLessThan(30)
+    expect(distance).toBeLessThan(GAME_CONFIG.POSSESSION_RADIUS)
     expect(ballState.possessedBy).toBe(client1SessionId)
     console.log('✅ Ball possession detected by server')
 

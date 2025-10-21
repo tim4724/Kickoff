@@ -356,7 +356,7 @@ export class AIOnlyScene extends BaseGameScene {
       },
       action: decision.shootPower !== null,
       actionPower: decision.shootPower ?? 0,
-      timestamp: Date.now(),
+      timestamp: this.gameEngine.frameCount,
       playerId: playerId,
     }
 

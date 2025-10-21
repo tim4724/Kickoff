@@ -2,6 +2,7 @@ import { test, expect, Browser } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
 import { TEST_ENV } from "./config/test-env"
+import { GAME_CONFIG } from '../shared/src/types'
 
 /**
  * Test Suite: Player Lifecycle Management
@@ -97,7 +98,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log(`  Player 1 team: ${ballState.playerTeam}`)
     console.log(`  Player 1 position: (${ballState.playerX.toFixed(0)}, ${ballState.playerY.toFixed(0)})`)
     console.log(`  Ball position: (${ballState.ballX.toFixed(0)}, ${ballState.ballY.toFixed(0)})`)
-    console.log(`  Distance: ${dist.toFixed(1)}px (possession radius: 70px)`)
+    console.log(`  Distance: ${dist.toFixed(1)}px (possession radius: ${GAME_CONFIG.POSSESSION_RADIUS}px)`)
     console.log(`  Ball possessed by: ${ballState.possessedBy || 'none'}`)
 
     // Verify Client 1 has possession

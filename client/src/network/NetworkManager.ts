@@ -90,6 +90,10 @@ export class NetworkManager {
     // Check window variable for test isolation
     const testRoomId = (window as any).__testRoomId
     if (testRoomId) {
+      // Log for test verification (dev/test mode only)
+      if (import.meta.env.DEV) {
+        console.log('[NetworkManager] Using test room:', testRoomId)
+      }
       return testRoomId
     }
 
@@ -136,6 +140,11 @@ export class NetworkManager {
 
       this.sessionId = this.room.sessionId
       this.connected = true
+
+      // Log for test verification (dev/test mode only)
+      if (import.meta.env.DEV) {
+        console.log('[NetworkManager] Connected! Session ID:', this.sessionId)
+      }
 
       // Handle room errors
       this.room.onError((code, message) => {

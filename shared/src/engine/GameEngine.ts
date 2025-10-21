@@ -33,6 +33,9 @@ export class GameEngine {
   private readonly FIXED_TIMESTEP_S = this.FIXED_TIMESTEP_MS / 1000
   private physicsAccumulator: number = 0
 
+  // Frame counter (deterministic, increments on each physics step)
+  public frameCount: number = 0
+
   // Event callbacks
   private onGoalCallback?: (event: GoalEvent) => void
   private onMatchEndCallback?: () => void
@@ -262,7 +265,7 @@ export class GameEngine {
           movement: { x: 0, y: 0 },
           action: false,
           actionPower: 0,
-          timestamp: Date.now(),
+          timestamp: this.frameCount,
         }
 
         // Use latest movement
@@ -345,6 +348,9 @@ export class GameEngine {
 
       this.physicsAccumulator -= this.FIXED_TIMESTEP_MS
       physicsSteps++
+
+      // Increment frame counter (deterministic!)
+      this.frameCount++
     }
 
     // Prevent spiral of death
@@ -367,6 +373,7 @@ export class GameEngine {
   startMatch(): void {
     this.state.phase = 'playing'
     this.physicsAccumulator = 0
+    this.frameCount = 0
   }
 
   /**

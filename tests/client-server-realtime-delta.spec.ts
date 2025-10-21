@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupSinglePlayerTest } from './helpers/room-utils'
-import { waitScaled } from './helpers/time-control'
+import { waitScaled, setTimeScale } from './helpers/time-control'
+import { disableAI, disableAutoSwitch } from './helpers/test-utils'
 import { TEST_ENV } from "./config/test-env"
 
 /**
@@ -34,7 +35,13 @@ async function getPlayerPosition(page: Page) {
 test.describe('Real-Time Position Updates', () => {
   test('Player position updates smoothly during continuous movement', async ({ page }) => {
     await setupSinglePlayerTest(page, CLIENT_URL)
-    console.log('🎮 Single-player mode initialized')
+
+    // Disable 10x time acceleration for accurate real-time position sampling
+    await setTimeScale(page, 1)
+
+    await disableAI(page)
+    await disableAutoSwitch(page)
+    console.log('🎮 Single-player mode initialized (AI disabled, real-time)')
 
     await waitScaled(page, 500)
 
@@ -146,7 +153,13 @@ test.describe('Real-Time Position Updates', () => {
 
   test('Player responds smoothly to rapid direction changes', async ({ page }) => {
     await setupSinglePlayerTest(page, CLIENT_URL)
-    console.log('🎮 Single-player mode initialized')
+
+    // Disable 10x time acceleration for accurate real-time position sampling
+    await setTimeScale(page, 1)
+
+    await disableAI(page)
+    await disableAutoSwitch(page)
+    console.log('🎮 Single-player mode initialized (AI disabled, real-time)')
 
     await waitScaled(page, 500)
 

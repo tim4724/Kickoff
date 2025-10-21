@@ -21,6 +21,8 @@ export class SinglePlayerScene extends BaseGameScene {
   private gameEngine!: GameEngine
   private aiManager!: AIManager
   private lastBallPossessor: string = ''
+  private aiEnabled: boolean = true
+  private autoSwitchEnabled: boolean = true
 
   constructor() {
     super({ key: 'SinglePlayerScene' })
@@ -95,10 +97,20 @@ export class SinglePlayerScene extends BaseGameScene {
           getState: () => ({
             joystick: this.joystick.__test_getState(),
             button: this.actionButton.__test_getState(),
+            aiEnabled: this.aiEnabled,
+            autoSwitchEnabled: this.autoSwitchEnabled,
           }),
+          setAIEnabled: (enabled: boolean) => {
+            this.aiEnabled = enabled
+            console.log(`🤖 AI ${enabled ? 'enabled' : 'disabled'}`)
+          },
+          setAutoSwitchEnabled: (enabled: boolean) => {
+            this.autoSwitchEnabled = enabled
+            console.log(`🔄 Auto-switch ${enabled ? 'enabled' : 'disabled'}`)
+          },
           // Direct input method (bypasses UI simulation)
           // Queues continuous input for specified duration
-          // durationMs is in GAME TIME - we convert to real time based on time scale
+          // durationMs is in GAME TIME - we convert to frames based on time scale
           directMove: async (dx: number, dy: number, gameTimeDurationMs: number) => {
             // Normalize direction vector
             const length = Math.sqrt(dx * dx + dy * dy)
@@ -107,38 +119,36 @@ export class SinglePlayerScene extends BaseGameScene {
 
             const timeScale = GameClock.getTimeScale()
 
-            // Convert game time to real time
-            // With 10x acceleration: 2000ms game time = 200ms real time (2000 / 10)
+            // Calculate frames needed: at 60fps, each frame is ~16.67ms real time
+            // With time scale, we process (16.67 * timeScale)ms game time per frame
             const realTimeDurationMs = gameTimeDurationMs / timeScale
+            const framesNeeded = Math.ceil(realTimeDurationMs / 16.67)
 
-            console.log(`🎮 [Test] Direct move: (${normalizedX.toFixed(2)}, ${normalizedY.toFixed(2)})`)
-            console.log(`  Game time: ${gameTimeDurationMs}ms, Real time: ${realTimeDurationMs}ms, Scale: ${timeScale}x`)
+            console.log(`🎮 [Test] Direct move: (${normalizedX.toFixed(2)}, ${normalizedY.toFixed(2)}) for ${framesNeeded} frames`)
 
-            const startTime = performance.now()
-            const endTime = startTime + realTimeDurationMs
+            let frameCount = 0
 
-            // Queue input continuously in real time
-            // Queue multiple inputs per iteration to ensure smooth movement under CPU load
-            let iterations = 0
-            while (performance.now() < endTime) {
-              // Queue 3 inputs per iteration for redundancy
-              for (let i = 0; i < 3; i++) {
+            return new Promise<void>((resolve) => {
+              const queueInput = () => {
+                if (frameCount >= framesNeeded) {
+                  console.log(`🎮 [Test] Direct move complete: ${frameCount} frames`)
+                  resolve()
+                  return
+                }
+
+                // Queue one input per frame
                 this.gameEngine.queueInput(this.myPlayerId, {
                   movement: { x: normalizedX, y: normalizedY },
-                  action: false,
-                  actionPower: undefined,
-                  timestamp: Date.now(),
+                  timestamp: this.gameEngine.frameCount,
                   playerId: this.myPlayerId
                 })
+
+                frameCount++
+                requestAnimationFrame(queueInput)
               }
-              iterations++
 
-              // Small delay to avoid overwhelming the queue (real time)
-              await new Promise(resolve => setTimeout(resolve, 5))
-            }
-
-            const actualRealTime = performance.now() - startTime
-            console.log(`🎮 [Test] Direct move complete: ${iterations} iterations, ${actualRealTime.toFixed(1)}ms real time`)
+              requestAnimationFrame(queueInput)
+            })
           },
         },
       }
@@ -155,10 +165,14 @@ export class SinglePlayerScene extends BaseGameScene {
 
   protected updateGameState(delta: number): void {
     // Auto-switch to ball carrier if ball possession changed
-    this.handleAutoSwitch()
+    if (this.autoSwitchEnabled) {
+      this.handleAutoSwitch()
+    }
 
     // Update AI for all non-controlled players
-    this.updateAI()
+    if (this.aiEnabled) {
+      this.updateAI()
+    }
 
     // Get input from joystick or keyboard for controlled player
     const movement = { x: 0, y: 0 }
@@ -193,7 +207,7 @@ export class SinglePlayerScene extends BaseGameScene {
     if (Math.abs(movement.x) > 0.01 || Math.abs(movement.y) > 0.01) {
       this.gameEngine.queueInput(this.controlledPlayerId, {
         movement,
-        timestamp: Date.now(),
+        timestamp: this.gameEngine.frameCount,
       })
     }
 
@@ -211,7 +225,7 @@ export class SinglePlayerScene extends BaseGameScene {
       movement: { x: 0, y: 0 },
       action: true,
       actionPower: power,
-      timestamp: Date.now(),
+      timestamp: this.gameEngine.frameCount,
     })
 
     // Auto-switching is handled by handleAutoSwitch() when ball becomes loose
@@ -305,7 +319,7 @@ export class SinglePlayerScene extends BaseGameScene {
       },
       action: decision.shootPower !== null,
       actionPower: decision.shootPower ?? 0,
-      timestamp: Date.now(),
+      timestamp: this.gameEngine.frameCount,
       playerId: playerId,
     }
 

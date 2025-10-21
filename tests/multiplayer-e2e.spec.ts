@@ -292,8 +292,8 @@ test.describe('Socca2 Multiplayer Tests', () => {
         const ballX = scene.ball.x
         const ballY = scene.ball.y
 
-        // Move player very close to ball (within possession radius ~30px)
-        scene.player.x = ballX - 25
+        // Move player very close to ball (within possession radius of 45px)
+        scene.player.x = ballX - 25  // 25px offset puts player well within radius
         scene.player.y = ballY
 
         console.log(`🎮 Moved player to (${scene.player.x}, ${scene.player.y}), ball at (${ballX}, ${ballY})`)

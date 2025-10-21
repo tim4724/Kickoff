@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { setupMultiClientTest, setupIsolatedTest, setupSinglePlayerTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
+import { disableAI, disableAutoSwitch } from './helpers/test-utils'
 import { TEST_ENV } from "./config/test-env"
 
 /**
@@ -201,7 +202,9 @@ test.describe('Core Features Regression Suite', () => {
 
   test('9. Field boundaries prevent out-of-bounds movement', async ({ page }) => {
     await setupSinglePlayerTest(page, CLIENT_URL)
-    console.log('🎮 Single-player mode initialized')
+    await disableAI(page)
+    await disableAutoSwitch(page)
+    console.log('🎮 Single-player mode initialized (AI disabled)')
 
     // Small buffer after scene starts
     await waitScaled(page, 500)
