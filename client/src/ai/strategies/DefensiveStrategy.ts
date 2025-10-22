@@ -15,6 +15,7 @@ import { Vector2D, AIGameState, PlayerRole } from '../types'
 import { PlayerData, GAME_CONFIG, Team } from '../../../../shared/src/types'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { SpreadPositionStrategy } from './SpreadPositionStrategy'
+import { PassEvaluator } from '../utils/PassEvaluator'
 
 export class DefensiveStrategy {
   private readonly ourGoal: Vector2D
@@ -77,11 +78,26 @@ export class DefensiveStrategy {
         roles.set(p.id, this.getDefensivePassReceivePosition(sortedOpp[i], this.ourGoal))
       })
 
+      // Calculate opponent goal for pass evaluation
+      const opponentGoal: Vector2D = {
+        x: this.ourGoal.x === 0 ? GAME_CONFIG.FIELD_WIDTH : 0,
+        y: GAME_CONFIG.FIELD_HEIGHT / 2,
+      }
+
+      // Calculate pass options for offensive players
+      const passOptions = PassEvaluator.evaluatePassOptions(
+        weReachFirstBallPosition,
+        offensive,
+        remainingOpponents,
+        opponentGoal
+      )
+
       const spreadRoles = SpreadPositionStrategy.getSpreadPassReceivePositions(
         offensive,
         weReachFirstBallPosition,
         remainingOpponents,
-        this.ourGoal
+        this.ourGoal,
+        passOptions
       )
       spreadRoles.forEach((role, playerId) => roles.set(playerId, role))
     } else {

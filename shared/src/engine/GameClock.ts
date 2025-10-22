@@ -27,6 +27,7 @@ export class GameClock {
   // Mode
   private useMock: boolean = false
   private timeScale: number = 1.0
+  private paused: boolean = false
 
   // Mock time state
   private mockTime: number = 0
@@ -59,11 +60,15 @@ export class GameClock {
       return this.mockTime
     }
 
-    // In real-time mode, update scaled time
+    // In real-time mode, update scaled time (only if not paused)
     const currentRealTime = this.getRealTime()
     const realDelta = currentRealTime - this.lastRealTime
     this.lastRealTime = currentRealTime
-    this.scaledTime += realDelta * this.timeScale
+
+    // Only advance time if not paused
+    if (!this.paused) {
+      this.scaledTime += realDelta * this.timeScale
+    }
 
     return this.scaledTime
   }
@@ -203,6 +208,33 @@ export class GameClock {
   }
 
   /**
+   * Pause the clock (time stops advancing)
+   */
+  pause(): void {
+    this.paused = true
+    console.log('⏸️ GameClock: Paused')
+  }
+
+  /**
+   * Resume the clock (time continues advancing)
+   */
+  resume(): void {
+    if (this.paused) {
+      // Reset lastRealTime to prevent time jump
+      this.lastRealTime = this.getRealTime()
+      this.paused = false
+      console.log('▶️ GameClock: Resumed')
+    }
+  }
+
+  /**
+   * Check if clock is paused
+   */
+  isPaused(): boolean {
+    return this.paused
+  }
+
+  /**
    * Reset clock state (for test isolation)
    */
   reset(): void {
@@ -211,6 +243,7 @@ export class GameClock {
     this.lastRealTime = this.getRealTime()
     this.timers.clear()
     this.timeScale = 1.0
+    this.paused = false
     console.log('🕐 GameClock: Reset')
   }
 

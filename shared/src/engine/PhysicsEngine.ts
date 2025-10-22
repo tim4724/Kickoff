@@ -292,7 +292,8 @@ export class PhysicsEngine {
   handlePlayerAction(
     player: EnginePlayerData,
     ball: EngineBallData,
-    actionPower: number = 0.8
+    actionPower: number = 0.8,
+    onShootCallback?: (playerId: string, power: number) => void
   ): void {
     if (ball.possessedBy === player.id) {
       // Shoot in direction player is facing
@@ -314,6 +315,11 @@ export class PhysicsEngine {
 
       player.state = 'kicking'
       player.kickingUntil = gameClock.now() + 300
+
+      // Trigger shoot callback
+      if (onShootCallback) {
+        onShootCallback(player.id, actionPower)
+      }
     } else {
       // Try to gain possession
       const dx = ball.x - player.x

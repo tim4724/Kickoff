@@ -81,6 +81,10 @@ export class AIOnlyScene extends BaseGameScene {
       }
     })
 
+    this.gameEngine.onShoot((playerId: string, power: number) => {
+      console.log(`🎯 Player ${playerId} shot with power ${power.toFixed(2)}`)
+    })
+
     // Start match immediately
     this.gameEngine.startMatch()
 
@@ -125,13 +129,11 @@ export class AIOnlyScene extends BaseGameScene {
   protected updateGameState(delta: number): void {
     // No human input - all players are AI-controlled
 
-    // Update AI and apply decisions
+    // Update AI and apply decisions when not paused
+    // GameClock.pause() ensures cooldown timers don't advance during pause
     if (!this.paused) {
       this.updateAI()
-    }
 
-    // Apply pause and game speed
-    if (!this.paused) {
       // Scale delta by game speed
       const scaledDelta = delta * this.gameSpeed
       this.gameEngine.update(scaledDelta)
@@ -182,6 +184,14 @@ export class AIOnlyScene extends BaseGameScene {
     // Add SPACE key for play/pause
     this.input.keyboard?.on('keydown-SPACE', () => {
       this.paused = !this.paused
+
+      // Sync GameClock pause state
+      if (this.paused) {
+        GameClock.pause()
+      } else {
+        GameClock.resume()
+      }
+
       this.updateSpeedDisplay()
       console.log('⏸️ Game:', this.paused ? 'PAUSED' : 'PLAYING')
     })
