@@ -15,6 +15,7 @@ import { Vector2D, AIGameState, PlayerRole } from '../types'
 import { PlayerData, GAME_CONFIG, Team } from '../../../../shared/src/types'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { SpreadPositionStrategy } from './SpreadPositionStrategy'
+import { PassEvaluator } from '../utils/PassEvaluator'
 
 export class DefensiveStrategy {
   private readonly ourGoal: Vector2D
@@ -58,8 +59,18 @@ export class DefensiveStrategy {
       weReachFirstBallPosition = interceptPoint
     } else {
       // Opponent reaches ball first - assign our player to intercept them
-      const result = this.selectBestInterceptor(remainingPlayers, interceptor, this.ourGoal)
-      roles.set(result.interceptor.id, { goal: 'interceptOpponent', target: result.target })
+      const result = this.selectBestInterceptor(remainingPlayers, interceptor, this.ourGoal, ball)
+
+      // Simple rule: if close to ball (< 60px), go directly after it
+      const distToBall = InterceptionCalculator.distance(result.interceptor.position, ball.position)
+      const BALL_PURSUIT_THRESHOLD = 60
+
+      if (distToBall < BALL_PURSUIT_THRESHOLD) {
+        roles.set(result.interceptor.id, { goal: 'getBall', target: ball.position })
+      } else {
+        roles.set(result.interceptor.id, { goal: 'interceptOpponent', target: result.target })
+      }
+
       remainingPlayers = remainingPlayers.filter(p => p.id !== result.interceptor.id)
       remainingOpponents = remainingOpponents.filter(o => o.id !== interceptor.id)
     }
@@ -77,16 +88,28 @@ export class DefensiveStrategy {
         roles.set(p.id, this.getDefensivePassReceivePosition(sortedOpp[i], this.ourGoal))
       })
 
+      // Calculate opponent goal for pass evaluation
+      const opponentGoal: Vector2D = {
+        x: this.ourGoal.x === 0 ? GAME_CONFIG.FIELD_WIDTH : 0,
+        y: GAME_CONFIG.FIELD_HEIGHT / 2,
+      }
+
+      // Calculate pass options for offensive players
+      const passOptions = PassEvaluator.evaluatePassOptions(
+        weReachFirstBallPosition,
+        offensive,
+        remainingOpponents,
+        opponentGoal
+      )
+
       const spreadRoles = SpreadPositionStrategy.getSpreadPassReceivePositions(
         offensive,
-        weReachFirstBallPosition,
-        remainingOpponents,
-        this.ourGoal
+        passOptions
       )
       spreadRoles.forEach((role, playerId) => roles.set(playerId, role))
     } else {
       // Defensive marking: mark all opponents
-      const markingRoles = this.getOpponentMarking(remainingPlayers, remainingOpponents, this.ourGoal)
+      const markingRoles = this.getOpponentMarking(remainingPlayers, remainingOpponents, ball.position, this.ourGoal)
       markingRoles.forEach((role, playerId) => roles.set(playerId, role))
     }
 
@@ -137,7 +160,7 @@ export class DefensiveStrategy {
 
     const direction = dist < 1 ? { x: 1, y: 0 } : { x: dx / dist, y: dy / dist }
 
-    return (t: number) => InterceptionCalculator.predictOpponentBallPosition(opponent.position, direction, t)
+    return (t: number) => InterceptionCalculator.predictPlayerBallPosition(opponent.position, direction, t)
   }
 
   /**
@@ -147,7 +170,8 @@ export class DefensiveStrategy {
   private selectBestInterceptor(
     myPlayers: PlayerData[],
     opponent: PlayerData,
-    ourGoal: Vector2D
+    ourGoal: Vector2D,
+    ball: { position: Vector2D; velocity: Vector2D }
   ): { interceptor: PlayerData; target: Vector2D } {
     const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
     const currentBallPos = predictPath(0)
@@ -207,12 +231,14 @@ export class DefensiveStrategy {
 
   /**
    * Get one-to-one opponent marking assignments
-   * Prioritizes opponents by distance to goal (most dangerous first)
-   * Then assigns best interceptor to each opponent
+   * Positioning strategy:
+   * - In defensive third (close to our goal): Mark tightly (intercept opponent)
+   * - In other areas: Position between opponent, ball, and goal (zonal defense)
    */
   private getOpponentMarking(
     ownRemainingPlayers: PlayerData[],
     opponentRemainingPlayers: PlayerData[],
+    ballPosition: Vector2D,
     ourGoal: Vector2D
   ): Map<string, PlayerRole> {
     const roles = new Map<string, PlayerRole>()
@@ -222,6 +248,11 @@ export class DefensiveStrategy {
     // Track which players have been assigned
     const assignedPlayers = new Set<string>()
 
+    // Calculate defensive third boundary (1/3 of field from our goal)
+    const defensiveThirdBoundary = this.teamId === 'blue'
+      ? GAME_CONFIG.FIELD_WIDTH / 3
+      : (GAME_CONFIG.FIELD_WIDTH * 2) / 3
+
     // Sort opponents by distance to our goal (closest = most dangerous = highest priority)
     const sortedOpponents = [...opponentRemainingPlayers].sort((a, b) => {
       const aDist = InterceptionCalculator.distance(a.position, ourGoal)
@@ -229,25 +260,53 @@ export class DefensiveStrategy {
       return aDist - bDist
     })
 
-    // For each opponent (in priority order), assign best interceptor
+    // For each opponent (in priority order), assign best defender
     for (const opponent of sortedOpponents) {
       // Get available players (not yet assigned)
       const availablePlayers = ownRemainingPlayers.filter(p => !assignedPlayers.has(p.id))
 
       if (availablePlayers.length === 0) break
 
-      // Find best interceptor for this opponent
-      const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
-      const currentPos = predictPath(0)
+      // Check if opponent is in defensive third
+      const opponentInDefensiveThird = this.teamId === 'blue'
+        ? opponent.position.x < defensiveThirdBoundary
+        : opponent.position.x > defensiveThirdBoundary
 
-      const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
-        availablePlayers,
-        predictPath,
-        currentPos
-      )
+      let markingTarget: Vector2D
+      let assignedPlayer: PlayerData
 
-      assignedPlayers.add(interceptor.id)
-      roles.set(interceptor.id, { goal: 'markOpponent', target: interceptPoint })
+      if (opponentInDefensiveThird) {
+        // Close marking: Intercept opponent's path to goal
+        const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
+        const currentPos = predictPath(0)
+
+        const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
+          availablePlayers,
+          predictPath,
+          currentPos
+        )
+
+        assignedPlayer = interceptor
+        markingTarget = interceptPoint
+      } else {
+        // Zonal marking: Position between opponent, ball, and goal
+        markingTarget = this.getZonalMarkingPosition(opponent, ballPosition, ourGoal)
+
+        // Assign closest available player
+        assignedPlayer = availablePlayers[0]
+        let closestDist = InterceptionCalculator.distance(assignedPlayer.position, markingTarget)
+
+        for (const player of availablePlayers) {
+          const dist = InterceptionCalculator.distance(player.position, markingTarget)
+          if (dist < closestDist) {
+            assignedPlayer = player
+            closestDist = dist
+          }
+        }
+      }
+
+      assignedPlayers.add(assignedPlayer.id)
+      roles.set(assignedPlayer.id, { goal: 'markOpponent', target: markingTarget })
     }
 
     // Any unassigned players stay in defensive position
@@ -258,5 +317,41 @@ export class DefensiveStrategy {
     }
 
     return roles
+  }
+
+  /**
+   * Calculate zonal marking position between opponent, ball, and goal
+   * Position is behind both opponent and ball, closer to goal
+   */
+  private getZonalMarkingPosition(
+    opponent: PlayerData,
+    ballPosition: Vector2D,
+    ourGoal: Vector2D
+  ): Vector2D {
+    // Get the point between opponent and goal (60% toward goal from opponent)
+    const toGoalX = ourGoal.x - opponent.position.x
+    const toGoalY = ourGoal.y - opponent.position.y
+    const baseX = opponent.position.x + toGoalX * 0.6
+    const baseY = opponent.position.y + toGoalY * 0.6
+
+    // Adjust to also be behind ball if ball is closer to our goal
+    const ballDistToGoal = InterceptionCalculator.distance(ballPosition, ourGoal)
+    const opponentDistToGoal = InterceptionCalculator.distance(opponent.position, ourGoal)
+
+    if (ballDistToGoal < opponentDistToGoal) {
+      // Ball is closer to our goal, position between ball and goal too
+      const toBallGoalX = ourGoal.x - ballPosition.x
+      const toBallGoalY = ourGoal.y - ballPosition.y
+      const ballDefenseX = ballPosition.x + toBallGoalX * 0.4
+      const ballDefenseY = ballPosition.y + toBallGoalY * 0.4
+
+      // Average the two defensive positions (between opponent-goal and ball-goal)
+      return {
+        x: (baseX + ballDefenseX) / 2,
+        y: (baseY + ballDefenseY) / 2,
+      }
+    }
+
+    return { x: baseX, y: baseY }
   }
 }

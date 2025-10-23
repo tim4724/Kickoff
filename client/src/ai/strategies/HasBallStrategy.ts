@@ -8,7 +8,7 @@
 import { Vector2D, PlayerRole } from '../types'
 import { PlayerData, GAME_CONFIG } from '../../../../shared/src/types'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
-import { PassEvaluator } from '../utils/PassEvaluator'
+import { PassEvaluator, PassOption } from '../utils/PassEvaluator'
 
 export class HasBallStrategy {
   /**
@@ -18,13 +18,15 @@ export class HasBallStrategy {
    * @param teammates - Teammates (excluding carrier)
    * @param opponents - Opponent players
    * @param opponentGoal - Target goal position
+   * @param passOptions - Pre-calculated pass options (optional, will calculate if not provided)
    * @returns Role assignment for the ball carrier
    */
   static decideBallCarrierAction(
     carrier: PlayerData,
     teammates: PlayerData[],
     opponents: PlayerData[],
-    opponentGoal: Vector2D
+    opponentGoal: Vector2D,
+    passOptions?: PassOption[]
   ): PlayerRole {
     const distToGoal = InterceptionCalculator.distance(carrier.position, opponentGoal)
 
@@ -53,7 +55,13 @@ export class HasBallStrategy {
 
     // Step 3: If path is blocked, try to pass
     if (isPathBlocked) {
-      const passTarget = this.findBestPassTarget(carrier, teammates, opponents, opponentGoal)
+      const passTarget = this.findBestPassTarget(
+        carrier,
+        teammates,
+        opponents,
+        opponentGoal,
+        passOptions
+      )
 
       if (passTarget) {
         return { goal: 'pass', target: passTarget, shootPower: 0.5 }
@@ -96,7 +104,7 @@ export class HasBallStrategy {
 
     // Predict carrier's path to goal (moving at player speed)
     const predictCarrierPosition = (t: number): Vector2D => {
-      return InterceptionCalculator.predictOpponentBallPosition(
+      return InterceptionCalculator.predictPlayerBallPosition(
         carrier.position,
         { x: dirX, y: dirY },
         t
@@ -127,22 +135,33 @@ export class HasBallStrategy {
    * @param teammates - Available teammates
    * @param opponents - Opponent players
    * @param opponentGoal - Target goal
+   * @param passOptions - Pre-calculated pass options (optional, will calculate if not provided)
    * @returns Best pass target position, or null if no viable pass exists
    */
   private static findBestPassTarget(
     carrier: PlayerData,
     teammates: PlayerData[],
     opponents: PlayerData[],
-    opponentGoal: Vector2D
+    opponentGoal: Vector2D,
+    passOptions?: PassOption[]
   ): Vector2D | null {
-    // Use PassEvaluator for consistent pass evaluation logic
-    const options = PassEvaluator.evaluatePassOptions(
-      carrier.position,
-      teammates,
-      opponents,
-      opponentGoal,
-      GAME_CONFIG.MIN_SHOOT_SPEED
-    )
+    // Use pre-calculated options if available, otherwise calculate now
+    let options = passOptions
+
+    if (!options) {
+      // Calculate actual ball position (ball is POSSESSION_BALL_OFFSET ahead of player)
+      const actualBallPosition = {
+        x: carrier.position.x + Math.cos(carrier.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET,
+        y: carrier.position.y + Math.sin(carrier.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET,
+      }
+
+      options = PassEvaluator.evaluatePassOptions(
+        actualBallPosition,
+        teammates,
+        opponents,
+        opponentGoal
+      )
+    }
 
     return PassEvaluator.findBestPassTarget(options)
   }

@@ -10,9 +10,9 @@
  * 3. Ensure spacing by preferring positions not already taken
  */
 
-import { Vector2D, PlayerRole } from '../types'
-import { PlayerData, GAME_CONFIG } from '../../../../shared/src/types'
-import { PassEvaluator } from '../utils/PassEvaluator'
+import { PlayerRole } from '../types'
+import { PlayerData } from '../../../../shared/src/types'
+import { PassOption } from '../utils/PassEvaluator'
 
 export class SpreadPositionStrategy {
   /**
@@ -20,16 +20,12 @@ export class SpreadPositionStrategy {
    * Uses PassEvaluator to find optimal pass-to-space positions
    *
    * @param offensivePlayers - Players to position for receiving passes
-   * @param ballTarget - Where ball will be (or is)
-   * @param opponents - Opponent players
-   * @param ourGoal - Our goal position (to determine forward direction)
+   * @param passOptions - Pre-calculated pass options (required)
    * @returns Map of player ID to role assignment
    */
   static getSpreadPassReceivePositions(
     offensivePlayers: PlayerData[],
-    ballTarget: Vector2D,
-    opponents: PlayerData[],
-    ourGoal: Vector2D
+    passOptions: PassOption[]
   ): Map<string, PlayerRole> {
     const roles = new Map<string, PlayerRole>()
 
@@ -37,25 +33,14 @@ export class SpreadPositionStrategy {
       return roles
     }
 
-    // Determine opponent goal (for forward direction in PassEvaluator)
-    const opponentGoal: Vector2D = {
-      x: ourGoal.x === 0 ? GAME_CONFIG.FIELD_WIDTH : 0,
-      y: GAME_CONFIG.FIELD_HEIGHT / 2,
-    }
-
-    // Use PassEvaluator to find optimal pass-to-space positions
-    const passOptions = PassEvaluator.evaluatePassOptions(
-      ballTarget,
-      offensivePlayers,
-      opponents,
-      opponentGoal
-    )
+    // Use provided pass options
+    const options = passOptions
 
     // Track assigned players to avoid duplicates
     const assignedPlayers = new Set<string>()
 
     // Assign each player to their best available position
-    for (const option of passOptions) {
+    for (const option of options) {
       if (assignedPlayers.has(option.teammate.id)) {
         // This player already has a position - skip to next option
         continue

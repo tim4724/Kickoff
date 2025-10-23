@@ -7,6 +7,7 @@ import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { FieldRenderer } from '../utils/FieldRenderer'
 import { BallRenderer } from '../utils/BallRenderer'
 import { CameraManager } from '../utils/CameraManager'
+import { AIDebugRenderer } from '../utils/AIDebugRenderer'
 
 /**
  * Base Game Scene
@@ -29,6 +30,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
   // Camera manager
   protected cameraManager!: CameraManager
+
+  // AI Debug renderer
+  protected aiDebugRenderer!: AIDebugRenderer
+  protected debugEnabled: boolean = false
 
   // Mobile controls
   protected joystick!: VirtualJoystick
@@ -59,6 +64,11 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected abstract handleShootAction(power: number): void
   protected abstract cleanupGameState(): void
 
+  // Optional method for AI debug - subclasses can override if they have AI
+  protected updateAIDebugLabels(): void {
+    // Default: no-op. Subclasses with AI should override this.
+  }
+
   create() {
     console.log(`🎮 ${this.scene.key} - Creating...`)
 
@@ -71,6 +81,9 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Setup camera manager
     this.cameraManager = new CameraManager(this)
+
+    // Initialize AI debug renderer (pass UI camera so debug elements only show on game camera)
+    this.aiDebugRenderer = new AIDebugRenderer(this, this.cameraManager.getUICamera())
 
     // Create visual elements
     FieldRenderer.createField(this, this.gameObjects, this.cameraManager.getUICamera())
@@ -165,6 +178,13 @@ export abstract class BaseGameScene extends Phaser.Scene {
       } else {
         this.switchToNextTeammate()
       }
+    })
+
+    // Toggle AI debug labels with 'L' key
+    this.input.keyboard!.on('keydown-L', () => {
+      this.debugEnabled = !this.debugEnabled
+      this.aiDebugRenderer.setEnabled(this.debugEnabled)
+      console.log('🐛 AI Debug Labels:', this.debugEnabled ? 'ON' : 'OFF')
     })
   }
 
@@ -466,6 +486,11 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Auto-switch on possession change
     this.checkAutoSwitchOnPossession(state)
+
+    // Update AI debug visualization if enabled
+    if (this.debugEnabled) {
+      this.updateAIDebugLabels()
+    }
   }
 
   shutdown() {

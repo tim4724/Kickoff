@@ -120,6 +120,7 @@ export class NetworkManager {
 
       // Get room name (test room ID or production room)
       const roomName = this.getRoomName()
+      console.log('[NetworkManager] Connecting with roomName:', roomName)
 
       // Build options object with roomName and optional timeScale (for tests)
       const options: any = { roomName }
@@ -153,7 +154,7 @@ export class NetworkManager {
       })
 
       // Handle room leave
-      this.room.onLeave((code) => {
+      this.room.onLeave(() => {
         this.connected = false
       })
 

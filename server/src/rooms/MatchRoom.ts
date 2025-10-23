@@ -24,7 +24,8 @@ export class MatchRoom extends Room<GameState> {
   private timeScale: number = 1.0
 
   async onCreate(options: any) {
-    console.log('Match room created:', this.roomId, options)
+    console.log('🏗️  Match room created:', this.roomId, 'with options:', options)
+    console.log('📋 Room metadata will be set to:', { roomName: options.roomName || 'match' })
 
     // Apply time scale from environment variable or options (for tests)
     const envTimeScale = process.env.TEST_TIME_SCALE
@@ -65,6 +66,8 @@ export class MatchRoom extends Room<GameState> {
   }
 
   async onJoin(client: Client, options: any) {
+    console.log(`👋 Player joining: ${client.sessionId} (room: ${this.roomId}, clients: ${this.clients.length}/${this.maxClients})`)
+
     // Add player to game state (wait for completion to ensure atomic team assignment)
     const playerInfo = await this.state.addPlayer(client.sessionId)
 
@@ -75,7 +78,7 @@ export class MatchRoom extends Room<GameState> {
       team: playerInfo.team,
     })
 
-    console.log(`🎮 Player ${client.sessionId} ready on ${playerInfo.team} team`)
+    console.log(`🎮 Player ${client.sessionId} ready on ${playerInfo.team} team (${this.clients.length}/${this.maxClients} players)`)
 
     // Count human players and check team distribution
     let humanPlayerCount = 0

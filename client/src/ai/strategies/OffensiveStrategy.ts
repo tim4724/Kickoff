@@ -15,6 +15,7 @@ import { GAME_CONFIG, Team } from '../../../../shared/src/types'
 import { HasBallStrategy } from './HasBallStrategy'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { SpreadPositionStrategy } from './SpreadPositionStrategy'
+import { PassEvaluator, PassOption } from '../utils/PassEvaluator'
 
 export class OffensiveStrategy {
   private readonly opponentGoal: Vector2D
@@ -31,9 +32,10 @@ export class OffensiveStrategy {
    * Execute offensive strategy
    *
    * Flow:
-   * 1. Assign ball carrier or interceptor role
-   * 2. Remove assigned player from myPlayers
-   * 3. Spread position remaining players
+   * 1. Calculate pass options once (shared by ball carrier and off-ball players)
+   * 2. Assign ball carrier or interceptor role
+   * 3. Remove assigned player from myPlayers
+   * 4. Spread position remaining players using pre-calculated pass options
    *
    * @param gameState - Current game state
    * @returns Map of player ID to role assignment
@@ -46,7 +48,7 @@ export class OffensiveStrategy {
     const opponents = this.teamId === 'blue' ? gameState.redPlayers : gameState.bluePlayers
     const ball = gameState.ball
 
-    let ballFocusPosition: Vector2D
+    let passOptions: PassOption[] = []
 
     // Step 1: Assign ball carrier or interceptor role
     const ballCarrier = ball.possessedBy
@@ -57,15 +59,23 @@ export class OffensiveStrategy {
       // We have possession - ball carrier decides action
       const teammates = myPlayers.filter(p => p.id !== ballCarrier.id)
 
-      const carrierRole = HasBallStrategy.decideBallCarrierAction(
-        ballCarrier,
+      // Calculate pass options once for both ball carrier and off-ball positioning
+      passOptions = PassEvaluator.evaluatePassOptions(
+        ball.position,
         teammates,
         opponents,
         this.opponentGoal
       )
 
+      const carrierRole = HasBallStrategy.decideBallCarrierAction(
+        ballCarrier,
+        teammates,
+        opponents,
+        this.opponentGoal,
+        passOptions
+      )
+
       roles.set(ballCarrier.id, carrierRole)
-      ballFocusPosition = ballCarrier.position
 
       // Remove ball carrier from myPlayers
       myPlayers = teammates
@@ -82,24 +92,26 @@ export class OffensiveStrategy {
       )
 
       roles.set(interceptor.id, { goal: 'receive-pass', target: interceptPoint })
-      ballFocusPosition = interceptPoint
 
       // Remove interceptor from myPlayers
-      myPlayers = myPlayers.filter(p => p.id !== interceptor.id)
+      const teammates = myPlayers.filter(p => p.id !== interceptor.id)
+      myPlayers = teammates
+
+      // Calculate pass options from intercept position so teammates can move proactively
+      // This makes off-ball players position themselves for passes before ball is received
+      passOptions = PassEvaluator.evaluatePassOptions(
+        interceptPoint,
+        teammates,
+        opponents,
+        this.opponentGoal
+      )
     }
 
-    // Step 2: Spread position remaining players
+    // Step 2: Spread position remaining players using pre-calculated pass options
     if (myPlayers.length > 0) {
-      const ourGoal: Vector2D = {
-        x: this.teamId === 'blue' ? 0 : GAME_CONFIG.FIELD_WIDTH,
-        y: GAME_CONFIG.FIELD_HEIGHT / 2,
-      }
-
       const spreadRoles = SpreadPositionStrategy.getSpreadPassReceivePositions(
         myPlayers,
-        ballFocusPosition,
-        opponents,
-        ourGoal
+        passOptions
       )
 
       spreadRoles.forEach((role, playerId) => roles.set(playerId, role))
@@ -107,5 +119,4 @@ export class OffensiveStrategy {
 
     return roles
   }
-
 }

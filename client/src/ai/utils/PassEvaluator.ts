@@ -30,20 +30,21 @@ export class PassEvaluator {
    * @param teammates - Teammates to consider as pass receivers
    * @param opponents - Opponent players
    * @param opponentGoal - Target goal position
-   * @param _passSpeed - (Unused) Pass speed is calculated adaptively based on distance
    * @returns Array of viable pass options sorted by score (best first)
    */
   static evaluatePassOptions(
     ballPosition: Vector2D,
     teammates: PlayerData[],
     opponents: PlayerData[],
-    opponentGoal: Vector2D,
-    _passSpeed: number = GAME_CONFIG.MIN_SHOOT_SPEED
+    opponentGoal: Vector2D
   ): PassOption[] {
     if (teammates.length === 0) return []
 
     const allPlayers = [...teammates, ...opponents]
     const options: PassOption[] = []
+    const PASS_POWER = 0.5
+    const passSpeed = GAME_CONFIG.MIN_SHOOT_SPEED +
+      (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * PASS_POWER
 
     for (const teammate of teammates) {
       const candidates = this.generateCandidatePositions(teammate, opponentGoal)
@@ -54,13 +55,6 @@ export class PassEvaluator {
         const passDistance = Math.sqrt(dx * dx + dy * dy)
 
         if (passDistance < 50) continue
-
-        // Pass speed scales with distance: 600-1400 px/s
-        const passSpeed = Math.min(
-          GAME_CONFIG.MIN_SHOOT_SPEED * 1.75,
-          GAME_CONFIG.MIN_SHOOT_SPEED * 0.75 + passDistance * 2
-        )
-
         const predictBallPosition = this.createBallPredictor(ballPosition, position, passSpeed)
         const { interceptor } = InterceptionCalculator.calculateInterception(
           allPlayers,
@@ -70,7 +64,6 @@ export class PassEvaluator {
 
         if (interceptor.id !== teammate.id) continue
 
-        // Simplified scoring
         const forwardProgress =
           InterceptionCalculator.distance(ballPosition, opponentGoal) -
           InterceptionCalculator.distance(position, opponentGoal)

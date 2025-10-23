@@ -39,6 +39,7 @@ export class GameEngine {
   // Event callbacks
   private onGoalCallback?: (event: GoalEvent) => void
   private onMatchEndCallback?: () => void
+  private onShootCallback?: (playerId: string, power: number) => void
 
   // Goal reset timer
   private goalResetTimerId?: number
@@ -289,7 +290,12 @@ export class GameEngine {
 
         // Handle action
         if (mergedInput.action) {
-          this.physics.handlePlayerAction(player, this.state.ball, mergedInput.actionPower)
+          this.physics.handlePlayerAction(
+            player,
+            this.state.ball,
+            mergedInput.actionPower,
+            this.onShootCallback
+          )
         }
       }
     })
@@ -447,5 +453,12 @@ export class GameEngine {
    */
   onMatchEnd(callback: () => void): void {
     this.onMatchEndCallback = callback
+  }
+
+  /**
+   * Set shoot callback
+   */
+  onShoot(callback: (playerId: string, power: number) => void): void {
+    this.onShootCallback = callback
   }
 }

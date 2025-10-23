@@ -18,7 +18,7 @@ export class InterceptionCalculator {
    * Checks all players at each time step, returns immediately when first match found
    * Much more efficient than calculating all time steps for each player individually
    *
-   * IMPORTANT: Accounts for POSSESSION_RADIUS - players can capture ball when within 70px,
+   * IMPORTANT: Accounts for PRESSURE_RADIUS - players can capture ball when within 70px,
    * not just at exact position. This is critical for accurate pass/interception calculations.
    */
   static calculateInterception(
@@ -27,31 +27,40 @@ export class InterceptionCalculator {
     fallbackPosition: Vector2D
   ): { interceptor: PlayerData; interceptPoint: Vector2D } {
     const playerSpeed = GAME_CONFIG.PLAYER_SPEED
-    const possessionRadius = GAME_CONFIG.POSSESSION_RADIUS
+    const pressureRadius = GAME_CONFIG.PRESSURE_RADIUS
     const maxLookAhead = 4.0 // seconds
     const timeStep = 0.1 // check every 0.1 seconds
 
-    // Check each time step, trying all players before moving to next time
+    // For each time step, check if any player can reach the ball
     for (let t = timeStep; t <= maxLookAhead; t += timeStep) {
       const futurePos = predictPosition(t)
+      const maxPlayerTravel = playerSpeed * t // How far can a player travel in time t?
 
-      // Check if ANY player can get within capture range at this time
+      // Find ALL players who can intercept at this time, then pick the closest
+      let closestInterceptor: PlayerData | null = null
+      let closestDistance = Infinity
+
       for (const player of players) {
-        const distance = this.distance(player.position, futurePos)
+        const distanceToBall = this.distance(player.position, futurePos)
 
-        // Account for possession radius - player doesn't need to reach exact position
-        // They just need to get within POSSESSION_RADIUS (70px) to capture the ball
-        const captureDistance = Math.max(0, distance - possessionRadius)
-        const timeToReach = captureDistance / playerSpeed
-
-        if (timeToReach <= t) {
-          // Found first player who can intercept! Return immediately
-          return { interceptor: player, interceptPoint: futurePos }
+        // Can this player reach the ball (within pressure radius) in time t?
+        if (distanceToBall - pressureRadius <= maxPlayerTravel) {
+          // This player CAN intercept - check if they're closest
+          if (distanceToBall < closestDistance) {
+            closestInterceptor = player
+            closestDistance = distanceToBall
+          }
         }
+      }
+
+      // If any player can intercept at this time, return the closest one
+      if (closestInterceptor) {
+        return { interceptor: closestInterceptor, interceptPoint: futurePos }
       }
     }
 
-    // No interception possible, return first player with fallback position
+    // No interception possible within time window, return first player with fallback position
+    // This ensures we always have an assignment, even if suboptimal
     return { interceptor: players[0], interceptPoint: fallbackPosition }
   }
 
@@ -64,7 +73,10 @@ export class InterceptionCalculator {
     startVel: Vector2D,
     timeSeconds: number
   ): Vector2D {
-    const dt = 1 / GAME_CONFIG.TICK_RATE // delta time per tick
+    // IMPORTANT: Use 60Hz physics timestep to match GameEngine's FIXED_TIMESTEP
+    // TICK_RATE (30Hz) is for network updates, not physics simulation
+    const PHYSICS_HZ = 60
+    const dt = 1 / PHYSICS_HZ // 0.01666s per step (matches GameEngine)
     const steps = Math.ceil(timeSeconds / dt)
 
     // Physics config matching game engine
@@ -102,7 +114,7 @@ export class InterceptionCalculator {
    * Predict ball position when opponent has possession and moves in a direction
    * Ball stays POSSESSION_BALL_OFFSET ahead of opponent as they move at PLAYER_SPEED
    */
-  static predictOpponentBallPosition(
+  static predictPlayerBallPosition(
     opponentPos: Vector2D,
     direction: Vector2D,
     timeSeconds: number

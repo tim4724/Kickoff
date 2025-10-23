@@ -22,8 +22,11 @@ const gameServer = new Server({
   server: httpServer,
 })
 
-// Register room handlers with metadata filtering for test isolation
-// filterBy checks options, not metadata - use options.roomName for matching
+// Register room handlers
+// filterBy(['roomName']) creates separate room instances for each unique roomName
+// This allows:
+// - Tests: Each test gets isolated room (unique roomName from worker index)
+// - Production: All players with same roomName join same room
 gameServer.define('match', MatchRoom).filterBy(['roomName'])
 
 // Colyseus monitor (dev tool)
