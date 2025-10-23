@@ -94,9 +94,6 @@ export class DefensiveStrategy {
 
       const spreadRoles = SpreadPositionStrategy.getSpreadPassReceivePositions(
         offensive,
-        weReachFirstBallPosition,
-        remainingOpponents,
-        this.ourGoal,
         passOptions
       )
       spreadRoles.forEach((role, playerId) => roles.set(playerId, role))

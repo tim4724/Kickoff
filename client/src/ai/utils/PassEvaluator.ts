@@ -42,6 +42,9 @@ export class PassEvaluator {
 
     const allPlayers = [...teammates, ...opponents]
     const options: PassOption[] = []
+    const PASS_POWER = 0.5
+    const passSpeed = GAME_CONFIG.MIN_SHOOT_SPEED +
+      (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * PASS_POWER
 
     for (const teammate of teammates) {
       const candidates = this.generateCandidatePositions(teammate, opponentGoal)
@@ -52,15 +55,6 @@ export class PassEvaluator {
         const passDistance = Math.sqrt(dx * dx + dy * dy)
 
         if (passDistance < 50) continue
-
-        // Use actual pass power (0.5) to match what AI will actually use
-        // This matches HasBallStrategy which uses shootPower: 0.5 for passes
-        const PASS_POWER = 0.5
-        const passSpeed =
-          GAME_CONFIG.MIN_SHOOT_SPEED +
-          (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * PASS_POWER
-        // Result: 800 + (2000 - 800) * 0.5 = 1400 px/s (matches actual shooting)
-
         const predictBallPosition = this.createBallPredictor(ballPosition, position, passSpeed)
         const { interceptor } = InterceptionCalculator.calculateInterception(
           allPlayers,
@@ -70,7 +64,6 @@ export class PassEvaluator {
 
         if (interceptor.id !== teammate.id) continue
 
-        // Simplified scoring
         const forwardProgress =
           InterceptionCalculator.distance(ballPosition, opponentGoal) -
           InterceptionCalculator.distance(position, opponentGoal)

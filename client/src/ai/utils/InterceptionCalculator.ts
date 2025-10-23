@@ -59,9 +59,8 @@ export class InterceptionCalculator {
       }
     }
 
-    // No interception possible, return first player with fallback position
-    // TODO return null?
-    // TODO Remove fallback-position
+    // No interception possible within time window, return first player with fallback position
+    // This ensures we always have an assignment, even if suboptimal
     return { interceptor: players[0], interceptPoint: fallbackPosition }
   }
 

@@ -29,8 +29,8 @@ export interface AIDecision {
   moveX: number
   moveY: number
 
-  // Shooting power (null = no shoot, 0.0 = min power, 1.0 = max power)
-  shootPower: number | null // 0.0 to 1.0, or null for no shoot
+  // Shooting power (null = no shoot, 0.0-1.0 = power level)
+  shootPower: number | null
 }
 
 /**
@@ -44,7 +44,7 @@ export type PlayerGoal = string
 export interface PlayerRole {
   goal: PlayerGoal
   target: Vector2D
-  shootPower?: number | null // 0.0 to 1.0 (shooting power), or null/undefined for no shoot
+  shootPower?: number | null // 0.0-1.0 shooting power, or null for no shoot
 }
 
 /**
@@ -53,50 +53,4 @@ export interface PlayerRole {
 export interface Vector2D {
   x: number
   y: number
-}
-
-/**
- * Action score returned by scorers
- */
-export interface ActionScore {
-  action: 'shoot' | 'dribble' | 'pass' | 'move'
-  score: number // 0-1, higher is better
-  target: Vector2D // Where to aim/move
-  reasoning: string // Debug info
-  metadata?: Record<string, any> // Action-specific data
-}
-
-/**
- * Context provided to action scorers
- */
-export interface ActionContext {
-  // The player making the decision
-  me: PlayerData
-
-  // Ball carrier (if someone has possession)
-  carrier?: PlayerData
-
-  // Opponent ball carrier (if opponent has possession)
-  opponentCarrier?: PlayerData
-
-  // My teammates (excluding me)
-  teammates: PlayerData[]
-
-  // Opponent players
-  opponents: PlayerData[]
-
-  // Ball state
-  ball: BallData
-
-  // Goal positions
-  opponentGoal: Vector2D
-  ownGoal: Vector2D
-
-  // Match state
-  matchTime: number
-  scoreBlue: number
-  scoreRed: number
-
-  // Additional metadata
-  metadata?: Record<string, any>
 }

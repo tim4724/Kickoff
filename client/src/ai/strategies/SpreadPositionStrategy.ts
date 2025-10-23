@@ -10,9 +10,9 @@
  * 3. Ensure spacing by preferring positions not already taken
  */
 
-import { Vector2D, PlayerRole } from '../types'
-import { PlayerData, GAME_CONFIG } from '../../../../shared/src/types'
-import { PassEvaluator, PassOption } from '../utils/PassEvaluator'
+import { PlayerRole } from '../types'
+import { PlayerData } from '../../../../shared/src/types'
+import { PassOption } from '../utils/PassEvaluator'
 
 export class SpreadPositionStrategy {
   /**
@@ -20,17 +20,11 @@ export class SpreadPositionStrategy {
    * Uses PassEvaluator to find optimal pass-to-space positions
    *
    * @param offensivePlayers - Players to position for receiving passes
-   * @param ballTarget - Where ball will be (or is)
-   * @param opponents - Opponent players
-   * @param ourGoal - Our goal position (to determine forward direction)
    * @param passOptions - Pre-calculated pass options (required)
    * @returns Map of player ID to role assignment
    */
   static getSpreadPassReceivePositions(
     offensivePlayers: PlayerData[],
-    ballTarget: Vector2D,
-    opponents: PlayerData[],
-    ourGoal: Vector2D,
     passOptions: PassOption[]
   ): Map<string, PlayerRole> {
     const roles = new Map<string, PlayerRole>()

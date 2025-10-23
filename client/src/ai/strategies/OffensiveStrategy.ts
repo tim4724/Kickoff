@@ -48,7 +48,6 @@ export class OffensiveStrategy {
     const opponents = this.teamId === 'blue' ? gameState.redPlayers : gameState.bluePlayers
     const ball = gameState.ball
 
-    let ballFocusPosition: Vector2D
     let passOptions: PassOption[] = []
 
     // Step 1: Assign ball carrier or interceptor role
@@ -60,15 +59,9 @@ export class OffensiveStrategy {
       // We have possession - ball carrier decides action
       const teammates = myPlayers.filter(p => p.id !== ballCarrier.id)
 
-      // Calculate actual ball position (ball is POSSESSION_BALL_OFFSET ahead of player)
-      const actualBallPosition = {
-        x: ballCarrier.position.x + Math.cos(ballCarrier.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET,
-        y: ballCarrier.position.y + Math.sin(ballCarrier.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET,
-      }
-
       // Calculate pass options once for both ball carrier and off-ball positioning
       passOptions = PassEvaluator.evaluatePassOptions(
-        actualBallPosition,
+        ball.position,
         teammates,
         opponents,
         this.opponentGoal
@@ -83,7 +76,6 @@ export class OffensiveStrategy {
       )
 
       roles.set(ballCarrier.id, carrierRole)
-      ballFocusPosition = ballCarrier.position
 
       // Remove ball carrier from myPlayers
       myPlayers = teammates
@@ -100,7 +92,6 @@ export class OffensiveStrategy {
       )
 
       roles.set(interceptor.id, { goal: 'receive-pass', target: interceptPoint })
-      ballFocusPosition = interceptPoint
 
       // Remove interceptor from myPlayers
       myPlayers = myPlayers.filter(p => p.id !== interceptor.id)
@@ -108,16 +99,8 @@ export class OffensiveStrategy {
 
     // Step 2: Spread position remaining players using pre-calculated pass options
     if (myPlayers.length > 0) {
-      const ourGoal: Vector2D = {
-        x: this.teamId === 'blue' ? 0 : GAME_CONFIG.FIELD_WIDTH,
-        y: GAME_CONFIG.FIELD_HEIGHT / 2,
-      }
-
       const spreadRoles = SpreadPositionStrategy.getSpreadPassReceivePositions(
         myPlayers,
-        ballFocusPosition,
-        opponents,
-        ourGoal,
         passOptions
       )
 
@@ -126,5 +109,4 @@ export class OffensiveStrategy {
 
     return roles
   }
-
 }
