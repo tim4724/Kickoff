@@ -1,6 +1,18 @@
 import Phaser from 'phaser'
+import { sceneRouter } from '../utils/SceneRouter'
 
 export class MenuScene extends Phaser.Scene {
+  // UI element references for responsive layout
+  private background!: Phaser.GameObjects.Rectangle
+  private title!: Phaser.GameObjects.Text
+  private singlePlayerButton!: Phaser.GameObjects.Rectangle
+  private singlePlayerText!: Phaser.GameObjects.Text
+  private multiplayerButton!: Phaser.GameObjects.Rectangle
+  private multiplayerText!: Phaser.GameObjects.Text
+  private aiOnlyButton!: Phaser.GameObjects.Rectangle
+  private aiOnlyText!: Phaser.GameObjects.Text
+  private versionText!: Phaser.GameObjects.Text
+
   constructor() {
     super({ key: 'MenuScene' })
   }
@@ -35,122 +47,204 @@ export class MenuScene extends Phaser.Scene {
     console.log('📱 Fullscreen mode requested')
   }
 
+  /**
+   * Layout all UI elements responsively based on current screen size
+   * Called on create() and whenever screen size changes (resize/rotation)
+   */
+  private layoutUI(): void {
+    const width = this.scale.width
+    const height = this.scale.height
+    const centerX = width / 2
+    const centerY = height / 2
+
+    // Determine if portrait or landscape
+    const isPortrait = height > width
+
+    // Scale factor based on screen size (relative to standard 1920x1080)
+    const scaleFactor = Math.min(width / 1920, height / 1080)
+
+    // Button dimensions scale with screen size but have max limits
+    const buttonWidth = Math.min(400 * scaleFactor, width * 0.8)
+    const buttonHeight = Math.min(80 * scaleFactor, 100)
+
+    // Font sizes scale with screen size
+    const titleFontSize = Math.max(32, Math.min(72 * scaleFactor, 120))
+    const buttonFontSize = Math.max(18, Math.min(32 * scaleFactor, 48))
+    const versionFontSize = Math.max(12, Math.min(16 * scaleFactor, 20))
+
+    // Update background
+    this.background.setSize(width, height)
+    this.background.setPosition(centerX, centerY)
+
+    // Update title
+    this.title.setFontSize(titleFontSize)
+    this.title.setPosition(centerX, height * 0.2)
+
+    // Adjust vertical spacing based on orientation
+    let buttonSpacing: number
+    if (isPortrait) {
+      // Portrait: tighter spacing
+      buttonSpacing = height * 0.15
+    } else {
+      // Landscape: more generous spacing
+      buttonSpacing = height * 0.18
+    }
+
+    // Calculate button positions
+    const firstButtonY = isPortrait ? height * 0.4 : height * 0.45
+    const secondButtonY = firstButtonY + buttonSpacing
+    const thirdButtonY = secondButtonY + buttonSpacing
+
+    // Update Single Player Button
+    this.singlePlayerButton.setSize(buttonWidth, buttonHeight)
+    this.singlePlayerButton.setPosition(centerX, firstButtonY)
+
+    this.singlePlayerText.setFontSize(buttonFontSize)
+    this.singlePlayerText.setPosition(centerX, firstButtonY)
+
+    // Update Multiplayer Button
+    this.multiplayerButton.setSize(buttonWidth, buttonHeight)
+    this.multiplayerButton.setPosition(centerX, secondButtonY)
+
+    this.multiplayerText.setFontSize(buttonFontSize)
+    this.multiplayerText.setPosition(centerX, secondButtonY)
+
+    // Update AI-Only Button
+    this.aiOnlyButton.setSize(buttonWidth, buttonHeight)
+    this.aiOnlyButton.setPosition(centerX, thirdButtonY)
+
+    this.aiOnlyText.setFontSize(buttonFontSize)
+    this.aiOnlyText.setPosition(centerX, thirdButtonY)
+
+    // Update version text
+    this.versionText.setFontSize(versionFontSize)
+    this.versionText.setPosition(centerX, height * 0.95)
+
+    console.log(`📐 Layout updated: ${width}x${height} (${isPortrait ? 'portrait' : 'landscape'})`)
+  }
+
   create() {
     const width = this.scale.width
     const height = this.scale.height
 
     // Background
-    this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a1a)
+    this.background = this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a1a)
 
     // Title
-    const title = this.add.text(width / 2, height * 0.25, 'KICKOFF', {
+    this.title = this.add.text(width / 2, height * 0.25, 'KICKOFF', {
       fontSize: '72px',
       color: '#ffffff',
       fontStyle: 'bold',
     })
-    title.setOrigin(0.5)
+    this.title.setOrigin(0.5)
 
     // Single Player Button
-    const singlePlayerButton = this.add.rectangle(
+    this.singlePlayerButton = this.add.rectangle(
       width / 2,
       height * 0.5,
       400,
       80,
       0x0066ff
     )
-    singlePlayerButton.setInteractive({ useHandCursor: true })
+    this.singlePlayerButton.setInteractive({ useHandCursor: true })
 
-    const singlePlayerText = this.add.text(width / 2, height * 0.5, 'Single Player', {
+    this.singlePlayerText = this.add.text(width / 2, height * 0.5, 'Single Player', {
       fontSize: '32px',
       color: '#ffffff',
       fontStyle: 'bold',
     })
-    singlePlayerText.setOrigin(0.5)
+    this.singlePlayerText.setOrigin(0.5)
 
     // Multiplayer Button
-    const multiplayerButton = this.add.rectangle(
+    this.multiplayerButton = this.add.rectangle(
       width / 2,
       height * 0.65,
       400,
       80,
       0xff4444
     )
-    multiplayerButton.setInteractive({ useHandCursor: true })
+    this.multiplayerButton.setInteractive({ useHandCursor: true })
 
-    const multiplayerText = this.add.text(width / 2, height * 0.65, 'Multiplayer', {
+    this.multiplayerText = this.add.text(width / 2, height * 0.65, 'Multiplayer', {
       fontSize: '32px',
       color: '#ffffff',
       fontStyle: 'bold',
     })
-    multiplayerText.setOrigin(0.5)
+    this.multiplayerText.setOrigin(0.5)
 
     // AI-Only Button (Dev Mode)
-    const aiOnlyButton = this.add.rectangle(
+    this.aiOnlyButton = this.add.rectangle(
       width / 2,
       height * 0.8,
       400,
       80,
       0xffaa00
     )
-    aiOnlyButton.setInteractive({ useHandCursor: true })
+    this.aiOnlyButton.setInteractive({ useHandCursor: true })
 
-    const aiOnlyText = this.add.text(width / 2, height * 0.8, 'AI-Only (Dev)', {
+    this.aiOnlyText = this.add.text(width / 2, height * 0.8, 'AI-Only (Dev)', {
       fontSize: '32px',
       color: '#ffffff',
       fontStyle: 'bold',
     })
-    aiOnlyText.setOrigin(0.5)
+    this.aiOnlyText.setOrigin(0.5)
+
+    // Version info
+    this.versionText = this.add.text(width / 2, height * 0.9, 'v0.2.0 - Single Player Update', {
+      fontSize: '16px',
+      color: '#888888',
+    })
+    this.versionText.setOrigin(0.5)
 
     // Button hover effects
-    singlePlayerButton.on('pointerover', () => {
-      singlePlayerButton.setFillStyle(0x0088ff)
+    this.singlePlayerButton.on('pointerover', () => {
+      this.singlePlayerButton.setFillStyle(0x0088ff)
     })
-    singlePlayerButton.on('pointerout', () => {
-      singlePlayerButton.setFillStyle(0x0066ff)
-    })
-
-    multiplayerButton.on('pointerover', () => {
-      multiplayerButton.setFillStyle(0xff6666)
-    })
-    multiplayerButton.on('pointerout', () => {
-      multiplayerButton.setFillStyle(0xff4444)
+    this.singlePlayerButton.on('pointerout', () => {
+      this.singlePlayerButton.setFillStyle(0x0066ff)
     })
 
-    aiOnlyButton.on('pointerover', () => {
-      aiOnlyButton.setFillStyle(0xffcc00)
+    this.multiplayerButton.on('pointerover', () => {
+      this.multiplayerButton.setFillStyle(0xff6666)
     })
-    aiOnlyButton.on('pointerout', () => {
-      aiOnlyButton.setFillStyle(0xffaa00)
+    this.multiplayerButton.on('pointerout', () => {
+      this.multiplayerButton.setFillStyle(0xff4444)
+    })
+
+    this.aiOnlyButton.on('pointerover', () => {
+      this.aiOnlyButton.setFillStyle(0xffcc00)
+    })
+    this.aiOnlyButton.on('pointerout', () => {
+      this.aiOnlyButton.setFillStyle(0xffaa00)
     })
 
     // Button click handlers - Using 'pointerup' for touch device compatibility
     // Note: Touch devices require 'pointerup' for fullscreen requests to work
-    singlePlayerButton.on('pointerup', () => {
+    this.singlePlayerButton.on('pointerup', () => {
       console.log('🎮 Starting Single Player mode')
       this.requestFullscreen()
-      this.scene.start('SinglePlayerScene')
+      sceneRouter.navigateTo('SinglePlayerScene')
     })
 
-    multiplayerButton.on('pointerup', () => {
+    this.multiplayerButton.on('pointerup', () => {
       console.log('🌐 Starting Multiplayer mode')
       this.requestFullscreen()
-      this.scene.start('GameScene')
+      sceneRouter.navigateTo('GameScene')
     })
 
-    aiOnlyButton.on('pointerup', () => {
+    this.aiOnlyButton.on('pointerup', () => {
       console.log('🤖 Starting AI-Only mode')
       this.requestFullscreen()
-      this.scene.start('AIOnlyScene')
+      sceneRouter.navigateTo('AIOnlyScene')
     })
 
-    // Version info
-    const versionText = this.add.text(width / 2, height * 0.9, 'v0.2.0 - Single Player Update', {
-      fontSize: '16px',
-      color: '#888888',
-    })
-    versionText.setOrigin(0.5)
+    // Initial layout
+    this.layoutUI()
 
-    console.log('📋 Menu scene loaded')
+    // Listen for resize events (screen rotation, window resize)
+    this.scale.on('resize', this.handleResize, this)
+
+    console.log('📋 Menu scene loaded with responsive layout')
 
     // Auto-start multiplayer for tests
     if (typeof window !== 'undefined' && (window as any).__testRoomId) {
@@ -159,5 +253,20 @@ export class MenuScene extends Phaser.Scene {
         this.scene.start('GameScene')
       })
     }
+  }
+
+  /**
+   * Handle resize events (called by Phaser when screen size changes)
+   */
+  private handleResize(gameSize: Phaser.Structs.Size): void {
+    console.log(`🔄 Resize detected: ${gameSize.width}x${gameSize.height}`)
+    this.layoutUI()
+  }
+
+  /**
+   * Cleanup: remove resize listener when scene shuts down
+   */
+  shutdown(): void {
+    this.scale.off('resize', this.handleResize, this)
   }
 }

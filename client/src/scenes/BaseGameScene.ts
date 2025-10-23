@@ -27,6 +27,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected scoreText!: Phaser.GameObjects.Text
   protected timerText!: Phaser.GameObjects.Text
   protected controlsHint!: Phaser.GameObjects.Text
+  protected backButton!: Phaser.GameObjects.Container
 
   // Camera manager
   protected cameraManager!: CameraManager
@@ -94,6 +95,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.createUI()
     this.setupInput()
     this.createMobileControls()
+    this.createBackButton()
+    this.scale.on('resize', this.onResize, this)
 
     // Create particle texture for celebrations
     this.createParticleTexture()
@@ -215,6 +218,54 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const buttonObjects = this.actionButton.getGameObjects()
     this.cameraManager.getGameCamera().ignore([...joystickObjects, ...buttonObjects])
     this.uiObjects.push(...joystickObjects, ...buttonObjects)
+  }
+
+  protected createBackButton() {
+    const buttonX = 10
+    const buttonY = 10
+
+    this.backButton = this.add.container(buttonX, buttonY)
+
+    const background = this.add.rectangle(0, 0, 100, 40, 0x000000, 0.5)
+    background.setOrigin(0, 0)
+
+    const text = this.add.text(10, 10, '← Menu', {
+      fontSize: '18px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+    })
+    text.setOrigin(0, 0)
+
+    this.backButton.add([background, text])
+    this.backButton.setDepth(3000)
+    this.backButton.setScrollFactor(0)
+    this.backButton.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, 100, 40),
+      Phaser.Geom.Rectangle.Contains
+    )
+
+    this.backButton.on('pointerdown', () => {
+      console.log('🔙 Back to menu')
+      // Use sceneRouter for navigation
+      const { sceneRouter } = require('../utils/SceneRouter')
+      sceneRouter.navigateTo('MenuScene')
+    })
+
+    this.backButton.on('pointerover', () => {
+      background.setAlpha(0.7)
+    })
+    this.backButton.on('pointerout', () => {
+      background.setAlpha(0.5)
+    })
+
+    this.cameraManager.getGameCamera().ignore([this.backButton])
+    this.uiObjects.push(this.backButton)
+  }
+
+  protected updateBackButtonPosition() {
+    if (this.backButton) {
+      this.backButton.setPosition(10, 10)
+    }
   }
 
   protected switchToNextTeammate() {
@@ -451,6 +502,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
   }
 
   protected onResize(gameSize: Phaser.Structs.Size) {
+    this.updateBackButtonPosition()
+
     if (this.scoreText) {
       this.scoreText.setPosition(gameSize.width / 2, 30)
     }
@@ -495,6 +548,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
   shutdown() {
     console.log(`🔄 [Shutdown] ${this.scene.key} shutting down...`)
+
+    this.scale.off('resize', this.onResize, this)
 
     if (this.joystick) {
       this.joystick.destroy()

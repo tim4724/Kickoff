@@ -3,6 +3,7 @@ import { MenuScene } from './scenes/MenuScene'
 import { GameScene } from './scenes/GameScene'
 import { SinglePlayerScene } from './scenes/SinglePlayerScene'
 import { AIOnlyScene } from './scenes/AIOnlyScene'
+import { sceneRouter } from './utils/SceneRouter'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -36,6 +37,9 @@ if (loading) {
 
 // Initialize game
 const game = new Phaser.Game(config)
+
+// Initialize scene router for URL navigation
+sceneRouter.init(game)
 
 // Mobile optimizations
 if ('ontouchstart' in window) {
