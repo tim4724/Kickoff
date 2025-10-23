@@ -94,7 +94,17 @@ export class OffensiveStrategy {
       roles.set(interceptor.id, { goal: 'receive-pass', target: interceptPoint })
 
       // Remove interceptor from myPlayers
-      myPlayers = myPlayers.filter(p => p.id !== interceptor.id)
+      const teammates = myPlayers.filter(p => p.id !== interceptor.id)
+      myPlayers = teammates
+
+      // Calculate pass options from intercept position so teammates can move proactively
+      // This makes off-ball players position themselves for passes before ball is received
+      passOptions = PassEvaluator.evaluatePassOptions(
+        interceptPoint,
+        teammates,
+        opponents,
+        this.opponentGoal
+      )
     }
 
     // Step 2: Spread position remaining players using pre-calculated pass options

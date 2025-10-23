@@ -60,7 +60,19 @@ export class DefensiveStrategy {
     } else {
       // Opponent reaches ball first - assign our player to intercept them
       const result = this.selectBestInterceptor(remainingPlayers, interceptor, this.ourGoal)
-      roles.set(result.interceptor.id, { goal: 'interceptOpponent', target: result.target })
+
+      // Check if interceptor is close to the intercept position (within 5px threshold)
+      const distToIntercept = InterceptionCalculator.distance(result.interceptor.position, result.target)
+      const INTERCEPT_REACHED_THRESHOLD = 5
+
+      if (distToIntercept <= INTERCEPT_REACHED_THRESHOLD) {
+        // Already at intercept position - go directly for the ball instead
+        roles.set(result.interceptor.id, { goal: 'getBall', target: ball.position })
+      } else {
+        // Still moving to intercept position
+        roles.set(result.interceptor.id, { goal: 'interceptOpponent', target: result.target })
+      }
+
       remainingPlayers = remainingPlayers.filter(p => p.id !== result.interceptor.id)
       remainingOpponents = remainingOpponents.filter(o => o.id !== interceptor.id)
     }
