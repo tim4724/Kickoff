@@ -59,17 +59,15 @@ export class DefensiveStrategy {
       weReachFirstBallPosition = interceptPoint
     } else {
       // Opponent reaches ball first - assign our player to intercept them
-      const result = this.selectBestInterceptor(remainingPlayers, interceptor, this.ourGoal)
+      const result = this.selectBestInterceptor(remainingPlayers, interceptor, this.ourGoal, ball)
 
-      // Check if interceptor is close to the intercept position (within 5px threshold)
-      const distToIntercept = InterceptionCalculator.distance(result.interceptor.position, result.target)
-      const INTERCEPT_REACHED_THRESHOLD = 5
+      // Simple rule: if close to ball (< 60px), go directly after it
+      const distToBall = InterceptionCalculator.distance(result.interceptor.position, ball.position)
+      const BALL_PURSUIT_THRESHOLD = 60
 
-      if (distToIntercept <= INTERCEPT_REACHED_THRESHOLD) {
-        // Already at intercept position - go directly for the ball instead
+      if (distToBall < BALL_PURSUIT_THRESHOLD) {
         roles.set(result.interceptor.id, { goal: 'getBall', target: ball.position })
       } else {
-        // Still moving to intercept position
         roles.set(result.interceptor.id, { goal: 'interceptOpponent', target: result.target })
       }
 
@@ -172,7 +170,8 @@ export class DefensiveStrategy {
   private selectBestInterceptor(
     myPlayers: PlayerData[],
     opponent: PlayerData,
-    ourGoal: Vector2D
+    ourGoal: Vector2D,
+    ball: { position: Vector2D; velocity: Vector2D }
   ): { interceptor: PlayerData; target: Vector2D } {
     const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
     const currentBallPos = predictPath(0)
