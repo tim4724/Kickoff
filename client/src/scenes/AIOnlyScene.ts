@@ -15,7 +15,7 @@ export class AIOnlyScene extends BaseGameScene {
   private gameEngine!: GameEngine
   private aiManager!: AIManager
   private paused: boolean = false
-  private gameSpeed: number = 0.05 // Initial speed: 0.05 (range: 0.01 to 1.0)
+  private gameSpeed: number = 1.0 // Initial speed: 1.0 (range: 0.01 to 1.0)
   private gameSpeedText!: Phaser.GameObjects.Text
 
   constructor() {
