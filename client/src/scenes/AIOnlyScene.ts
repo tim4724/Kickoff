@@ -3,7 +3,6 @@ import { GameEngine } from '@shared'
 import type { EnginePlayerData, EnginePlayerInput } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
-import { AIDebugRenderer } from '../utils/AIDebugRenderer'
 import { AIManager } from '../ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 
@@ -15,8 +14,6 @@ import { gameClock as GameClock } from '@shared/engine/GameClock'
 export class AIOnlyScene extends BaseGameScene {
   private gameEngine!: GameEngine
   private aiManager!: AIManager
-  private aiDebugRenderer!: AIDebugRenderer
-  private debugEnabled: boolean = true
   private paused: boolean = false
   private gameSpeed: number = 0.05 // Initial speed: 0.05 (range: 0.01 to 1.0)
   private gameSpeedText!: Phaser.GameObjects.Text
@@ -29,9 +26,25 @@ export class AIOnlyScene extends BaseGameScene {
    * Override setupInput to remove player switching behavior
    */
   protected setupInput(): void {
-    // Create cursor keys but don't add spacebar handler
+    // Create cursor keys
     this.cursors = this.input.keyboard!.createCursorKeys()
-    // Spacebar will be handled in setupSpectatorControls instead
+
+    // Add WASD keys for movement (even though not used in AI-only, keeps consistency)
+    this.wasd = {
+      w: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+    }
+
+    // Register 'L' key for AI debug toggle (from BaseGameScene)
+    this.input.keyboard!.on('keydown-L', () => {
+      this.debugEnabled = !this.debugEnabled
+      this.aiDebugRenderer.setEnabled(this.debugEnabled)
+      console.log('🐛 AI Debug Labels:', this.debugEnabled ? 'ON' : 'OFF')
+    })
+
+    // Spacebar will be handled in setupSpectatorControls instead (no shooting)
   }
 
   /**
@@ -91,11 +104,12 @@ export class AIOnlyScene extends BaseGameScene {
     // Initialize player visuals from engine state
     this.syncPlayersFromEngine()
 
-    // Initialize AI debug renderer (pass UI camera so debug elements only show on game camera)
-    this.aiDebugRenderer = new AIDebugRenderer(this, this.cameraManager.getUICamera())
+    // Enable AI debug by default in AI-only mode
+    this.debugEnabled = true
+    this.aiDebugRenderer.setEnabled(true)
 
     // Update controls hint for AI-only mode
-    this.controlsHint.setText('SPACE: Play/Pause • +/-: Speed • D: Toggle Debug')
+    this.controlsHint.setText('SPACE: Play/Pause • +/-: Speed • L: Toggle Debug')
 
     // Enable spectator camera controls
     this.setupSpectatorControls()
@@ -142,10 +156,7 @@ export class AIOnlyScene extends BaseGameScene {
     // Sync visuals from engine state (always update visuals even when paused)
     this.syncVisualsFromEngine()
 
-    // Update AI debug visualization
-    if (this.debugEnabled) {
-      this.updateAIDebug()
-    }
+    // Note: AI debug visualization is handled by BaseGameScene.update()
   }
 
   protected handleShootAction(_power: number): void {
@@ -210,12 +221,7 @@ export class AIOnlyScene extends BaseGameScene {
       this.adjustGameSpeed(-0.05)
     })
 
-    // Add D key to toggle debug visualization
-    this.input.keyboard?.on('keydown-D', () => {
-      this.debugEnabled = !this.debugEnabled
-      this.aiDebugRenderer.setEnabled(this.debugEnabled)
-      console.log('🐛 AI Debug:', this.debugEnabled ? 'ON' : 'OFF')
-    })
+    // Note: L key for debug toggle is handled in BaseGameScene.setupInput()
   }
 
   /**
@@ -410,9 +416,9 @@ export class AIOnlyScene extends BaseGameScene {
   }
 
   /**
-   * Update AI debug visualization
+   * Update AI debug visualization (called from BaseGameScene when debug is enabled)
    */
-  private updateAIDebug() {
+  protected updateAIDebugLabels(): void {
     const state = this.gameEngine.getState()
 
     state.players.forEach((playerData: EnginePlayerData, playerId: string) => {

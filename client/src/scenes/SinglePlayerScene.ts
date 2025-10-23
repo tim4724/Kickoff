@@ -503,4 +503,41 @@ export class SinglePlayerScene extends BaseGameScene {
       this.timerText.setColor('#ffffff')
     }
   }
+
+  /**
+   * Update AI debug visualization (called from BaseGameScene when debug is enabled)
+   */
+  protected updateAIDebugLabels(): void {
+    const state = this.gameEngine.getState()
+
+    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
+      // Get AI player instance from AIManager
+      const teamAI = this.aiManager.getTeamAI(playerData.team)
+      const aiPlayer = teamAI?.getPlayer(playerId)
+
+      // Get goal text from AIPlayer (debug label)
+      const goal = aiPlayer?.getGoal()
+      let goalText = goal ? goal.toUpperCase() : ''
+
+      // Update goal label
+      this.aiDebugRenderer.updatePlayerLabel(
+        playerId,
+        { x: playerData.x, y: playerData.y },
+        goalText,
+        playerData.team
+      )
+
+      // Get target position from AIPlayer
+      const targetPos = aiPlayer?.getTargetPosition()
+      if (targetPos) {
+        // Draw target line to AI's actual target position
+        this.aiDebugRenderer.updateTargetLine(
+          playerId,
+          { x: playerData.x, y: playerData.y },
+          targetPos,
+          playerData.team
+        )
+      }
+    })
+  }
 }
