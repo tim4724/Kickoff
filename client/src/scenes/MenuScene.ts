@@ -61,16 +61,21 @@ export class MenuScene extends Phaser.Scene {
     const isPortrait = height > width
 
     // Scale factor based on screen size (relative to standard 1920x1080)
-    const scaleFactor = Math.min(width / 1920, height / 1080)
+    // const scaleFactor = Math.min(width / 1920, height / 1080) // Reserved for future use
 
-    // Button dimensions scale with screen size but have max limits
-    const buttonWidth = Math.min(400 * scaleFactor, width * 0.8)
-    const buttonHeight = Math.min(80 * scaleFactor, 100)
+    // Button dimensions - more screen-relative with better proportions
+    // Max 85% of width, but cap at 500px for larger screens
+    const buttonWidth = Math.min(400, width * 0.85, 500)
+    // Height proportional to width (20% of width), with sensible min/max
+    const buttonHeight = Math.max(60, Math.min(buttonWidth * 0.2, 100))
 
-    // Font sizes scale with screen size
-    const titleFontSize = Math.max(32, Math.min(72 * scaleFactor, 120))
-    const buttonFontSize = Math.max(18, Math.min(32 * scaleFactor, 48))
-    const versionFontSize = Math.max(12, Math.min(16 * scaleFactor, 20))
+    // Font sizes scale with screen width for better readability on small screens
+    // Title: 8% of width (larger minimum for small screens)
+    const titleFontSize = Math.max(48, Math.min(width * 0.08, 120))
+    // Button text: 4% of width (increased minimum from 18 to 20)
+    const buttonFontSize = Math.max(20, Math.min(width * 0.04, 48))
+    // Version text: 2.5% of width (increased minimum from 12 to 14)
+    const versionFontSize = Math.max(14, Math.min(width * 0.025, 20))
 
     // Update background
     this.background.setSize(width, height)

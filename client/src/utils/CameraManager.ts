@@ -80,6 +80,14 @@ export class CameraManager {
     this.updateGameCameraViewport()
   }
 
+  /**
+   * Public method to handle resize events
+   * Called by scenes to update camera viewports
+   */
+  public handleResize(gameSize: Phaser.Structs.Size): void {
+    this.onResize(gameSize)
+  }
+
   destroy(): void {
     this.scene.scale.off('resize', this.onResize, this)
   }

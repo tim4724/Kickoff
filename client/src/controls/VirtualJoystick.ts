@@ -201,6 +201,24 @@ export class VirtualJoystick {
   public resize(newWidth: number) {
     // Update screen width for left-half zone detection
     this.screenWidth = newWidth
+
+    // If joystick is currently active, reposition it to ensure it stays within bounds
+    if (this.isActive) {
+      const margin = 70
+      // Ensure base position stays within new screen bounds
+      this.baseX = Phaser.Math.Clamp(this.baseX, margin, newWidth / 2 - margin)
+      // Don't update Y here as screen height isn't passed, base will remain valid
+
+      // Reposition visual elements
+      this.base.x = this.baseX
+      this.base.y = this.baseY
+
+      // Keep stick at current relative position
+      const currentDx = this.stick.x - this.base.x
+      const currentDy = this.stick.y - this.base.y
+      this.stick.x = this.baseX + currentDx
+      this.stick.y = this.baseY + currentDy
+    }
   }
 
   /**

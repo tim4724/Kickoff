@@ -8,6 +8,7 @@ import { FieldRenderer } from '../utils/FieldRenderer'
 import { BallRenderer } from '../utils/BallRenderer'
 import { CameraManager } from '../utils/CameraManager'
 import { AIDebugRenderer } from '../utils/AIDebugRenderer'
+import { sceneRouter } from '../utils/SceneRouter'
 
 /**
  * Base Game Scene
@@ -246,16 +247,16 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     this.backButton.on('pointerdown', () => {
       console.log('🔙 Back to menu')
-      // Use sceneRouter for navigation
-      const { sceneRouter } = require('../utils/SceneRouter')
       sceneRouter.navigateTo('MenuScene')
     })
 
     this.backButton.on('pointerover', () => {
       background.setAlpha(0.7)
+      this.input.setDefaultCursor('pointer')
     })
     this.backButton.on('pointerout', () => {
       background.setAlpha(0.5)
+      this.input.setDefaultCursor('default')
     })
 
     this.cameraManager.getGameCamera().ignore([this.backButton])
@@ -502,8 +503,17 @@ export abstract class BaseGameScene extends Phaser.Scene {
   }
 
   protected onResize(gameSize: Phaser.Structs.Size) {
+    console.log(`🔄 [BaseGameScene] Resize triggered: ${gameSize.width}x${gameSize.height}`)
+
+    // Update camera manager to handle UI camera viewport changes
+    if (this.cameraManager) {
+      this.cameraManager.handleResize(gameSize)
+    }
+
+    // Update back button position
     this.updateBackButtonPosition()
 
+    // Update UI text positions
     if (this.scoreText) {
       this.scoreText.setPosition(gameSize.width / 2, 30)
     }
@@ -514,11 +524,14 @@ export abstract class BaseGameScene extends Phaser.Scene {
       this.controlsHint.setPosition(gameSize.width / 2, gameSize.height - 30)
     }
 
+    // Update mobile controls positions
     if (this.joystick) {
       this.joystick.resize(gameSize.width)
+      console.log(`🕹️ [BaseGameScene] Joystick resized to width: ${gameSize.width}`)
     }
     if (this.actionButton) {
       this.actionButton.resize(gameSize.width, gameSize.height)
+      console.log(`🎯 [BaseGameScene] Action button resized to: ${gameSize.width}x${gameSize.height}`)
     }
   }
 
