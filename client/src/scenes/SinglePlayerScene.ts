@@ -1,6 +1,6 @@
 import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
-import type { EnginePlayerData, EnginePlayerInput } from '@shared'
+import type { EnginePlayerData, EnginePlayerInput, PlayerData } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
@@ -139,8 +139,8 @@ export class SinglePlayerScene extends BaseGameScene {
                 // Queue one input per frame
                 this.gameEngine.queueInput(this.myPlayerId, {
                   movement: { x: normalizedX, y: normalizedY },
+                  action: false,
                   timestamp: this.gameEngine.frameCount,
-                  playerId: this.myPlayerId
                 })
 
                 frameCount++
@@ -207,6 +207,7 @@ export class SinglePlayerScene extends BaseGameScene {
     if (Math.abs(movement.x) > 0.01 || Math.abs(movement.y) > 0.01) {
       this.gameEngine.queueInput(this.controlledPlayerId, {
         movement,
+        action: false,
         timestamp: this.gameEngine.frameCount,
       })
     }
@@ -240,7 +241,7 @@ export class SinglePlayerScene extends BaseGameScene {
 
     // Get all blue team players (human team) INCLUDING the current player
     const blueTeamPlayers: EnginePlayerData[] = []
-    engineState.players.forEach((player, playerId) => {
+    engineState.players.forEach((player) => {
       if (player.team === 'blue') {
         blueTeamPlayers.push(player)
       }
@@ -248,11 +249,16 @@ export class SinglePlayerScene extends BaseGameScene {
 
     if (blueTeamPlayers.length === 0) return
 
-    // Convert to format InterceptionCalculator expects
-    const teammates = blueTeamPlayers.map(p => ({
+    // Convert to format InterceptionCalculator expects (PlayerData format)
+    const teammates: PlayerData[] = blueTeamPlayers.map(p => ({
       id: p.id,
-      position: { x: p.x, y: p.y } as Vector2D,
-      velocity: { x: p.velocityX, y: p.velocityY } as Vector2D,
+      team: p.team,
+      isHuman: p.isHuman,
+      isControlled: p.isControlled,
+      position: { x: p.x, y: p.y },
+      velocity: { x: p.velocityX, y: p.velocityY },
+      state: p.state,
+      direction: p.direction,
     }))
 
     // Create ball prediction function

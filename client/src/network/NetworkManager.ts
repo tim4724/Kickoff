@@ -153,7 +153,7 @@ export class NetworkManager {
       })
 
       // Handle room leave
-      this.room.onLeave((code) => {
+      this.room.onLeave(() => {
         this.connected = false
       })
 
