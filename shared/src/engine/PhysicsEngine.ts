@@ -79,15 +79,17 @@ export class PhysicsEngine {
   }
 
   /**
-   * Process player input and update player position/velocity
+   * Process player input and update player position/velocity with inertia
    */
   processPlayerInput(player: EnginePlayerData, input: EnginePlayerInput, dt: number): void {
-    // Update velocity based on input
-    player.velocityX = input.movement.x * this.config.playerSpeed
-    player.velocityY = input.movement.y * this.config.playerSpeed
+    // Target velocity based on input
+    const targetVelocityX = input.movement.x * this.config.playerSpeed
+    const targetVelocityY = input.movement.y * this.config.playerSpeed
 
-    const oldX = player.x
-    const oldY = player.y
+    // Inertia: smooth acceleration/deceleration (lower = more momentum, higher = faster response)
+    const ACCELERATION_FACTOR = 0.15
+    player.velocityX += (targetVelocityX - player.velocityX) * ACCELERATION_FACTOR
+    player.velocityY += (targetVelocityY - player.velocityY) * ACCELERATION_FACTOR
 
     // Update position
     player.x += player.velocityX * dt
