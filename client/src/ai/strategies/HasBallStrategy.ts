@@ -104,7 +104,7 @@ export class HasBallStrategy {
 
     // Predict carrier's path to goal (moving at player speed)
     const predictCarrierPosition = (t: number): Vector2D => {
-      return InterceptionCalculator.predictOpponentBallPosition(
+      return InterceptionCalculator.predictPlayerBallPosition(
         carrier.position,
         { x: dirX, y: dirY },
         t

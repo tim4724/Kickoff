@@ -114,7 +114,7 @@ export class InterceptionCalculator {
    * Predict ball position when opponent has possession and moves in a direction
    * Ball stays POSSESSION_BALL_OFFSET ahead of opponent as they move at PLAYER_SPEED
    */
-  static predictOpponentBallPosition(
+  static predictPlayerBallPosition(
     opponentPos: Vector2D,
     direction: Vector2D,
     timeSeconds: number
