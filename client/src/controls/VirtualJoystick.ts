@@ -73,6 +73,14 @@ export class VirtualJoystick {
         return // Right half = button territory
       }
 
+      // EXCLUSION ZONE: Don't activate in back button area (top-left corner)
+      // Back button is at (10, 10) with size 100x40, add margin for safety
+      const BACK_BUTTON_EXCLUSION_WIDTH = 120
+      const BACK_BUTTON_EXCLUSION_HEIGHT = 60
+      if (pointer.x < BACK_BUTTON_EXCLUSION_WIDTH && pointer.y < BACK_BUTTON_EXCLUSION_HEIGHT) {
+        return // Top-left corner = back button territory
+      }
+
       // Spawn joystick at touch position
       this.baseX = pointer.x
       this.baseY = pointer.y
@@ -244,15 +252,24 @@ export class VirtualJoystick {
   public __test_simulateTouch(x: number, y: number) {
     if (!this.scene) return
 
-    // Simulate left-half touch
-    if (x < this.screenWidth / 2) {
-      const margin = 70
-      this.baseX = Phaser.Math.Clamp(x, margin, this.screenWidth / 2 - margin)
-      this.baseY = Phaser.Math.Clamp(y, margin, this.scene.scale.height - margin)
-      this.repositionJoystick(this.baseX, this.baseY)
-      this.isActive = true
-      this.setVisible(true)
+    // Apply same exclusion rules as setupInput()
+    if (x >= this.screenWidth / 2) {
+      return // Right half = button territory
     }
+
+    const BACK_BUTTON_EXCLUSION_WIDTH = 120
+    const BACK_BUTTON_EXCLUSION_HEIGHT = 60
+    if (x < BACK_BUTTON_EXCLUSION_WIDTH && y < BACK_BUTTON_EXCLUSION_HEIGHT) {
+      return // Top-left corner = back button territory
+    }
+
+    // Simulate left-half touch
+    const margin = 70
+    this.baseX = Phaser.Math.Clamp(x, margin, this.screenWidth / 2 - margin)
+    this.baseY = Phaser.Math.Clamp(y, margin, this.scene.scale.height - margin)
+    this.repositionJoystick(this.baseX, this.baseY)
+    this.isActive = true
+    this.setVisible(true)
   }
 
   /**

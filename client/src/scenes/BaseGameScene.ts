@@ -498,7 +498,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.cameraManager.getGameCamera().ignore([overlay, resultText, scoreText, restartText])
 
     this.input.once('pointerdown', () => {
-      this.scene.start('MenuScene')
+      console.log('🔙 Match ended - returning to menu via router')
+      sceneRouter.navigateTo('MenuScene')
     })
   }
 

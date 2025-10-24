@@ -306,6 +306,145 @@ test.describe('Responsive UI and Navigation', () => {
 
       console.log('✅ Back button works after resize')
     })
+
+    test('back button clicks do not activate joystick (mobile)', async ({ page }) => {
+      // Set mobile viewport to trigger mobile controls
+      await page.setViewportSize({ width: 375, height: 667 })
+      await page.goto(CLIENT_URL)
+      await page.waitForSelector('text=KICKOFF', { timeout: 5000 })
+
+      // Navigate to Single Player
+      await page.locator('text=Single Player').click()
+      await page.waitForTimeout(1000)
+
+      // Get back button position
+      const backButton = page.locator('text=← Menu')
+      const buttonBox = await backButton.boundingBox()
+      expect(buttonBox).not.toBeNull()
+
+      // Click back button and verify it returns to menu (not blocked by joystick)
+      await backButton.click()
+      await page.waitForTimeout(500)
+
+      // Should be back at menu (confirms back button click worked)
+      await expect(page.locator('text=KICKOFF')).toBeVisible()
+      expect(page.url()).toContain('#/menu')
+
+      console.log('✅ Back button not blocked by joystick')
+    })
+
+    test('back button touch events work correctly in top-left corner', async ({ page }) => {
+      // Set mobile viewport
+      await page.setViewportSize({ width: 375, height: 667 })
+      await page.goto(`${CLIENT_URL}#/singleplayer`)
+      await page.waitForTimeout(1000)
+
+      // Back button should be visible at (10, 10)
+      const backButton = page.locator('text=← Menu')
+      await expect(backButton).toBeVisible()
+
+      // Touch at back button coordinates (simulate mobile touch)
+      await page.touchscreen.tap(60, 30) // Center of back button (10 + 100/2, 10 + 40/2)
+      await page.waitForTimeout(500)
+
+      // Should return to menu (not activate joystick)
+      await expect(page.locator('text=KICKOFF')).toBeVisible()
+      expect(page.url()).toContain('#/menu')
+
+      console.log('✅ Touch events in top-left corner work for back button')
+    })
+  })
+
+  test.describe('Scene Overlap Prevention', () => {
+
+    test('only one scene active at a time - menu to game', async ({ page }) => {
+      await page.goto(CLIENT_URL)
+      await page.waitForSelector('text=KICKOFF', { timeout: 5000 })
+
+      // Verify menu is visible
+      await expect(page.locator('text=KICKOFF')).toBeVisible()
+
+      // Navigate to Single Player
+      await page.locator('text=Single Player').click()
+      await page.waitForTimeout(1000)
+
+      // Menu should NOT be visible anymore (scene switched properly)
+      await expect(page.locator('text=KICKOFF')).not.toBeVisible()
+
+      // Back button should be visible (we're in game scene)
+      await expect(page.locator('text=← Menu')).toBeVisible()
+
+      console.log('✅ No scene overlap when navigating menu to game')
+    })
+
+    test('only one scene active at a time - game to menu', async ({ page }) => {
+      await page.goto(`${CLIENT_URL}#/singleplayer`)
+      await page.waitForTimeout(1000)
+
+      // Back button should be visible (we're in game scene)
+      await expect(page.locator('text=← Menu')).toBeVisible()
+
+      // Menu should NOT be visible
+      await expect(page.locator('text=KICKOFF')).not.toBeVisible()
+
+      // Click back to menu
+      await page.locator('text=← Menu').click()
+      await page.waitForTimeout(500)
+
+      // Menu should be visible
+      await expect(page.locator('text=KICKOFF')).toBeVisible()
+
+      // Back button should NOT be visible anymore
+      await expect(page.locator('text=← Menu')).not.toBeVisible()
+
+      console.log('✅ No scene overlap when navigating game to menu')
+    })
+
+    test('rapid scene transitions handle correctly', async ({ page }) => {
+      await page.goto(CLIENT_URL)
+      await page.waitForSelector('text=KICKOFF', { timeout: 5000 })
+
+      // Rapidly navigate between scenes
+      await page.locator('text=Single Player').click()
+      await page.waitForTimeout(200)
+      await page.locator('text=← Menu').click()
+      await page.waitForTimeout(200)
+      await page.locator('text=AI-Only').click()
+      await page.waitForTimeout(200)
+      await page.locator('text=← Menu').click()
+      await page.waitForTimeout(500)
+
+      // Should end up at menu with no overlapping scenes
+      await expect(page.locator('text=KICKOFF')).toBeVisible()
+      expect(page.url()).toContain('#/menu')
+
+      console.log('✅ Rapid transitions handle correctly without overlap')
+    })
+
+    test('browser back/forward does not cause scene overlap', async ({ page }) => {
+      await page.goto(CLIENT_URL)
+      await page.waitForSelector('text=KICKOFF', { timeout: 5000 })
+
+      // Navigate forward to game
+      await page.locator('text=Single Player').click()
+      await page.waitForTimeout(1000)
+      await expect(page.locator('text=← Menu')).toBeVisible()
+      await expect(page.locator('text=KICKOFF')).not.toBeVisible()
+
+      // Browser back to menu
+      await page.goBack()
+      await page.waitForTimeout(1000)
+      await expect(page.locator('text=KICKOFF')).toBeVisible()
+      await expect(page.locator('text=← Menu')).not.toBeVisible()
+
+      // Browser forward to game
+      await page.goForward()
+      await page.waitForTimeout(1000)
+      await expect(page.locator('text=← Menu')).toBeVisible()
+      await expect(page.locator('text=KICKOFF')).not.toBeVisible()
+
+      console.log('✅ Browser navigation does not cause scene overlap')
+    })
   })
 
   test.describe('Integration Tests', () => {

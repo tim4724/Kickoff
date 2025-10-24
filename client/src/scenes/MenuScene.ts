@@ -253,9 +253,9 @@ export class MenuScene extends Phaser.Scene {
 
     // Auto-start multiplayer for tests
     if (typeof window !== 'undefined' && (window as any).__testRoomId) {
-      console.log('🧪 Test mode detected - auto-starting multiplayer')
+      console.log('🧪 Test mode detected - auto-starting multiplayer via router')
       this.time.delayedCall(100, () => {
-        this.scene.start('GameScene')
+        sceneRouter.navigateTo('GameScene')
       })
     }
   }

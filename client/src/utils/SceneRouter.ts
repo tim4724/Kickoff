@@ -142,11 +142,20 @@ export class SceneRouter {
     // Update current path
     this.currentPath = path
 
-    // Start the new scene
+    // Properly transition scenes - stop current scene first, then start new scene
     if (currentScene) {
-      currentScene.scene.start(sceneKey)
+      const currentKey = currentScene.scene.key
+      console.log(`[SceneRouter] Stopping scene: ${currentKey}`)
+
+      // Stop current scene first to prevent overlap
+      this.game.scene.stop(currentKey)
+
+      // Then start the new scene
+      console.log(`[SceneRouter] Starting scene: ${sceneKey}`)
+      this.game.scene.start(sceneKey)
     } else {
       // No scene running yet, start the target scene
+      console.log(`[SceneRouter] Starting initial scene: ${sceneKey}`)
       this.game.scene.start(sceneKey)
     }
   }
