@@ -3,6 +3,7 @@ import { MenuScene } from './scenes/MenuScene'
 import { GameScene } from './scenes/GameScene'
 import { SinglePlayerScene } from './scenes/SinglePlayerScene'
 import { AIOnlyScene } from './scenes/AIOnlyScene'
+import { sceneRouter } from './utils/SceneRouter'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -37,6 +38,9 @@ if (loading) {
 // Initialize game
 const game = new Phaser.Game(config)
 
+// Initialize scene router for URL navigation
+sceneRouter.init(game)
+
 // Mobile optimizations
 if ('ontouchstart' in window) {
   // Prevent pull-to-refresh
@@ -47,9 +51,28 @@ if ('ontouchstart' in window) {
   document.addEventListener('touchstart', () => {
     if (!fullscreenRequested && document.documentElement.requestFullscreen) {
       fullscreenRequested = true
-      document.documentElement.requestFullscreen().catch(() => {
-        console.log('Fullscreen request declined')
-      })
+      document.documentElement.requestFullscreen()
+        .then(() => {
+          console.log('Fullscreen activated')
+          // Lock to landscape after fullscreen is active
+          if (screen.orientation && 'lock' in screen.orientation) {
+            const orientationLock = (screen.orientation as any).lock('landscape')
+            if (orientationLock && orientationLock.then) {
+              orientationLock
+                .then(() => {
+                  console.log('Orientation locked to landscape')
+                })
+                .catch((err: any) => {
+                  console.log('Orientation lock not supported:', err)
+                })
+            }
+          } else {
+            console.log('Screen Orientation API not supported')
+          }
+        })
+        .catch(() => {
+          console.log('Fullscreen request declined')
+        })
     }
   }, { once: true })
 }

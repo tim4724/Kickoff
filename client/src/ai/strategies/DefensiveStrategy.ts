@@ -171,7 +171,7 @@ export class DefensiveStrategy {
     myPlayers: PlayerData[],
     opponent: PlayerData,
     ourGoal: Vector2D,
-    ball: { position: Vector2D; velocity: Vector2D }
+    _ball: { position: Vector2D; velocity: Vector2D }
   ): { interceptor: PlayerData; target: Vector2D } {
     const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
     const currentBallPos = predictPath(0)
