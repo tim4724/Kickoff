@@ -99,6 +99,9 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.createBackButton()
     this.scale.on('resize', this.onResize, this)
 
+    // Also listen for native orientation change events (important for fullscreen on mobile)
+    window.addEventListener('orientationchange', this.handleOrientationChange)
+
     // Create particle texture for celebrations
     this.createParticleTexture()
 
@@ -130,16 +133,24 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const width = this.scale.width
     const height = this.scale.height
 
-    this.scoreText = this.add.text(width / 2, 30, '0 - 0', {
-      fontSize: '32px',
+    // Responsive text sizing
+    const scoreFontSize = Math.max(24, Math.min(width * 0.035, 48)) // 3.5% of width (24-48px)
+    const timerFontSize = Math.max(18, Math.min(width * 0.022, 32)) // 2.2% of width (18-32px)
+    const hintFontSize = Math.max(12, Math.min(width * 0.016, 20)) // 1.6% of width (12-20px)
+
+    // Safe zone margins (top margin for notch/status bar)
+    const topMargin = 40
+
+    this.scoreText = this.add.text(width / 2, topMargin, '0 - 0', {
+      fontSize: `${scoreFontSize}px`,
       color: '#ffffff',
       fontStyle: 'bold',
     })
     this.scoreText.setOrigin(0.5, 0)
     this.scoreText.setScrollFactor(0)
 
-    this.timerText = this.add.text(width / 2, 70, '2:00', {
-      fontSize: '24px',
+    this.timerText = this.add.text(width / 2, topMargin + scoreFontSize + 10, '2:00', {
+      fontSize: `${timerFontSize}px`,
       color: '#ffffff',
     })
     this.timerText.setOrigin(0.5, 0)
@@ -149,11 +160,14 @@ export abstract class BaseGameScene extends Phaser.Scene {
       ? 'Touch Joystick to Move • Tap Button to Shoot/Switch'
       : 'WASD/Arrows to Move • Space to Shoot/Switch'
 
-    this.controlsHint = this.add.text(width / 2, height - 30, controlsText, {
-      fontSize: '16px',
+    // Bottom margin for home indicator/gesture bar (safe zone)
+    const bottomMargin = 40
+
+    this.controlsHint = this.add.text(width / 2, height - bottomMargin, controlsText, {
+      fontSize: `${hintFontSize}px`,
       color: '#aaaaaa',
     })
-    this.controlsHint.setOrigin(0.5, 0)
+    this.controlsHint.setOrigin(0.5, 1) // Bottom center anchor
     this.controlsHint.setScrollFactor(0)
 
     this.uiObjects.push(this.scoreText, this.timerText, this.controlsHint)
@@ -196,8 +210,16 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const width = this.scale.width
     const height = this.scale.height
 
+    // Safe zone margins (avoid iOS notch/home indicator, Android gesture bar)
+    const SAFE_MARGIN_X = 20
+    const SAFE_MARGIN_Y = 40
+
     this.joystick = new VirtualJoystick(this)
-    this.actionButton = new ActionButton(this, width - 120, height - 120)
+    this.actionButton = new ActionButton(
+      this,
+      width - 100 - SAFE_MARGIN_X,
+      height - 100 - SAFE_MARGIN_Y
+    )
 
     this.joystick.setTeamColor(this.playerTeamColor)
     this.actionButton.setTeamColor(this.playerTeamColor)
@@ -504,6 +526,11 @@ export abstract class BaseGameScene extends Phaser.Scene {
   }
 
   protected onResize(gameSize: Phaser.Structs.Size) {
+    // Only handle resize if this scene is active
+    if (!this.scene.isActive()) {
+      return
+    }
+
     console.log(`🔄 [BaseGameScene] Resize triggered: ${gameSize.width}x${gameSize.height}`)
 
     // Update camera manager to handle UI camera viewport changes
@@ -514,26 +541,85 @@ export abstract class BaseGameScene extends Phaser.Scene {
     // Update back button position
     this.updateBackButtonPosition()
 
-    // Update UI text positions
+    // Responsive text sizing
+    const scoreFontSize = Math.max(24, Math.min(gameSize.width * 0.035, 48))
+    const timerFontSize = Math.max(18, Math.min(gameSize.width * 0.022, 32))
+    const hintFontSize = Math.max(12, Math.min(gameSize.width * 0.016, 20))
+
+    // Safe zone margins
+    const topMargin = 40
+    const bottomMargin = 40
+    const SAFE_MARGIN_X = 20
+    const SAFE_MARGIN_Y = 40
+
+    // Update UI text positions and sizes
     if (this.scoreText) {
-      this.scoreText.setPosition(gameSize.width / 2, 30)
+      this.scoreText.setPosition(gameSize.width / 2, topMargin)
+      this.scoreText.setFontSize(scoreFontSize)
     }
     if (this.timerText) {
-      this.timerText.setPosition(gameSize.width / 2, 70)
+      this.timerText.setPosition(gameSize.width / 2, topMargin + scoreFontSize + 10)
+      this.timerText.setFontSize(timerFontSize)
     }
     if (this.controlsHint) {
-      this.controlsHint.setPosition(gameSize.width / 2, gameSize.height - 30)
+      this.controlsHint.setPosition(gameSize.width / 2, gameSize.height - bottomMargin)
+      this.controlsHint.setFontSize(hintFontSize)
     }
 
-    // Update mobile controls positions
+    // Update mobile controls positions with safe zones
     if (this.joystick) {
       this.joystick.resize(gameSize.width)
       console.log(`🕹️ [BaseGameScene] Joystick resized to width: ${gameSize.width}`)
     }
     if (this.actionButton) {
-      this.actionButton.resize(gameSize.width, gameSize.height)
-      console.log(`🎯 [BaseGameScene] Action button resized to: ${gameSize.width}x${gameSize.height}`)
+      this.actionButton.resize(
+        gameSize.width - SAFE_MARGIN_X,
+        gameSize.height - SAFE_MARGIN_Y
+      )
+      console.log(
+        `🎯 [BaseGameScene] Action button resized to: ${gameSize.width - SAFE_MARGIN_X}x${
+          gameSize.height - SAFE_MARGIN_Y
+        }`
+      )
     }
+  }
+
+  /**
+   * Handle native orientation change events (for fullscreen rotation on mobile)
+   * Similar to MenuScene, Phaser's resize event doesn't always fire during fullscreen
+   */
+  protected handleOrientationChange = (): void => {
+    // Only handle if this scene is active
+    if (!this.scene.isActive()) {
+      return
+    }
+
+    console.log(`🔄 [${this.scene.key}] Orientation change detected`)
+
+    // Wait for dimensions to stabilize after rotation
+    setTimeout(() => {
+      // Double-check scene is still active after timeout
+      if (!this.scene.isActive()) {
+        return
+      }
+
+      const width = window.innerWidth
+      const height = window.innerHeight
+
+      console.log(`📐 [${this.scene.key}] New dimensions: ${width}x${height}`)
+
+      // Force Phaser to resize
+      this.scale.resize(width, height)
+
+      // Explicitly update camera manager (Phaser's resize event doesn't always fire properly)
+      if (this.cameraManager) {
+        console.log('🎥 Explicitly updating cameras after orientation change')
+        this.cameraManager.handleResize(new Phaser.Structs.Size(width, height))
+      }
+
+      // Manually trigger our onResize handler to update UI elements
+      this.onResize(new Phaser.Structs.Size(width, height))
+    }, 100)
   }
 
   update(_time: number, delta: number) {
@@ -564,6 +650,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
     console.log(`🔄 [Shutdown] ${this.scene.key} shutting down...`)
 
     this.scale.off('resize', this.onResize, this)
+    window.removeEventListener('orientationchange', this.handleOrientationChange)
 
     if (this.joystick) {
       this.joystick.destroy()

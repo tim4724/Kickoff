@@ -18,36 +18,6 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * Request fullscreen using Phaser's Scale Manager (mobile only)
-   * Note: iOS Safari does NOT support fullscreen API - user must install as PWA
-   * Android browsers support this when triggered by user interaction
-   */
-  private requestFullscreen(): void {
-    // Only request fullscreen on mobile devices
-    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-    if (!isMobile) {
-      console.log('💻 Desktop detected - skipping fullscreen request')
-      return
-    }
-
-    // Check if fullscreen is supported
-    if (!this.scale.fullscreen.available) {
-      console.log('📱 Fullscreen API not available (iOS requires PWA installation)')
-      return
-    }
-
-    // Check if already in fullscreen
-    if (this.scale.isFullscreen) {
-      console.log('📱 Already in fullscreen mode')
-      return
-    }
-
-    // Use Phaser's scale manager to request fullscreen
-    this.scale.startFullscreen()
-    console.log('📱 Fullscreen mode requested')
-  }
-
-  /**
    * Layout all UI elements responsively based on current screen size
    * Called on create() and whenever screen size changes (resize/rotation)
    */
@@ -224,22 +194,19 @@ export class MenuScene extends Phaser.Scene {
     })
 
     // Button click handlers - Using 'pointerup' for touch device compatibility
-    // Note: Touch devices require 'pointerup' for fullscreen requests to work
+    // Note: Fullscreen is handled globally in main.ts on first touch
     this.singlePlayerButton.on('pointerup', () => {
       console.log('🎮 Starting Single Player mode')
-      this.requestFullscreen()
       sceneRouter.navigateTo('SinglePlayerScene')
     })
 
     this.multiplayerButton.on('pointerup', () => {
       console.log('🌐 Starting Multiplayer mode')
-      this.requestFullscreen()
       sceneRouter.navigateTo('GameScene')
     })
 
     this.aiOnlyButton.on('pointerup', () => {
       console.log('🤖 Starting AI-Only mode')
-      this.requestFullscreen()
       sceneRouter.navigateTo('AIOnlyScene')
     })
 
@@ -248,6 +215,10 @@ export class MenuScene extends Phaser.Scene {
 
     // Listen for resize events (screen rotation, window resize)
     this.scale.on('resize', this.handleResize, this)
+
+    // Also listen for native orientation change events (important for fullscreen on mobile)
+    // Phaser's resize event doesn't always fire during fullscreen orientation changes
+    window.addEventListener('orientationchange', this.handleOrientationChange)
 
     console.log('📋 Menu scene loaded with responsive layout')
 
@@ -264,14 +235,68 @@ export class MenuScene extends Phaser.Scene {
    * Handle resize events (called by Phaser when screen size changes)
    */
   private handleResize(gameSize: Phaser.Structs.Size): void {
-    console.log(`🔄 Resize detected: ${gameSize.width}x${gameSize.height}`)
+    // Only handle resize if this scene is active
+    if (!this.scene.isActive()) {
+      return
+    }
+
+    console.log(`🔄 [MenuScene] Resize detected: ${gameSize.width}x${gameSize.height}`)
+
+    // Update camera viewport to match new size
+    const camera = this.cameras.main
+    if (camera) {
+      camera.setViewport(0, 0, gameSize.width, gameSize.height)
+      camera.setScroll(0, 0)
+    }
+
+    // Re-layout all UI elements
     this.layoutUI()
   }
 
   /**
-   * Cleanup: remove resize listener when scene shuts down
+   * Handle native orientation change events (for fullscreen rotation on mobile)
+   * Phaser's resize event doesn't always fire during fullscreen, so we listen to this too
+   */
+  private handleOrientationChange = (): void => {
+    // Only handle if this scene is active
+    if (!this.scene.isActive()) {
+      return
+    }
+
+    console.log('🔄 [MenuScene] Orientation change detected')
+
+    // Wait a bit for the actual resize to happen
+    setTimeout(() => {
+      // Double-check scene is still active after timeout
+      if (!this.scene.isActive()) {
+        return
+      }
+
+      const width = window.innerWidth
+      const height = window.innerHeight
+
+      console.log(`📐 [MenuScene] New dimensions after orientation: ${width}x${height}`)
+
+      // Manually trigger resize handling
+      const camera = this.cameras.main
+      if (camera) {
+        camera.setViewport(0, 0, width, height)
+        camera.setScroll(0, 0)
+      }
+
+      // Force Phaser to update scale
+      this.scale.resize(width, height)
+
+      // Re-layout UI
+      this.layoutUI()
+    }, 100)
+  }
+
+  /**
+   * Cleanup: remove listeners when scene shuts down
    */
   shutdown(): void {
     this.scale.off('resize', this.handleResize, this)
+    window.removeEventListener('orientationchange', this.handleOrientationChange)
   }
 }

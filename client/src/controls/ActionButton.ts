@@ -4,6 +4,8 @@
  * Activates only in right half of screen to avoid conflicts with joystick
  */
 
+import { HapticFeedback } from '../utils/HapticFeedback'
+
 export class ActionButton {
   private scene: Phaser.Scene
   private button!: Phaser.GameObjects.Arc
@@ -28,9 +30,13 @@ export class ActionButton {
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene
+    this.screenWidth = scene.scale.width
+
+    // Scale button based on screen size (6% of screen height)
+    this.radius = Math.max(50, Math.min(scene.scale.height * 0.06, 80))
+
     this.x = x
     this.y = y
-    this.screenWidth = scene.scale.width
 
     this.createButton()
     this.setupInput()
@@ -38,7 +44,7 @@ export class ActionButton {
 
   private createButton() {
     // Button circle - color will be set to team color via setTeamColor()
-    this.button = this.scene.add.circle(this.x, this.y, this.radius, 0xff4444, 0.4)
+    this.button = this.scene.add.circle(this.x, this.y, this.radius, 0xff4444, 0.6)
     this.button.setStrokeStyle(3, 0xff6666, 0.7)
     this.button.setDepth(1000)
     this.button.setScrollFactor(0)
@@ -67,8 +73,8 @@ export class ActionButton {
     // Update button to use team color - force update with explicit fill
     if (this.button) {
       this.button.fillColor = this.teamColor
-      this.button.fillAlpha = 0.4
-      this.button.setFillStyle(this.teamColor, 0.4)
+      this.button.fillAlpha = 0.6
+      this.button.setFillStyle(this.teamColor, 0.6)
       this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
       console.log(`🎨 [ActionButton] Button color updated to ${this.button.fillColor.toString(16)}`)
     }
@@ -107,6 +113,9 @@ export class ActionButton {
     this.button.setFillStyle(this.teamColorLight, 0.7)
     this.button.setScale(0.9)
 
+    // Haptic feedback on press
+    HapticFeedback.light()
+
     // Callback
     if (this.onPressCallback) {
       this.onPressCallback()
@@ -119,11 +128,15 @@ export class ActionButton {
     const holdDuration = holdDurationMs / 1000 // Convert to seconds
 
     // Reset visual - use team color
-    this.button.setFillStyle(this.teamColor, 0.4)
+    this.button.setFillStyle(this.teamColor, 0.6)
     this.button.setScale(1)
+    this.button.setStrokeStyle(3, this.teamColorLight, 0.7) // Reset to normal stroke
 
     // Calculate power based on hold duration
     const power = Math.min(holdDuration / 1.0, 1)
+
+    // Haptic feedback on release (medium for shooting action)
+    HapticFeedback.medium()
 
     // Trigger release callback with power
     if (this.onReleaseCallback) {
@@ -196,13 +209,23 @@ export class ActionButton {
   public update() {
     if (this.isPressed) {
       const power = this.getPower()
-      // Pulse effect based on power
-      const scale = 0.9 + power * 0.2
+      // Enhanced pulse effect based on power (more pronounced scaling)
+      const scale = 0.85 + power * 0.3
       this.button.setScale(scale)
 
-      // Change color intensity based on power
-      const alpha = 0.4 + power * 0.4
+      // Change color intensity based on power (starts from new base 0.6)
+      const alpha = 0.6 + power * 0.4
       this.button.setAlpha(alpha)
+
+      // Add outer glow ring for charging effect
+      const glowSize = 3 + power * 5 // Stroke width grows from 3 to 8
+      const glowAlpha = 0.4 + power * 0.6 // Glow becomes more visible
+      this.button.setStrokeStyle(glowSize, this.teamColorLight, glowAlpha)
+    } else {
+      // Reset to base state
+      this.button.setScale(1.0)
+      this.button.setAlpha(0.6)
+      this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
     }
   }
 
@@ -239,8 +262,9 @@ export class ActionButton {
     const power = Math.min(holdDuration / 1.0, 1)
 
     // Reset visual - use team color
-    this.button.setFillStyle(this.teamColor, 0.4)
+    this.button.setFillStyle(this.teamColor, 0.6)
     this.button.setScale(1)
+    this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
 
     // Trigger callback
     if (this.onReleaseCallback) {

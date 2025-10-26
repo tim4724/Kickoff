@@ -3,6 +3,8 @@
  * Spawns dynamically at touch position on left half of screen
  */
 
+import { HapticFeedback } from '../utils/HapticFeedback'
+
 export class VirtualJoystick {
   private scene: Phaser.Scene
   private base!: Phaser.GameObjects.Arc
@@ -21,6 +23,9 @@ export class VirtualJoystick {
     this.scene = scene
     this.screenWidth = scene.scale.width
 
+    // Scale joystick based on screen size (5% of screen height)
+    this.maxRadius = Math.max(50, Math.min(scene.scale.height * 0.05, 80))
+
     this.createJoystick()
     this.setupInput()
   }
@@ -28,15 +33,15 @@ export class VirtualJoystick {
   private createJoystick() {
     // Base circle (outer ring) - initially at (0, 0), will be repositioned on touch
     // Color will be set to team color via setTeamColor()
-    this.base = this.scene.add.circle(0, 0, this.maxRadius, 0x333333, 0.3)
-    this.base.setStrokeStyle(3, 0x666666, 0.5)
+    this.base = this.scene.add.circle(0, 0, this.maxRadius, 0x333333, 0.5)
+    this.base.setStrokeStyle(3, 0x666666, 0.7)
     this.base.setDepth(1000)
     this.base.setScrollFactor(0) // Fixed to camera
 
     // Stick circle (inner control)
     // Color will be set to team color via setTeamColor()
-    this.stick = this.scene.add.circle(0, 0, 30, 0x0066ff, 0.6)
-    this.stick.setStrokeStyle(2, 0xffffff, 0.8)
+    this.stick = this.scene.add.circle(0, 0, this.maxRadius * 0.5, 0x0066ff, 0.8)
+    this.stick.setStrokeStyle(2, 0xffffff, 1.0)
     this.stick.setDepth(1001)
     this.stick.setScrollFactor(0)
 
@@ -50,14 +55,14 @@ export class VirtualJoystick {
    */
   public setTeamColor(color: number) {
     // Update base to use team color with lower opacity
-    this.base.setFillStyle(color, 0.3)
+    this.base.setFillStyle(color, 0.5)
 
     // Calculate lighter stroke color (add 0x222222 to make it brighter)
     const lighterColor = Math.min(color + 0x222222, 0xffffff)
-    this.base.setStrokeStyle(3, lighterColor, 0.5)
+    this.base.setStrokeStyle(3, lighterColor, 0.7)
 
     // Update stick to use team color
-    this.stick.setFillStyle(color, 0.6)
+    this.stick.setFillStyle(color, 0.8)
   }
 
   private setupInput() {
@@ -97,6 +102,9 @@ export class VirtualJoystick {
       this.pointerId = pointer.id
       this.isActive = true
       this.setVisible(true)
+
+      // Haptic feedback on touch
+      HapticFeedback.light()
     })
 
     this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
