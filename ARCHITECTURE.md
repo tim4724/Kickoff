@@ -224,6 +224,113 @@ interface PlayerInput {
 #### 3. Game State Manager (Client)
 **Responsibility:** Maintain local game state and predict future state
 
+**State Adapter Pattern:**
+The client uses a unified state interface to work with game state from different sources (GameEngine for SinglePlayer/AIOnly, NetworkManager for Multiplayer). This eliminates code duplication and simplifies scene implementation.
+
+```typescript
+// Unified state interface - used by all scenes
+interface UnifiedGameState {
+  players: Map<string, UnifiedPlayerData>
+  ball: UnifiedBallData
+  scoreBlue: number
+  scoreRed: number
+  matchTime: number
+  phase: 'waiting' | 'kickoff' | 'playing' | 'goal' | 'ended'
+}
+
+interface UnifiedPlayerData {
+  id: string
+  team: Team
+  isHuman: boolean
+  isControlled: boolean
+  x: number              // Flat structure (not nested)
+  y: number
+  velocityX: number
+  velocityY: number
+  state: 'idle' | 'running' | 'kicking'
+  direction: number
+  role?: 'defender' | 'forward'
+}
+
+// StateAdapter converts between formats
+class StateAdapter {
+  // Convert GameEngine state (flat: player.x, ball.x)
+  static fromGameEngine(state: GameEngineState): UnifiedGameState {
+    const unifiedPlayers = new Map<string, UnifiedPlayerData>()
+    state.players.forEach((player, id) => {
+      unifiedPlayers.set(id, {
+        id: player.id,
+        team: player.team,
+        x: player.x,           // Already flat
+        y: player.y,
+        velocityX: player.velocityX,
+        velocityY: player.velocityY,
+        // ... other fields
+      })
+    })
+    return { players: unifiedPlayers, ball: {...}, ... }
+  }
+
+  // Convert NetworkManager state (nested: player.position.x, ball.position.x)
+  static fromNetwork(state: GameStateData): UnifiedGameState {
+    const unifiedPlayers = new Map<string, UnifiedPlayerData>()
+    state.players.forEach((player, id) => {
+      unifiedPlayers.set(id, {
+        id: player.id,
+        team: player.team,
+        x: player.position.x,  // Flatten nested structure
+        y: player.position.y,
+        velocityX: player.velocity.x,
+        velocityY: player.velocity.y,
+        // ... other fields
+      })
+    })
+    return { players: unifiedPlayers, ball: {...}, ... }
+  }
+
+  // Helper methods for common operations
+  static getPlayerTeam(state: UnifiedGameState, playerId: string): Team | null
+  static getTeammateIds(state: UnifiedGameState, myPlayerId: string): string[]
+  static findBestInterceptor(state: UnifiedGameState, teammateIds: string[]): string | null
+}
+
+// Scenes implement a single abstract method
+abstract class BaseGameScene {
+  protected abstract getUnifiedState(): UnifiedGameState | null
+
+  // Common logic uses unified state (no duplication)
+  protected checkAutoSwitchOnPossession() {
+    const state = this.getUnifiedState()
+    if (!state) return
+
+    const myTeam = StateAdapter.getPlayerTeam(state, this.myPlayerId)
+    // ... auto-switching logic works for all scenes
+  }
+}
+
+// SinglePlayerScene - simple conversion
+class SinglePlayerScene extends BaseGameScene {
+  protected getUnifiedState() {
+    return StateAdapter.fromGameEngine(this.gameEngine.getState())
+  }
+}
+
+// GameScene - simple conversion
+class GameScene extends BaseGameScene {
+  protected getUnifiedState() {
+    const networkState = this.networkManager?.getState()
+    return networkState ? StateAdapter.fromNetwork(networkState) : null
+  }
+}
+```
+
+**Benefits:**
+- Eliminates ~145 lines of duplicate code across scenes
+- Single source of truth for state access patterns
+- Type-safe conversion between state formats
+- Simplified scene implementations (4 abstract methods → 1)
+- Team-agnostic auto-switching (works for any team color)
+
 **Client-Side Prediction:**
 ```typescript
 class ClientStateManager {
@@ -1228,7 +1335,12 @@ TTL: 1 hour for sessions, 5 minutes for queue entries
 **Rationale:** Faster iteration, no app store delays
 **Trade-off:** Slightly lower performance, less discoverability
 
+**Decision 6:** StateAdapter pattern for unified state interface
+**Rationale:** Eliminate code duplication (~145 lines), single source of truth for state access
+**Trade-off:** Additional abstraction layer, but dramatically simplifies scene implementations
+**Impact:** Reduced abstract methods from 4 to 1, enabled team-agnostic auto-switching
+
 ---
 
 **Document Status:** ✅ Ready for Development
-**Last Updated:** 2025-10-01
+**Last Updated:** 2025-10-26

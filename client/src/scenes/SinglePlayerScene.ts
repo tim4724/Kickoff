@@ -1,12 +1,11 @@
 import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
-import type { EnginePlayerData, EnginePlayerInput, PlayerData } from '@shared'
+import type { EnginePlayerData, EnginePlayerInput } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '../ai'
-import { InterceptionCalculator } from '../ai/utils/InterceptionCalculator'
-import type { Vector2D } from '@shared/types'
+import { StateAdapter } from '../utils/StateAdapter'
 
 /**
  * Single Player Scene
@@ -20,9 +19,7 @@ import type { Vector2D } from '@shared/types'
 export class SinglePlayerScene extends BaseGameScene {
   private gameEngine!: GameEngine
   private aiManager!: AIManager
-  private lastBallPossessor: string = ''
   private aiEnabled: boolean = true
-  private autoSwitchEnabled: boolean = true
 
   constructor() {
     super({ key: 'SinglePlayerScene' })
@@ -164,11 +161,6 @@ export class SinglePlayerScene extends BaseGameScene {
   }
 
   protected updateGameState(delta: number): void {
-    // Auto-switch to ball carrier if ball possession changed
-    if (this.autoSwitchEnabled) {
-      this.handleAutoSwitch()
-    }
-
     // Update AI for all non-controlled players
     if (this.aiEnabled) {
       this.updateAI()
@@ -229,63 +221,7 @@ export class SinglePlayerScene extends BaseGameScene {
       timestamp: this.gameEngine.frameCount,
     })
 
-    // Auto-switching is handled by handleAutoSwitch() when ball becomes loose
-  }
-
-  /**
-   * Auto-switch to the teammate with best chance to intercept the ball
-   */
-  private autoSwitchToBestInterceptor(): void {
-    const engineState = this.gameEngine.getState()
-    const ball = engineState.ball
-
-    // Get all blue team players (human team) INCLUDING the current player
-    const blueTeamPlayers: EnginePlayerData[] = []
-    engineState.players.forEach((player) => {
-      if (player.team === 'blue') {
-        blueTeamPlayers.push(player)
-      }
-    })
-
-    if (blueTeamPlayers.length === 0) return
-
-    // Convert to format InterceptionCalculator expects (PlayerData format)
-    const teammates: PlayerData[] = blueTeamPlayers.map(p => ({
-      id: p.id,
-      team: p.team,
-      isHuman: p.isHuman,
-      isControlled: p.isControlled,
-      position: { x: p.x, y: p.y },
-      velocity: { x: p.velocityX, y: p.velocityY },
-      state: p.state,
-      direction: p.direction,
-    }))
-
-    // Create ball prediction function
-    const predictBallPosition = (t: number): Vector2D => {
-      return InterceptionCalculator.simulateBallPosition(
-        { x: ball.x, y: ball.y },
-        { x: ball.velocityX, y: ball.velocityY },
-        t
-      )
-    }
-
-    // Calculate best interceptor
-    const { interceptor } = InterceptionCalculator.calculateInterception(
-      teammates,
-      predictBallPosition,
-      { x: ball.x, y: ball.y }
-    )
-
-    // Only switch if the best interceptor is NOT the current player
-    if (interceptor.id === this.controlledPlayerId) {
-      console.log(`⚽ Current player is best interceptor, staying in control: ${interceptor.id}`)
-      return
-    }
-
-    // Switch to the best interceptor
-    this.switchToPlayer(interceptor.id)
-    console.log(`⚽ Auto-switched to best interceptor: ${interceptor.id}`)
+    // Auto-switching is handled by BaseGameScene.checkAutoSwitchOnPossession() when ball becomes loose
   }
 
   protected cleanupGameState(): void {
@@ -333,82 +269,18 @@ export class SinglePlayerScene extends BaseGameScene {
   }
 
   /**
-   * Auto-switch to ball carrier when possession changes
+   * Get unified game state (implements BaseGameScene abstract method)
    */
-  private handleAutoSwitch() {
+  protected getUnifiedState() {
     const engineState = this.gameEngine.getState()
-    const ballPossessor = engineState.ball.possessedBy
-
-    // Check if possession changed and belongs to blue team (human team)
-    if (ballPossessor && ballPossessor !== this.lastBallPossessor) {
-      const player = engineState.players.get(ballPossessor)
-      if (player && player.team === 'blue') {
-        // Switch to the ball carrier
-        this.switchToPlayer(ballPossessor)
-        console.log(`⚽ Auto-switched to ball carrier: ${ballPossessor}`)
-      }
-      this.lastBallPossessor = ballPossessor
-    } else if (!ballPossessor && this.lastBallPossessor) {
-      // Ball became loose - check if opponent shot/lost possession
-      const lastPlayer = engineState.players.get(this.lastBallPossessor)
-
-      // If last possessor was red team (opponent), switch to best interceptor
-      if (lastPlayer && lastPlayer.team === 'red') {
-        console.log(`⚽ Opponent lost possession, switching to best interceptor`)
-        this.autoSwitchToBestInterceptor()
-      }
-      // If last possessor was blue team (us) and ball is loose, also switch to best interceptor
-      else if (lastPlayer && lastPlayer.team === 'blue') {
-        console.log(`⚽ Ball loose after blue team possession, switching to best interceptor`)
-        this.autoSwitchToBestInterceptor()
-      }
-
-      this.lastBallPossessor = ''
-    }
+    return StateAdapter.fromGameEngine(engineState)
   }
 
   /**
-   * Switch to next teammate (manual switching)
+   * Called after player switch completes - update GameEngine control
    */
-  protected switchToNextTeammate() {
-    const engineState = this.gameEngine.getState()
-    const blueTeamPlayers: string[] = []
-
-    // Collect all blue team players
-    engineState.players.forEach((player, playerId) => {
-      if (player.team === 'blue') {
-        blueTeamPlayers.push(playerId)
-      }
-    })
-
-    if (blueTeamPlayers.length === 0) return
-
-    // Find current controlled player index
-    const currentIndex = blueTeamPlayers.indexOf(this.controlledPlayerId)
-    const nextIndex = (currentIndex + 1) % blueTeamPlayers.length
-    const nextPlayerId = blueTeamPlayers[nextIndex]
-
-    this.switchToPlayer(nextPlayerId)
-    console.log(`🔄 Manual switch to: ${nextPlayerId}`)
-  }
-
-  /**
-   * Switch control to a specific player
-   */
-  private switchToPlayer(playerId: string) {
-    const engineState = this.gameEngine.getState()
-    const player = engineState.players.get(playerId)
-
-    if (!player || player.team !== 'blue') {
-      return
-    }
-
-    // Update controlled player
-    this.controlledPlayerId = playerId
+  protected onPlayerSwitched(playerId: string): void {
     this.gameEngine.setPlayerControl(this.myPlayerId, playerId)
-
-    // Update player borders to show who is controlled
-    this.updatePlayerBorders()
   }
 
   /**

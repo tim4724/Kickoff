@@ -9,6 +9,7 @@ import { BallRenderer } from '../utils/BallRenderer'
 import { CameraManager } from '../utils/CameraManager'
 import { AIDebugRenderer } from '../utils/AIDebugRenderer'
 import { sceneRouter } from '../utils/SceneRouter'
+import { StateAdapter, type UnifiedGameState } from '../utils/StateAdapter'
 
 /**
  * Base Game Scene
@@ -59,12 +60,22 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected goalScored: boolean = false
   protected matchEnded: boolean = false
 
+  // Auto-switch state
+  protected lastBallPossessor: string = ''
+  protected autoSwitchEnabled: boolean = true
+
   // Abstract methods that subclasses must implement
   protected abstract initializeGameState(): void
   protected abstract getGameState(): any
   protected abstract updateGameState(delta: number): void
   protected abstract handleShootAction(power: number): void
   protected abstract cleanupGameState(): void
+
+  /**
+   * Get unified game state (normalized format)
+   * Subclasses implement this to convert their specific state format to unified format
+   */
+  protected abstract getUnifiedState(): UnifiedGameState | null
 
   // Optional method for AI debug - subclasses can override if they have AI
   protected updateAIDebugLabels(): void {
@@ -291,28 +302,6 @@ export abstract class BaseGameScene extends Phaser.Scene {
     }
   }
 
-  protected switchToNextTeammate() {
-    const state = this.getGameState()
-    const myTeam = state.players.get(this.myPlayerId)?.team
-    if (!myTeam) return
-
-    const teammates: string[] = []
-    state.players.forEach((player: EnginePlayerData, playerId: string) => {
-      if (player.team === myTeam) {
-        teammates.push(playerId)
-      }
-    })
-
-    if (teammates.length === 0) return
-
-    const currentIndex = teammates.indexOf(this.controlledPlayerId || '')
-    const nextIndex = (currentIndex + 1) % teammates.length
-    this.controlledPlayerId = teammates[nextIndex]
-
-    console.log(`🔄 Switched control to: ${this.controlledPlayerId}`)
-    this.updatePlayerBorders()
-  }
-
   protected createRemotePlayer(sessionId: string, playerState: EnginePlayerData) {
     const color =
       playerState.team === 'blue'
@@ -384,23 +373,125 @@ export abstract class BaseGameScene extends Phaser.Scene {
     )
   }
 
-  protected checkAutoSwitchOnPossession(state: any) {
-    const myTeam = state.players.get(this.myPlayerId)?.team
+  /**
+   * Auto-switch to ball carrier when possession changes
+   * Enhanced logic: Only auto-switch when our team captures the ball or shoots,
+   * NOT when opponent team loses possession.
+   */
+  protected checkAutoSwitchOnPossession() {
+    if (!this.autoSwitchEnabled) return
+
+    const unifiedState = this.getUnifiedState()
+    if (!unifiedState) return
+
+    const myTeam = StateAdapter.getPlayerTeam(unifiedState, this.myPlayerId)
     if (!myTeam) return
 
-    const currentPossessor = state.ball.possessedBy
+    const ballPossessor = unifiedState.ball.possessedBy
 
-    if (currentPossessor) {
-      const possessorPlayer = state.players.get(currentPossessor)
-      if (possessorPlayer?.team === myTeam) {
-        if (currentPossessor !== this.previousBallPossessor) {
-          this.controlledPlayerId = currentPossessor
-          this.updatePlayerBorders()
-        }
+    // Check if possession changed and belongs to our team (controlled player's team)
+    if (ballPossessor && ballPossessor !== this.lastBallPossessor) {
+      const playerTeam = StateAdapter.getPlayerTeam(unifiedState, ballPossessor)
+      if (playerTeam === myTeam) {
+        // Switch to the ball carrier on our team
+        this.switchToPlayer(ballPossessor)
+        console.log(`⚽ Auto-switched to ball carrier: ${ballPossessor}`)
       }
+      this.lastBallPossessor = ballPossessor
+    } else if (!ballPossessor && this.lastBallPossessor) {
+      // Ball became loose - check who lost possession
+      const lastPlayerTeam = StateAdapter.getPlayerTeam(unifiedState, this.lastBallPossessor)
+
+      // If last possessor was opponent team, DON'T auto-switch
+      // Wait for our team to capture the ball naturally
+      if (lastPlayerTeam && lastPlayerTeam !== myTeam) {
+        console.log(`⚽ Opponent lost possession, waiting for our team to capture`)
+        // Don't switch - let the player keep control
+      }
+      // If last possessor was our team and ball is loose, switch to best interceptor
+      else if (lastPlayerTeam === myTeam) {
+        console.log(`⚽ Ball loose after our team possession, switching to best interceptor`)
+        this.autoSwitchToBestInterceptor()
+      }
+
+      this.lastBallPossessor = ''
     }
 
-    this.previousBallPossessor = currentPossessor
+    // Keep previousBallPossessor for backward compatibility with other code
+    this.previousBallPossessor = ballPossessor
+  }
+
+  /**
+   * Auto-switch to the teammate with best chance to intercept the ball
+   */
+  protected autoSwitchToBestInterceptor() {
+    const unifiedState = this.getUnifiedState()
+    if (!unifiedState) return
+
+    const teammateIds = StateAdapter.getTeammateIds(unifiedState, this.myPlayerId)
+    const bestPlayerId = StateAdapter.findBestInterceptor(unifiedState, teammateIds)
+
+    // Only switch if we found a best interceptor and it's not the current player
+    if (!bestPlayerId || bestPlayerId === this.controlledPlayerId) {
+      console.log(`⚽ Current player is best interceptor, staying in control: ${this.controlledPlayerId}`)
+      return
+    }
+
+    // Switch to the best interceptor
+    this.switchToPlayer(bestPlayerId)
+    console.log(`⚽ Auto-switched to best interceptor: ${bestPlayerId}`)
+  }
+
+  /**
+   * Switch control to a specific player (validates team membership)
+   */
+  protected switchToPlayer(playerId: string): void {
+    const unifiedState = this.getUnifiedState()
+    if (!unifiedState) return
+
+    const myTeam = StateAdapter.getPlayerTeam(unifiedState, this.myPlayerId)
+    const playerTeam = StateAdapter.getPlayerTeam(unifiedState, playerId)
+
+    // Only allow switching to teammates
+    if (!myTeam || !playerTeam || playerTeam !== myTeam) {
+      return
+    }
+
+    // Update controlled player
+    this.controlledPlayerId = playerId
+
+    // Update player borders to show who is controlled
+    this.updatePlayerBorders()
+
+    // Subclasses can override to add additional logic (e.g., GameEngine.setPlayerControl)
+    this.onPlayerSwitched(playerId)
+  }
+
+  /**
+   * Called after player switch completes
+   * Subclasses can override to add scene-specific logic
+   */
+  protected onPlayerSwitched(_playerId: string): void {
+    // Default: no-op. Subclasses override if needed.
+  }
+
+  /**
+   * Switch to next teammate (manual switching)
+   */
+  protected switchToNextTeammate() {
+    const unifiedState = this.getUnifiedState()
+    if (!unifiedState) return
+
+    const teammates = StateAdapter.getTeammateIds(unifiedState, this.myPlayerId)
+    if (teammates.length === 0) return
+
+    // Find current controlled player index
+    const currentIndex = teammates.indexOf(this.controlledPlayerId)
+    const nextIndex = (currentIndex + 1) % teammates.length
+    const nextPlayerId = teammates[nextIndex]
+
+    this.switchToPlayer(nextPlayerId)
+    console.log(`🔄 Manual switch to: ${nextPlayerId}`)
   }
 
   protected onGoalScored(team: 'blue' | 'red') {
@@ -638,7 +729,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.updateBallColor(state)
 
     // Auto-switch on possession change
-    this.checkAutoSwitchOnPossession(state)
+    this.checkAutoSwitchOnPossession()
 
     // Update AI debug visualization if enabled
     if (this.debugEnabled) {

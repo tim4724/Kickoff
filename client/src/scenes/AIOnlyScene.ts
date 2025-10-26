@@ -5,6 +5,7 @@ import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { AIManager } from '../ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
+import { StateAdapter } from '../utils/StateAdapter'
 
 /**
  * AI-Only Scene
@@ -165,6 +166,14 @@ export class AIOnlyScene extends BaseGameScene {
 
   protected cleanupGameState(): void {
     // GameEngine cleanup (if needed in future)
+  }
+
+  /**
+   * Get unified game state (implements BaseGameScene abstract method)
+   */
+  protected getUnifiedState() {
+    const engineState = this.gameEngine.getState()
+    return StateAdapter.fromGameEngine(engineState)
   }
 
   /**

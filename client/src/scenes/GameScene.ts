@@ -3,6 +3,7 @@ import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { NetworkManager } from '../network/NetworkManager'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
+import { StateAdapter } from '../utils/StateAdapter'
 
 /**
  * Multiplayer Game Scene
@@ -172,6 +173,14 @@ export class GameScene extends BaseGameScene {
     // Reset initialization flags
     this.colorInitialized = false
     this.positionInitialized = false
+  }
+
+  /**
+   * Get unified game state (implements BaseGameScene abstract method)
+   */
+  protected getUnifiedState() {
+    const networkState = this.networkManager?.getState()
+    return networkState ? StateAdapter.fromNetwork(networkState) : null
   }
 
   // Override create to add room debug text and expose test API
@@ -471,6 +480,12 @@ export class GameScene extends BaseGameScene {
     const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
     sprite.x += (playerState.x - sprite.x) * lerpFactor
     sprite.y += (playerState.y - sprite.y) * lerpFactor
+
+    // Update team color (in case player switched teams or color wasn't set correctly)
+    const teamColor =
+      playerState.team === 'blue' ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR : VISUAL_CONSTANTS.PLAYER_RED_COLOR
+    sprite.setFillStyle(teamColor)
+    sprite.isFilled = true
   }
 
   private updateLocalPlayerColor() {
