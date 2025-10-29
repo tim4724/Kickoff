@@ -52,13 +52,14 @@ export class SceneRouter {
    * Handle initial page load - navigate to correct scene based on URL hash
    */
   private handleInitialRoute(): void {
-    const hash = window.location.hash.slice(1) || '/menu'
+    const originalHash = window.location.hash.slice(1)
+    const hash = originalHash || '/menu'
     const path = this.normalizePath(hash)
 
     console.log(`[SceneRouter] Initial route: ${hash} -> ${path}`)
 
-    // Update URL if normalized path differs
-    if (hash !== path) {
+    // Update URL if there was no hash OR if normalized path differs
+    if (!originalHash || hash !== path) {
       window.location.hash = path
     }
 
@@ -128,34 +129,60 @@ export class SceneRouter {
     }
 
     const sceneKey = ROUTES[path]
-    const currentScene = this.getActiveScene()
-
-    // Check if scene is already active
-    if (currentScene && currentScene.scene.key === sceneKey) {
-      console.log(`[SceneRouter] Scene ${sceneKey} already active, skipping`)
-      this.currentPath = path
-      return
-    }
 
     console.log(`[SceneRouter] Navigating: ${this.currentPath} -> ${path} (${sceneKey})`)
 
     // Update current path
     this.currentPath = path
 
-    // Properly transition scenes - stop current scene first, then start new scene
-    if (currentScene) {
-      const currentKey = currentScene.scene.key
-      console.log(`[SceneRouter] Stopping scene: ${currentKey}`)
+    // Get ALL currently active scenes (there might be multiple due to scene overlap)
+    const activeScenes = this.game.scene.getScenes(true)
 
-      // Stop current scene first to prevent overlap
-      this.game.scene.stop(currentKey)
+    // Check if target scene is already running AND it's the only active scene
+    const targetScene = this.game.scene.getScene(sceneKey)
+    const targetIsRunning = targetScene && targetScene.scene.isActive()
+    const onlyTargetActive = activeScenes.length === 1 && targetIsRunning
 
-      // Then start the new scene
-      console.log(`[SceneRouter] Starting scene: ${sceneKey}`)
-      this.game.scene.start(sceneKey)
+    if (onlyTargetActive) {
+      console.log(`[SceneRouter] Scene ${sceneKey} is already the only active scene, skipping`)
+      return
+    }
+
+    // Stop ALL active scenes (including target scene to ensure clean restart)
+    for (const scene of activeScenes) {
+      const key = scene.scene.key
+      console.log(`[SceneRouter] Stopping scene: ${key}`)
+      this.game.scene.stop(key)
+
+      // Clear test APIs immediately when stopping scenes
+      // (shutdown() is called asynchronously on next frame, so we do this now)
+      if (typeof window !== 'undefined') {
+        // Clear game scene test API
+        if ((window as any).__gameControls?.scene === scene) {
+          console.log('🧹 Clearing __gameControls test API (scene stopping)')
+          delete (window as any).__gameControls
+        }
+        // Clear menu scene test API
+        if (key === 'MenuScene' && (window as any).__menuLoaded) {
+          console.log('🧹 Clearing __menuLoaded flag (MenuScene stopping)')
+          ;(window as any).__menuLoaded = false
+          delete (window as any).__menuButtons
+        }
+      }
+    }
+
+    // Always use restart() if target scene has been created before, otherwise use start()
+    // Check scene status AFTER stopping - if it's STOPPED, it was created before
+    const targetAfterStop = this.game.scene.getScene(sceneKey)
+    const wasCreated = targetAfterStop && targetAfterStop.scene.settings.status === Phaser.Scenes.STOPPED
+
+    if (wasCreated) {
+      // Scene was created before - use restart() to force create() to run again
+      console.log(`[SceneRouter] Restarting scene: ${sceneKey}`)
+      this.game.scene.restart(sceneKey)
     } else {
-      // No scene running yet, start the target scene
-      console.log(`[SceneRouter] Starting initial scene: ${sceneKey}`)
+      // Scene never started - use start()
+      console.log(`[SceneRouter] Starting scene for first time: ${sceneKey}`)
       this.game.scene.start(sceneKey)
     }
   }

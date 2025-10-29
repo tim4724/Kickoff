@@ -85,6 +85,12 @@ export abstract class BaseGameScene extends Phaser.Scene {
   create() {
     console.log(`🎮 ${this.scene.key} - Creating...`)
 
+    // Clear menu scene flag (if coming from menu)
+    if (typeof window !== 'undefined' && (window as any).__menuLoaded) {
+      ;(window as any).__menuLoaded = false
+      console.log('🧹 Cleared __menuLoaded flag from previous menu scene')
+    }
+
     // Detect mobile
     this.isMobile =
       this.sys.game.device.os.android ||
@@ -756,5 +762,11 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.cleanupGameState()
 
     this.matchEnded = false
+
+    // Clear test API when scene shuts down
+    if (typeof window !== 'undefined' && (window as any).__gameControls?.scene === this) {
+      console.log('🧹 Clearing __gameControls test API')
+      delete (window as any).__gameControls
+    }
   }
 }

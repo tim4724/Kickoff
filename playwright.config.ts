@@ -40,8 +40,9 @@ export default defineConfig({
   },
 
   // Multiple reporters for better visibility
+  // HTML report is generated but not auto-opened (use npm run test:e2e:report to view)
   reporter: [
-    ['html'],
+    ['html', { open: 'never' }], // Don't auto-open HTML report
     ['json', { outputFile: 'test-results/results.json' }],
     ['list'], // Console output
   ],
@@ -51,6 +52,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    hasTouch: false, // Disable touch emulation to prevent fullscreen splash overlay
 
     // Action timeout for clicks, typing, etc
     actionTimeout: 15000, // 15 seconds
@@ -68,6 +70,7 @@ export default defineConfig({
       timeout: 90000, // Physics tests need more time
       use: {
         ...devices['Desktop Chrome'],
+        hasTouch: false, // Disable touch emulation to prevent fullscreen splash overlay
         launchOptions: {
           args: [
             '--disable-dev-shm-usage',
@@ -90,6 +93,7 @@ export default defineConfig({
       retries: process.env.CI ? 1 : 0, // Stable tests need fewer retries
       use: {
         ...devices['Desktop Chrome'],
+        hasTouch: false, // Disable touch emulation to prevent fullscreen splash overlay
         launchOptions: {
           args: [
             '--disable-dev-shm-usage',
@@ -111,6 +115,7 @@ export default defineConfig({
       testIgnore: /.*\/(ball-capture|shooting-mechanics|client-server-.*-sync|game-over|rendering|room-selection|two-player).*\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
+        hasTouch: false, // Disable touch emulation to prevent fullscreen splash overlay
         launchOptions: {
           args: [
             '--disable-dev-shm-usage',
@@ -128,23 +133,26 @@ export default defineConfig({
   ],
 
   // Auto-start test servers with isolated ports
+  // Note: Servers will automatically shut down after tests complete
+  // Port cleanup runs automatically via pretest:e2e script
   webServer: [
     {
-      command: 'npm run dev:shared',
+      command: 'npm run dev:server:test',
+      url: 'http://localhost:3001/health',
       timeout: 60 * 1000,
-      reuseExistingServer: !process.env.CI,
+      // Always start fresh servers to avoid stale state issues
+      // Use `npm run dev:test` for manual development with persistent servers
+      reuseExistingServer: false,
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
     {
       command: 'npm run dev:client:test',
       url: 'http://localhost:5174',
       timeout: 120 * 1000,
-      reuseExistingServer: !process.env.CI,
-    },
-    {
-      command: 'npm run dev:server:test',
-      url: 'http://localhost:3001/health',
-      timeout: 60 * 1000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
   ],
 

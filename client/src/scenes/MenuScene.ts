@@ -18,6 +18,35 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
+   * Update test API with current button positions
+   * Called after layout changes to keep test coordinates in sync
+   */
+  private updateTestAPI(): void {
+    if (typeof window !== 'undefined' && import.meta.env.DEV) {
+      ;(window as any).__menuButtons = {
+        singlePlayer: {
+          x: this.singlePlayerButton.x,
+          y: this.singlePlayerButton.y,
+          width: this.singlePlayerButton.width,
+          height: this.singlePlayerButton.height,
+        },
+        multiplayer: {
+          x: this.multiplayerButton.x,
+          y: this.multiplayerButton.y,
+          width: this.multiplayerButton.width,
+          height: this.multiplayerButton.height,
+        },
+        aiOnly: {
+          x: this.aiOnlyButton.x,
+          y: this.aiOnlyButton.y,
+          width: this.aiOnlyButton.width,
+          height: this.aiOnlyButton.height,
+        },
+      }
+    }
+  }
+
+  /**
    * Layout all UI elements responsively based on current screen size
    * Called on create() and whenever screen size changes (resize/rotation)
    */
@@ -94,6 +123,9 @@ export class MenuScene extends Phaser.Scene {
     // Update version text
     this.versionText.setFontSize(versionFontSize)
     this.versionText.setPosition(centerX, height * 0.95)
+
+    // Update test API with new button positions
+    this.updateTestAPI()
 
     console.log(`📐 Layout updated: ${width}x${height} (${isPortrait ? 'portrait' : 'landscape'})`)
   }
@@ -222,6 +254,12 @@ export class MenuScene extends Phaser.Scene {
 
     console.log('📋 Menu scene loaded with responsive layout')
 
+    // Expose test API for Playwright
+    if (typeof window !== 'undefined' && import.meta.env.DEV) {
+      ;(window as any).__menuLoaded = true
+      console.log('🧪 Test API exposed: window.__menuLoaded = true, __menuButtons')
+    }
+
     // Auto-start multiplayer for tests
     if (typeof window !== 'undefined' && (window as any).__testRoomId) {
       console.log('🧪 Test mode detected - auto-starting multiplayer via router')
@@ -296,7 +334,14 @@ export class MenuScene extends Phaser.Scene {
    * Cleanup: remove listeners when scene shuts down
    */
   shutdown(): void {
+    console.log('[MenuScene] shutdown() called - cleaning up')
     this.scale.off('resize', this.handleResize, this)
     window.removeEventListener('orientationchange', this.handleOrientationChange)
+
+    // Clear test API flags
+    if (typeof window !== 'undefined') {
+      ;(window as any).__menuLoaded = false
+      delete (window as any).__menuButtons
+    }
   }
 }
