@@ -69,7 +69,6 @@ export class OffensiveStrategy {
 
       const carrierRole = HasBallStrategy.decideBallCarrierAction(
         ballCarrier,
-        teammates,
         opponents,
         this.opponentGoal,
         passOptions
@@ -87,8 +86,7 @@ export class OffensiveStrategy {
 
       const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
         myPlayers,
-        predictBallPosition,
-        ball.position
+        predictBallPosition
       )
 
       roles.set(interceptor.id, { goal: 'receive-pass', target: interceptPoint })

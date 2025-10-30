@@ -138,8 +138,7 @@ export class DefensiveStrategy {
     const allPlayers = [...myPlayers, ...opponents]
     const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
       allPlayers,
-      predictBallPosition,
-      ballPosition
+      predictBallPosition
     )
 
     return { interceptor, interceptPoint }
@@ -174,13 +173,11 @@ export class DefensiveStrategy {
     _ball: { position: Vector2D; velocity: Vector2D }
   ): { interceptor: PlayerData; target: Vector2D } {
     const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
-    const currentBallPos = predictPath(0)
 
     // Calculate interception using InterceptionCalculator
     const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
       myPlayers,
-      predictPath,
-      currentBallPos
+      predictPath
     )
 
     return { interceptor, target: interceptPoint }
@@ -278,12 +275,10 @@ export class DefensiveStrategy {
       if (opponentInDefensiveThird) {
         // Close marking: Intercept opponent's path to goal
         const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
-        const currentPos = predictPath(0)
 
         const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
           availablePlayers,
-          predictPath,
-          currentPos
+          predictPath
         )
 
         assignedPlayer = interceptor

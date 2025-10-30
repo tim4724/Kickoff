@@ -172,14 +172,18 @@ export class SceneRouter {
     }
 
     // Always use restart() if target scene has been created before, otherwise use start()
-    // Check scene status AFTER stopping - if it's STOPPED, it was created before
+    // Check if scene exists in the scene manager (was created before)
     const targetAfterStop = this.game.scene.getScene(sceneKey)
-    const wasCreated = targetAfterStop && targetAfterStop.scene.settings.status === Phaser.Scenes.STOPPED
+    // A scene that exists but isn't active has status SHUTDOWN or DESTROYED
+    const wasCreated =
+      targetAfterStop &&
+      (targetAfterStop.scene.settings.status === Phaser.Scenes.SHUTDOWN ||
+        targetAfterStop.scene.settings.status === Phaser.Scenes.DESTROYED)
 
     if (wasCreated) {
       // Scene was created before - use restart() to force create() to run again
       console.log(`[SceneRouter] Restarting scene: ${sceneKey}`)
-      this.game.scene.restart(sceneKey)
+      targetAfterStop.scene.restart()
     } else {
       // Scene never started - use start()
       console.log(`[SceneRouter] Starting scene for first time: ${sceneKey}`)
@@ -187,20 +191,6 @@ export class SceneRouter {
     }
   }
 
-  /**
-   * Get the currently active Phaser scene instance
-   */
-  private getActiveScene(): Phaser.Scene | null {
-    if (!this.game) {
-      return null
-    }
-
-    // Get all active scenes
-    const activeScenes = this.game.scene.getScenes(true)
-
-    // Return the first active scene (should only be one game scene active)
-    return activeScenes.length > 0 ? activeScenes[0] : null
-  }
 
   /**
    * Programmatically navigate to a scene by name
