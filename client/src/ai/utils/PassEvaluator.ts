@@ -1,9 +1,8 @@
 /**
  * PassEvaluator - Unified pass evaluation logic
  *
- * Provides common utilities for evaluating pass targets and positioning.
- * Used by both ball carrier decision-making (HasBallStrategy) and
- * off-ball positioning (OffensiveStrategy).
+ * Evaluates fixed grid positions across the field to find best pass targets.
+ * Returns one best position per teammate with anti-clustering.
  */
 
 import { Vector2D } from '../types'
@@ -11,178 +10,127 @@ import { PlayerData, GAME_CONFIG } from '../../../../shared/src/types'
 import { InterceptionCalculator } from './InterceptionCalculator'
 
 export interface PassOption {
+  teammate: PlayerData
   position: Vector2D
   score: number
-  interceptor: PlayerData
-  teammate: PlayerData
-  forwardProgress: number
-  spaceAtTarget: number
-  passDistance: number
-  teammateMovement: number
 }
 
 export class PassEvaluator {
+  private static readonly GRID_COLS = 15
+  private static readonly GRID_ROWS = 8
+  private static readonly MIN_PASS_DISTANCE = 50
+  private static readonly PASS_POWER = 0.5
+  private static gridPositions: Vector2D[] | null = null
+
   /**
-   * Evaluate all possible pass targets for given teammates
-   * Generates candidate positions, simulates physics, checks interception, scores
-   *
-   * @param ballPosition - Position to pass from
-   * @param teammates - Teammates to consider as pass receivers
-   * @param opponents - Opponent players
-   * @param opponentGoal - Target goal position
-   * @returns Array of viable pass options sorted by score (best first)
+   * Get cached fixed grid positions (15×8 = 120 positions)
+   */
+  private static getGrid(): Vector2D[] {
+    if (this.gridPositions) return this.gridPositions
+
+    const colSpacing = GAME_CONFIG.FIELD_WIDTH / (this.GRID_COLS + 1)
+    const rowSpacing = GAME_CONFIG.FIELD_HEIGHT / (this.GRID_ROWS + 1)
+    const positions: Vector2D[] = []
+
+    for (let row = 1; row <= this.GRID_ROWS; row++) {
+      for (let col = 1; col <= this.GRID_COLS; col++) {
+        positions.push({ x: col * colSpacing, y: row * rowSpacing })
+      }
+    }
+
+    return (this.gridPositions = positions)
+  }
+
+  /**
+   * Calculate distance between two positions
+   */
+  private static dist(a: Vector2D, b: Vector2D): number {
+    const dx = a.x - b.x
+    const dy = a.y - b.y
+    return Math.sqrt(dx * dx + dy * dy)
+  }
+
+  /**
+   * Create ball trajectory predictor for interception calculation
+   */
+  private static ballPredictor(from: Vector2D, to: Vector2D, speed: number) {
+    const dist = this.dist(from, to)
+    const vx = dist > 0 ? ((to.x - from.x) / dist) * speed : 0
+    const vy = dist > 0 ? ((to.y - from.y) / dist) * speed : 0
+    return (t: number) => InterceptionCalculator.simulateBallPosition(from, { x: vx, y: vy }, t)
+  }
+
+  /**
+   * Evaluate pass options: one best position per teammate with anti-clustering
    */
   static evaluatePassOptions(
-    ballPosition: Vector2D,
+    ballPos: Vector2D,
     teammates: PlayerData[],
     opponents: PlayerData[],
-    opponentGoal: Vector2D
+    opponentGoal: Vector2D,
+    minSpacing = 200
   ): PassOption[] {
     if (teammates.length === 0) return []
 
     const allPlayers = [...teammates, ...opponents]
-    const options: PassOption[] = []
-    const PASS_POWER = 0.5
-    const passSpeed = GAME_CONFIG.MIN_SHOOT_SPEED +
-      (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * PASS_POWER
+    const passSpeed =
+      GAME_CONFIG.MIN_SHOOT_SPEED +
+      (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * this.PASS_POWER
 
-    for (const teammate of teammates) {
-      const candidates = this.generateCandidatePositions(teammate, opponentGoal)
+    // Group options by teammate
+    const optionsByTeammate = new Map(teammates.map(t => [t.id, [] as PassOption[]]))
 
-      for (const position of candidates) {
-        const dx = position.x - ballPosition.x
-        const dy = position.y - ballPosition.y
-        const passDistance = Math.sqrt(dx * dx + dy * dy)
+    // Evaluate each grid position
+    for (const pos of this.getGrid()) {
+      const passDist = this.dist(ballPos, pos)
+      if (passDist < this.MIN_PASS_DISTANCE) continue
 
-        if (passDistance < 50) continue
-        const predictBallPosition = this.createBallPredictor(ballPosition, position, passSpeed)
-        const { interceptor } = InterceptionCalculator.calculateInterception(
-          allPlayers,
-          predictBallPosition,
-          ballPosition
-        )
+      // Check who intercepts
+      const predictor = this.ballPredictor(ballPos, pos, passSpeed)
+      const { interceptor } = InterceptionCalculator.calculateInterception(allPlayers, predictor)
 
-        if (interceptor.id !== teammate.id) continue
+      const options = optionsByTeammate.get(interceptor.id)
+      if (!options) continue
 
-        const forwardProgress =
-          InterceptionCalculator.distance(ballPosition, opponentGoal) -
-          InterceptionCalculator.distance(position, opponentGoal)
+      // Score: forward progress + space - movement distance
+      const forwardProgress = this.dist(ballPos, opponentGoal) - this.dist(pos, opponentGoal)
+      const spaceAtTarget = Math.min(...opponents.map(opp => this.dist(pos, opp.position)))
+      const movement = this.dist(interceptor.position, pos)
+      const score = forwardProgress * 0.5 + spaceAtTarget * 0.3 - movement * 0.2
 
-        const spaceAtTarget = Math.min(
-          ...opponents.map(opp => InterceptionCalculator.distance(position, opp.position))
-        )
+      options.push({ teammate: interceptor, position: pos, score })
+    }
 
-        const teammateMovement = InterceptionCalculator.distance(teammate.position, position)
+    // Select best position per teammate with anti-clustering
+    const selected: PassOption[] = []
+    const usedPositions: Vector2D[] = [ballPos] // Include ball position to avoid clustering near it
 
-        const score = forwardProgress * 0.5 + spaceAtTarget * 0.3 - teammateMovement * 0.2
+    // Sort teammates by best option score
+    const sorted = teammates
+      .map(t => ({ t, best: optionsByTeammate.get(t.id)!.sort((a, b) => b.score - a.score)[0] }))
+      .filter(x => x.best)
+      .sort((a, b) => b.best.score - a.best.score)
 
-        options.push({
-          position,
-          score,
-          interceptor,
-          teammate,
-          forwardProgress,
-          spaceAtTarget,
-          passDistance,
-          teammateMovement,
-        })
+    // Assign positions with spacing constraint (from ball and other positions)
+    for (const { t } of sorted) {
+      const options = optionsByTeammate.get(t.id)!.sort((a, b) => b.score - a.score)
+      const option =
+        options.find(o => usedPositions.every(p => this.dist(o.position, p) >= minSpacing)) ||
+        options[0]
+
+      if (option) {
+        selected.push(option)
+        usedPositions.push(option.position)
       }
     }
 
-    return options.sort((a, b) => b.score - a.score)
+    return selected.sort((a, b) => b.score - a.score)
   }
 
   /**
-   * Generate candidate positions around a teammate
-   * Creates ~30 positions in various directions and forward-biased positions
-   */
-  private static generateCandidatePositions(
-    teammate: PlayerData,
-    opponentGoal: Vector2D
-  ): Vector2D[] {
-    const candidates: Vector2D[] = []
-    const CANDIDATE_DISTANCES = [100, 200, 300]
-    const CANDIDATE_ANGLES = 8 // 45° increments
-
-    // Determine forward direction (toward opponent goal)
-    const toGoalX = opponentGoal.x - teammate.position.x
-    const toGoalY = opponentGoal.y - teammate.position.y
-    const toGoalDist = Math.sqrt(toGoalX * toGoalX + toGoalY * toGoalY)
-    const forwardX = toGoalDist > 1 ? toGoalX / toGoalDist : 1
-    const forwardY = toGoalDist > 1 ? toGoalY / toGoalDist : 0
-
-    // Add positions in various directions (8 angles × 3 distances = 24 positions)
-    const angleIncrement = (2 * Math.PI) / CANDIDATE_ANGLES
-    for (let i = 0; i < CANDIDATE_ANGLES; i++) {
-      const angle = i * angleIncrement
-      for (const distance of CANDIDATE_DISTANCES) {
-        const x = teammate.position.x + Math.cos(angle) * distance
-        const y = teammate.position.y + Math.sin(angle) * distance
-
-        if (x >= 0 && x <= GAME_CONFIG.FIELD_WIDTH && y >= 0 && y <= GAME_CONFIG.FIELD_HEIGHT) {
-          candidates.push({ x, y })
-        }
-      }
-    }
-
-    // Add forward-biased positions (toward goal) (2 distances × 3 lateral = 6 positions)
-    for (const distance of [150, 250]) {
-      for (const lateralOffset of [-100, 0, 100]) {
-        const perpX = -forwardY // Perpendicular to forward direction
-        const perpY = forwardX
-
-        const x = teammate.position.x + forwardX * distance + perpX * lateralOffset
-        const y = teammate.position.y + forwardY * distance + perpY * lateralOffset
-
-        if (x >= 0 && x <= GAME_CONFIG.FIELD_WIDTH && y >= 0 && y <= GAME_CONFIG.FIELD_HEIGHT) {
-          candidates.push({ x, y })
-        }
-      }
-    }
-
-    return candidates
-  }
-
-  /**
-   * Create ball position predictor function
-   * Simulates a pass from ballPosition to targetPosition at passSpeed
-   */
-  private static createBallPredictor(
-    ballPosition: Vector2D,
-    targetPosition: Vector2D,
-    passSpeed: number
-  ): (t: number) => Vector2D {
-    // Calculate pass direction
-    const dx = targetPosition.x - ballPosition.x
-    const dy = targetPosition.y - ballPosition.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
-    const dirX = dist > 0 ? dx / dist : 0
-    const dirY = dist > 0 ? dy / dist : 0
-    const velocity = { x: dirX * passSpeed, y: dirY * passSpeed }
-
-    // Simulate pass with friction and bounces
-    return (t: number) => InterceptionCalculator.simulateBallPosition(ballPosition, velocity, t)
-  }
-
-  /**
-   * Find best pass target from evaluated options
-   * Returns the highest-scoring position, or null if no viable passes
+   * Find best pass target (highest scoring position)
    */
   static findBestPassTarget(options: PassOption[]): Vector2D | null {
-    if (options.length === 0) return null
-    return options[0].position // Already sorted by score
-  }
-
-  /**
-   * Find best receive position for a specific player
-   * Returns the best position where this player can receive the ball
-   */
-  static findBestReceivePosition(
-    player: PlayerData,
-    options: PassOption[]
-  ): Vector2D | null {
-    const playerOptions = options.filter(opt => opt.teammate.id === player.id)
-    if (playerOptions.length === 0) return null
-    return playerOptions[0].position
+    return options[0]?.position || null
   }
 }

@@ -8,14 +8,13 @@
 import { Vector2D, PlayerRole } from '../types'
 import { PlayerData, GAME_CONFIG } from '../../../../shared/src/types'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
-import { PassEvaluator, PassOption } from '../utils/PassEvaluator'
+import { PassOption } from '../utils/PassEvaluator'
 
 export class HasBallStrategy {
   /**
    * Decide the best action for the ball carrier
    *
    * @param carrier - Player with ball possession
-   * @param teammates - Teammates (excluding carrier)
    * @param opponents - Opponent players
    * @param opponentGoal - Target goal position
    * @param passOptions - Pre-calculated pass options (optional, will calculate if not provided)
@@ -23,10 +22,9 @@ export class HasBallStrategy {
    */
   static decideBallCarrierAction(
     carrier: PlayerData,
-    teammates: PlayerData[],
     opponents: PlayerData[],
     opponentGoal: Vector2D,
-    passOptions?: PassOption[]
+    passOptions: PassOption[]
   ): PlayerRole {
     const distToGoal = InterceptionCalculator.distance(carrier.position, opponentGoal)
 
@@ -55,13 +53,7 @@ export class HasBallStrategy {
 
     // Step 3: If path is blocked, try to pass
     if (isPathBlocked) {
-      const passTarget = this.findBestPassTarget(
-        carrier,
-        teammates,
-        opponents,
-        opponentGoal,
-        passOptions
-      )
+      const passTarget = passOptions[0]?.position
 
       if (passTarget) {
         return { goal: 'pass', target: passTarget, shootPower: 0.5 }
@@ -114,8 +106,7 @@ export class HasBallStrategy {
     // Find which opponent can intercept fastest
     const { interceptPoint } = InterceptionCalculator.calculateInterception(
       opponents,
-      predictCarrierPosition,
-      carrier.position
+      predictCarrierPosition
     )
 
     // Calculate distance from intercept point to carrier's current position
@@ -124,47 +115,6 @@ export class HasBallStrategy {
     return { interceptPoint, interceptDistance }
   }
 
-  /**
-   * Find the best pass target in open space
-   * Passes to positions where teammates can run to receive the ball
-   * More realistic than passing directly to current teammate position
-   *
-   * Uses PassEvaluator for consistent logic with receive-pass positioning
-   *
-   * @param carrier - Player with the ball
-   * @param teammates - Available teammates
-   * @param opponents - Opponent players
-   * @param opponentGoal - Target goal
-   * @param passOptions - Pre-calculated pass options (optional, will calculate if not provided)
-   * @returns Best pass target position, or null if no viable pass exists
-   */
-  private static findBestPassTarget(
-    carrier: PlayerData,
-    teammates: PlayerData[],
-    opponents: PlayerData[],
-    opponentGoal: Vector2D,
-    passOptions?: PassOption[]
-  ): Vector2D | null {
-    // Use pre-calculated options if available, otherwise calculate now
-    let options = passOptions
-
-    if (!options) {
-      // Calculate actual ball position (ball is POSSESSION_BALL_OFFSET ahead of player)
-      const actualBallPosition = {
-        x: carrier.position.x + Math.cos(carrier.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET,
-        y: carrier.position.y + Math.sin(carrier.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET,
-      }
-
-      options = PassEvaluator.evaluatePassOptions(
-        actualBallPosition,
-        teammates,
-        opponents,
-        opponentGoal
-      )
-    }
-
-    return PassEvaluator.findBestPassTarget(options)
-  }
 
   /**
    * Find the best shot target using interception calculations
@@ -222,8 +172,7 @@ export class HasBallStrategy {
       // Check if opponents can intercept this shot
       const { interceptPoint } = InterceptionCalculator.calculateInterception(
         opponents,
-        predictBallPosition,
-        carrier.position
+        predictBallPosition
       )
 
       // Calculate how far the intercept point is from carrier (further = better)

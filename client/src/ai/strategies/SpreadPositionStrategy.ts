@@ -58,7 +58,7 @@ export class SpreadPositionStrategy {
     for (const player of offensivePlayers) {
       if (!assignedPlayers.has(player.id)) {
         roles.set(player.id, {
-          goal: 'receivePass-spread',
+          goal: 'stay',
           target: player.position,
         })
       }

@@ -20,20 +20,24 @@ export class InterceptionCalculator {
    *
    * IMPORTANT: Accounts for PRESSURE_RADIUS - players can capture ball when within 70px,
    * not just at exact position. This is critical for accurate pass/interception calculations.
+   *
+   * @returns Interception data if any player can intercept, null otherwise
    */
   static calculateInterception(
     players: PlayerData[],
-    predictPosition: (timeSeconds: number) => Vector2D,
-    fallbackPosition: Vector2D
+    predictPosition: (timeSeconds: number) => Vector2D
   ): { interceptor: PlayerData; interceptPoint: Vector2D } {
     const playerSpeed = GAME_CONFIG.PLAYER_SPEED
     const pressureRadius = GAME_CONFIG.PRESSURE_RADIUS
     const maxLookAhead = 4.0 // seconds
     const timeStep = 0.1 // check every 0.1 seconds
 
+    let lastFuturePos: Vector2D | null = null
+
     // For each time step, check if any player can reach the ball
     for (let t = timeStep; t <= maxLookAhead; t += timeStep) {
       const futurePos = predictPosition(t)
+      lastFuturePos = futurePos
       const maxPlayerTravel = playerSpeed * t // How far can a player travel in time t?
 
       // Find ALL players who can intercept at this time, then pick the closest
@@ -59,9 +63,19 @@ export class InterceptionCalculator {
       }
     }
 
-    // No interception possible within time window, return first player with fallback position
-    // This ensures we always have an assignment, even if suboptimal
-    return { interceptor: players[0], interceptPoint: fallbackPosition }
+    // No interception possible - return player closest to final ball position
+    const finalPos = lastFuturePos || predictPosition(0)
+
+    // Guard against empty players array
+    if (players.length === 0) {
+      throw new Error('InterceptionCalculator: players array cannot be empty')
+    }
+
+    const closestPlayer = players.reduce((best, p) =>
+      this.distance(p.position, finalPos) < this.distance(best.position, finalPos) ? p : best
+    , players[0]) // Provide initial value to avoid reduce error
+
+    return { interceptor: closestPlayer, interceptPoint: finalPos }
   }
 
   /**
