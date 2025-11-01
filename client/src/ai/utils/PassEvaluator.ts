@@ -18,9 +18,13 @@ export interface PassOption {
 export class PassEvaluator {
   private static readonly GRID_COLS = 15
   private static readonly GRID_ROWS = 8
-  private static readonly MIN_PASS_DISTANCE = 50
   private static readonly PASS_POWER = 0.5
   private static gridPositions: Vector2D[] | null = null
+
+  // Scoring weights for pass evaluation
+  private static readonly SCORE_WEIGHT_FORWARD_PROGRESS = 0.5
+  private static readonly SCORE_WEIGHT_SPACE = 0.3
+  private static readonly SCORE_WEIGHT_MOVEMENT = 0.2
 
   /**
    * Get cached fixed grid positions (15×8 = 120 positions)
@@ -48,6 +52,15 @@ export class PassEvaluator {
     const dx = a.x - b.x
     const dy = a.y - b.y
     return Math.sqrt(dx * dx + dy * dy)
+  }
+
+  /**
+   * Calculate squared distance (faster, used for comparisons)
+   */
+  private static distSquared(a: Vector2D, b: Vector2D): number {
+    const dx = a.x - b.x
+    const dy = a.y - b.y
+    return dx * dx + dy * dy
   }
 
   /**
@@ -81,9 +94,10 @@ export class PassEvaluator {
     const optionsByTeammate = new Map(teammates.map(t => [t.id, [] as PassOption[]]))
 
     // Evaluate each grid position
+    const minSpacingSquared = minSpacing * minSpacing
     for (const pos of this.getGrid()) {
-      const passDist = this.dist(ballPos, pos)
-      if (passDist < this.MIN_PASS_DISTANCE) continue
+      // Use squared distance for comparison (no sqrt needed)
+      if (this.distSquared(ballPos, pos) < minSpacingSquared) continue
 
       // Check who intercepts
       const predictor = this.ballPredictor(ballPos, pos, passSpeed)
@@ -94,29 +108,78 @@ export class PassEvaluator {
 
       // Score: forward progress + space - movement distance
       const forwardProgress = this.dist(ballPos, opponentGoal) - this.dist(pos, opponentGoal)
-      const spaceAtTarget = Math.min(...opponents.map(opp => this.dist(pos, opp.position)))
+      
+      // Calculate space from nearest opponent (more efficient than spread operator)
+      // If no opponents, use maximum space (field diagonal as fallback)
+      let spaceAtTarget: number
+      if (opponents.length === 0) {
+        spaceAtTarget = this.dist({ x: 0, y: 0 }, { x: GAME_CONFIG.FIELD_WIDTH, y: GAME_CONFIG.FIELD_HEIGHT })
+      } else {
+        // Use squared distance for comparison to find minimum (no sqrt until final value)
+        let minSpaceSquared = Infinity
+        for (const opp of opponents) {
+          const dSquared = this.distSquared(pos, opp.position)
+          if (dSquared < minSpaceSquared) {
+            minSpaceSquared = dSquared
+          }
+        }
+        // Calculate real distance from squared value (only one sqrt instead of N)
+        spaceAtTarget = Math.sqrt(minSpaceSquared)
+      }
+      
       const movement = this.dist(interceptor.position, pos)
-      const score = forwardProgress * 0.5 + spaceAtTarget * 0.3 - movement * 0.2
+      const score =
+        forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS +
+        spaceAtTarget * this.SCORE_WEIGHT_SPACE -
+        movement * this.SCORE_WEIGHT_MOVEMENT
 
       options.push({ teammate: interceptor, position: pos, score })
+    }
+
+    // Sort options once per teammate (by score, descending)
+    // This avoids redundant sorting when selecting best options later
+    const sortedOptionsByTeammate = new Map<string, PassOption[]>()
+    for (const [teammateId, options] of optionsByTeammate.entries()) {
+      sortedOptionsByTeammate.set(teammateId, options.sort((a, b) => b.score - a.score))
     }
 
     // Select best position per teammate with anti-clustering
     const selected: PassOption[] = []
     const usedPositions: Vector2D[] = [ballPos] // Include ball position to avoid clustering near it
 
-    // Sort teammates by best option score
-    const sorted = teammates
-      .map(t => ({ t, best: optionsByTeammate.get(t.id)!.sort((a, b) => b.score - a.score)[0] }))
-      .filter(x => x.best)
-      .sort((a, b) => b.best.score - a.best.score)
+    // Sort teammates by their best option score (descending)
+    // Filter out teammates with no options - they won't get a position assigned
+    const teammatesByBestOption = teammates
+      .map(t => {
+        const sortedOptions = sortedOptionsByTeammate.get(t.id) || []
+        return { sortedOptions, bestOption: sortedOptions[0] }
+      })
+      .filter(x => x.bestOption !== undefined)
+      .sort((a, b) => b.bestOption.score - a.bestOption.score)
 
     // Assign positions with spacing constraint (from ball and other positions)
-    for (const { t } of sorted) {
-      const options = optionsByTeammate.get(t.id)!.sort((a, b) => b.score - a.score)
-      const option =
-        options.find(o => usedPositions.every(p => this.dist(o.position, p) >= minSpacing)) ||
-        options[0]
+    // Process teammates in order of best option score to prioritize higher-quality passes
+    // minSpacingSquared already calculated above, reuse it
+    
+    for (const { sortedOptions } of teammatesByBestOption) {
+      // Find first option that maintains minimum spacing from used positions
+      // Use squared distance comparison to avoid sqrt calculations
+      // Fallback to best option if no spacing-compliant option exists
+      let option: PassOption | undefined
+      
+      for (const candidate of sortedOptions) {
+        // Check spacing using squared distance (faster)
+        const hasSpacing = usedPositions.every(
+          p => this.distSquared(candidate.position, p) >= minSpacingSquared
+        )
+        if (hasSpacing) {
+          option = candidate
+          break // Found a valid option, no need to check more
+        }
+      }
+      
+      // Fallback to best option if none met spacing requirements
+      option = option || sortedOptions[0]
 
       if (option) {
         selected.push(option)
@@ -124,13 +187,9 @@ export class PassEvaluator {
       }
     }
 
+    // Final result is already sorted by teammate priority, but sort by score for consistency
+    // Note: This maintains order for teammates with similar scores
     return selected.sort((a, b) => b.score - a.score)
   }
 
-  /**
-   * Find best pass target (highest scoring position)
-   */
-  static findBestPassTarget(options: PassOption[]): Vector2D | null {
-    return options[0]?.position || null
-  }
 }
