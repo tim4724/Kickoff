@@ -18,17 +18,20 @@ export class InterceptionCalculator {
    * Checks all players at each time step, returns immediately when first match found
    * Much more efficient than calculating all time steps for each player individually
    *
-   * IMPORTANT: Accounts for PRESSURE_RADIUS - players can capture ball when within 70px,
+   * IMPORTANT: Accounts for interceptionRadius - players can capture ball when within this distance,
    * not just at exact position. This is critical for accurate pass/interception calculations.
    *
+   * @param players - Array of players that could potentially intercept
+   * @param predictPosition - Function that predicts ball position at a given time
+   * @param interceptionRadius - Maximum distance at which a player can intercept the ball
    * @returns Interception data if any player can intercept, null otherwise
    */
   static calculateInterception(
     players: PlayerData[],
-    predictPosition: (timeSeconds: number) => Vector2D
+    predictPosition: (timeSeconds: number) => Vector2D,
+    interceptionRadius: number
   ): { interceptor: PlayerData; interceptPoint: Vector2D } {
     const playerSpeed = GAME_CONFIG.PLAYER_SPEED
-    const pressureRadius = GAME_CONFIG.PRESSURE_RADIUS
     const maxLookAhead = 4.0 // seconds
     const timeStep = 0.1 // check every 0.1 seconds
 
@@ -47,8 +50,8 @@ export class InterceptionCalculator {
       for (const player of players) {
         const distanceToBall = this.distance(player.position, futurePos)
 
-        // Can this player reach the ball (within pressure radius) in time t?
-        if (distanceToBall - pressureRadius <= maxPlayerTravel) {
+        // Can this player reach the ball (within interception radius) in time t?
+        if (distanceToBall - interceptionRadius <= maxPlayerTravel) {
           // This player CAN intercept - check if they're closest
           if (distanceToBall < closestDistance) {
             closestInterceptor = player

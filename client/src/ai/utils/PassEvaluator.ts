@@ -22,9 +22,10 @@ export class PassEvaluator {
   private static gridPositions: Vector2D[] | null = null
 
   // Scoring weights for pass evaluation
-  private static readonly SCORE_WEIGHT_FORWARD_PROGRESS = 0.5
-  private static readonly SCORE_WEIGHT_SPACE = 0.3
-  private static readonly SCORE_WEIGHT_MOVEMENT = 0.2
+  private static readonly SCORE_WEIGHT_FORWARD_PROGRESS = 0.4
+  private static readonly SCORE_WEIGHT_SPACE = 0.5
+  private static readonly SCORE_WEIGHT_MOVEMENT = 0.1
+  private static readonly SPACE_CAP = 300
 
   /**
    * Get cached fixed grid positions (15×8 = 120 positions)
@@ -101,7 +102,11 @@ export class PassEvaluator {
 
       // Check who intercepts
       const predictor = this.ballPredictor(ballPos, pos, passSpeed)
-      const { interceptor } = InterceptionCalculator.calculateInterception(allPlayers, predictor)
+      const { interceptor } = InterceptionCalculator.calculateInterception(
+        allPlayers,
+        predictor,
+        GAME_CONFIG.PRESSURE_RADIUS
+      )
 
       const options = optionsByTeammate.get(interceptor.id)
       if (!options) continue
@@ -130,7 +135,7 @@ export class PassEvaluator {
       const movement = this.dist(interceptor.position, pos)
       const score =
         forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS +
-        spaceAtTarget * this.SCORE_WEIGHT_SPACE -
+        Math.min(this.SPACE_CAP, spaceAtTarget) * this.SCORE_WEIGHT_SPACE -
         movement * this.SCORE_WEIGHT_MOVEMENT
 
       options.push({ teammate: interceptor, position: pos, score })
@@ -191,5 +196,4 @@ export class PassEvaluator {
     // Note: This maintains order for teammates with similar scores
     return selected.sort((a, b) => b.score - a.score)
   }
-
 }

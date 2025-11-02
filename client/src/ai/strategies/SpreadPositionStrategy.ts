@@ -33,14 +33,11 @@ export class SpreadPositionStrategy {
       return roles
     }
 
-    // Use provided pass options
-    const options = passOptions
-
     // Track assigned players to avoid duplicates
     const assignedPlayers = new Set<string>()
 
     // Assign each player to their best available position
-    for (const option of options) {
+    for (const option of passOptions) {
       if (assignedPlayers.has(option.teammate.id)) {
         // This player already has a position - skip to next option
         continue

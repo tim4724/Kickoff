@@ -11,6 +11,26 @@ import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { PassOption } from '../utils/PassEvaluator'
 
 export class HasBallStrategy {
+  // Shooting constants
+  private static readonly SHOOTING_RANGE = GAME_CONFIG.FIELD_WIDTH / 3 // 640px
+  private static readonly MIN_INTERCEPT_DISTANCE = 150 // Minimum distance for safe shot
+  private static readonly GOAL_MARGIN = 20 // Margin from goal edges for shot targets
+  private static readonly MAX_SHOOT_POWER = 1.0
+
+  // Path blocking constants
+  private static readonly INTERCEPT_THRESHOLD = 200 // Distance threshold for blocked path
+
+  // Dribble constants
+  private static readonly DRIBBLE_DISTANCES = [150, 250] // Two distance rings
+  private static readonly DRIBBLE_ANGLES = 8 // 45° increments
+
+  // Pass constants
+  private static readonly PASS_SHOOT_POWER = 0.5
+
+  // Scoring constants
+  private static readonly MAX_SPACE_CAP = 300 // Maximum space value in scoring calculation
+  private static readonly SCORE_WEIGHT_SPACE = 1.0
+  private static readonly SCORE_WEIGHT_FORWARD_PROGRESS = 0.2
   /**
    * Decide the best action for the ball carrier
    *
@@ -28,19 +48,16 @@ export class HasBallStrategy {
   ): PlayerRole {
     const distToGoal = InterceptionCalculator.distance(carrier.position, opponentGoal)
 
-    // Step 1: Check if in shooting range (within 1/3 of field width)
-    const SHOOTING_RANGE = GAME_CONFIG.FIELD_WIDTH / 3 // 640px
-    if (distToGoal < SHOOTING_RANGE) {
+    if (distToGoal < this.SHOOTING_RANGE) {
       // Evaluate shot angles using interception logic
       const shotOption = this.findBestShotTarget(carrier, opponents, opponentGoal)
 
       if (shotOption) {
-        const shootPower = Math.min(1.0, distToGoal / SHOOTING_RANGE) // Further = harder shot
+        const shootPower = Math.min(this.MAX_SHOOT_POWER, distToGoal / this.SHOOTING_RANGE) // Further = harder shot
         return { goal: 'shoot', target: shotOption.target, shootPower }
       }
     }
 
-    // Step 2: Evaluate if opponents can intercept path to goal
     const { interceptDistance } = this.evaluateOpponentIntercept(
       carrier,
       opponents,
@@ -48,28 +65,30 @@ export class HasBallStrategy {
     )
 
     // Check if path is blocked (opponent can intercept within threshold)
-    const INTERCEPT_THRESHOLD = 200
-    const isPathBlocked = interceptDistance < INTERCEPT_THRESHOLD
+    const isPathBlocked = interceptDistance < this.INTERCEPT_THRESHOLD
 
-    // Step 3: If path is blocked, try to pass
-    if (isPathBlocked) {
-      const passTarget = passOptions[0]?.position
-
-      if (passTarget) {
-        return { goal: 'pass', target: passTarget, shootPower: 0.5 }
-      }
-
-      // No viable pass - dribble to empty space
-      const dribbleSpace = this.findBestDribbleSpace(carrier, opponents, opponentGoal)
-      if (dribbleSpace) {
-        return { goal: 'dribbleToSpace', target: dribbleSpace }
-      }
-
-      // Fallback: dribble toward goal anyway
+    if (!isPathBlocked) {
       return { goal: 'dribbleToGoal', target: opponentGoal }
     }
 
-    return { goal: 'dribbleToGoal', target: opponentGoal }
+    const passOption = passOptions[0]
+    const dribbleOption = this.findBestDribbleSpace(carrier, opponents, opponentGoal)
+
+    // XOR case: Only one option available - choose it
+    const hasPass = passOption !== undefined
+
+     // Both available - compare scores and choose better option
+     if (hasPass) {
+       const passScore = this.evaluatePassScore(carrier, passOption, opponentGoal, opponents)
+       // Choose option with higher score
+       if (passScore > dribbleOption.score) {
+         return { goal: 'pass', target: passOption.position, shootPower: this.PASS_SHOOT_POWER }
+       } else {
+         return { goal: 'dribbleToSpace', target: dribbleOption.position }
+       }
+    }
+
+    return { goal: 'dribbleToSpace', target: dribbleOption.position }
   }
 
   /**
@@ -106,7 +125,8 @@ export class HasBallStrategy {
     // Find which opponent can intercept fastest
     const { interceptPoint } = InterceptionCalculator.calculateInterception(
       opponents,
-      predictCarrierPosition
+      predictCarrierPosition,
+      GAME_CONFIG.PRESSURE_RADIUS
     )
 
     // Calculate distance from intercept point to carrier's current position
@@ -133,11 +153,11 @@ export class HasBallStrategy {
     // Generate candidate shot targets across the goal
     const goalX = opponentGoal.x
     const candidateYPositions = [
-      GAME_CONFIG.GOAL_Y_MIN + 20, // Top corner (with margin)
+      GAME_CONFIG.GOAL_Y_MIN + this.GOAL_MARGIN, // Top corner (with margin)
       GAME_CONFIG.GOAL_Y_MIN + (GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN) / 3, // Upper third
       opponentGoal.y, // Center
       GAME_CONFIG.GOAL_Y_MAX - (GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN) / 3, // Lower third
-      GAME_CONFIG.GOAL_Y_MAX - 20, // Bottom corner (with margin)
+      GAME_CONFIG.GOAL_Y_MAX - this.GOAL_MARGIN, // Bottom corner (with margin)
     ]
 
     interface ShotOption {
@@ -172,7 +192,8 @@ export class HasBallStrategy {
       // Check if opponents can intercept this shot
       const { interceptPoint } = InterceptionCalculator.calculateInterception(
         opponents,
-        predictBallPosition
+        predictBallPosition,
+        GAME_CONFIG.PRESSURE_RADIUS
       )
 
       // Calculate how far the intercept point is from carrier (further = better)
@@ -190,8 +211,7 @@ export class HasBallStrategy {
     const bestShot = shotOptions[0]
 
     // Only shoot if intercept distance is reasonable (opponent can't easily block)
-    const MIN_INTERCEPT_DISTANCE = 150
-    if (bestShot.interceptDistance < MIN_INTERCEPT_DISTANCE) {
+    if (bestShot.interceptDistance < this.MIN_INTERCEPT_DISTANCE) {
       return null // All shots too risky
     }
 
@@ -205,36 +225,24 @@ export class HasBallStrategy {
    * @param carrier - Player with the ball
    * @param opponents - Opponent players
    * @param opponentGoal - Target goal position
-   * @returns Best dribble target position, or null if no good space found
+   * @returns Best dribble target position with score, or null if no good space found
    */
   private static findBestDribbleSpace(
     carrier: PlayerData,
     opponents: PlayerData[],
     opponentGoal: Vector2D
-  ): Vector2D | null {
-    // Generate candidate dribble positions around carrier
-    const DRIBBLE_DISTANCES = [150, 250] // Two distance rings
-    const ANGLES = 8 // 45° increments
-
-    interface DribbleOption {
-      position: Vector2D
-      score: number
+  ): { position: Vector2D; score: number } {
+    // Initialize best option with opponentGoal and infinity score (fallback if no better option found)
+    let bestOption: { position: Vector2D; score: number } = {
+      position: opponentGoal,
+      score: 0
     }
 
-    const dribbleOptions: DribbleOption[] = []
-
-    // Calculate forward direction toward goal
-    const toGoalX = opponentGoal.x - carrier.position.x
-    const toGoalY = opponentGoal.y - carrier.position.y
-    const toGoalDist = Math.sqrt(toGoalX * toGoalX + toGoalY * toGoalY)
-    const forwardX = toGoalDist > 1 ? toGoalX / toGoalDist : 1
-    const forwardY = toGoalDist > 1 ? toGoalY / toGoalDist : 0
-
-    const angleIncrement = (2 * Math.PI) / ANGLES
-    for (let i = 0; i < ANGLES; i++) {
+    const angleIncrement = (2 * Math.PI) / this.DRIBBLE_ANGLES
+    for (let i = 0; i < this.DRIBBLE_ANGLES; i++) {
       const angle = i * angleIncrement
 
-      for (const distance of DRIBBLE_DISTANCES) {
+      for (const distance of this.DRIBBLE_DISTANCES) {
         const x = carrier.position.x + Math.cos(angle) * distance
         const y = carrier.position.y + Math.sin(angle) * distance
 
@@ -244,51 +252,64 @@ export class HasBallStrategy {
         }
 
         const position: Vector2D = { x, y }
+        const score = this.evaluatePositionScore(carrier, position, opponentGoal, opponents)
 
-        // Calculate space from nearest opponent (higher = better)
-        const spaceFromOpponents = Math.min(
-          ...opponents.map(opp => InterceptionCalculator.distance(position, opp.position))
-        )
-
-        // Calculate forward progress toward goal (positive = progress, negative = backward)
-        const currentDistToGoal = InterceptionCalculator.distance(carrier.position, opponentGoal)
-        const newDistToGoal = InterceptionCalculator.distance(position, opponentGoal)
-        const forwardProgress = currentDistToGoal - newDistToGoal
-
-        // Calculate lateral component (perpendicular to goal direction)
-        const dirX = x - carrier.position.x
-        const dirY = y - carrier.position.y
-        const dirDist = Math.sqrt(dirX * dirX + dirY * dirY)
-        const normDirX = dirDist > 0 ? dirX / dirDist : 0
-        const normDirY = dirDist > 0 ? dirY / dirDist : 0
-
-        // Dot product with forward direction (1 = straight ahead, -1 = backward)
-        const forwardDot = normDirX * forwardX + normDirY * forwardY
-
-        // Score: prioritize space, slight preference for forward/lateral over backward
-        const score = spaceFromOpponents * 1.0 + forwardProgress * 0.2 + forwardDot * 50
-
-        dribbleOptions.push({ position, score })
+        // Track best option so far
+        if (score > bestOption.score) {
+          bestOption = { position, score }
+        }
       }
     }
+    return bestOption
+  }
 
-    if (dribbleOptions.length === 0) return null
+  /**
+   * Shared scoring function for both pass and dribble options
+   * Ensures fair comparison using identical metrics
+   *
+   * @param carrier - Player with the ball
+   * @param targetPosition - Position to evaluate (pass target or dribble position)
+   * @param opponentGoal - Target goal position
+   * @param opponents - Opponent players
+   * @returns Score (higher = better)
+   */
+  private static evaluatePositionScore(
+    carrier: PlayerData,
+    targetPosition: Vector2D,
+    opponentGoal: Vector2D,
+    opponents: PlayerData[]
+  ): number {
+    // Space from opponents (higher = better)
+    const space =
+      opponents.length > 0
+        ? Math.min(...opponents.map(opp => InterceptionCalculator.distance(targetPosition, opp.position)))
+        : Infinity
 
-    // Sort by score (highest first)
-    dribbleOptions.sort((a, b) => b.score - a.score)
+    // Forward progress toward goal (positive = forward, negative = backward)
+    const forwardProgress =
+      InterceptionCalculator.distance(carrier.position, opponentGoal) -
+      InterceptionCalculator.distance(targetPosition, opponentGoal)
 
-    const bestOption = dribbleOptions[0]
+    // Simplified scoring: prioritize space and forward progress
+    return Math.min(this.MAX_SPACE_CAP, space) * this.SCORE_WEIGHT_SPACE + forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS
+  }
 
-    // Only use if we find reasonable space (at least 100px from opponents)
-    const MIN_SPACE = 100
-    const spaceAtBest = Math.min(
-      ...opponents.map(opp => InterceptionCalculator.distance(bestOption.position, opp.position))
-    )
-
-    if (spaceAtBest < MIN_SPACE) {
-      return null // No good space found
-    }
-
-    return bestOption.position
+  /**
+   * Evaluate pass option using comparable scoring metric
+   * Uses same scoring as dribble for fair comparison
+   *
+   * @param carrier - Player with the ball
+   * @param passOption - Pass option to evaluate
+   * @param opponentGoal - Target goal position
+   * @param opponents - Opponent players
+   * @returns Score for pass option (higher = better)
+   */
+  private static evaluatePassScore(
+    carrier: PlayerData,
+    passOption: PassOption,
+    opponentGoal: Vector2D,
+    opponents: PlayerData[]
+  ): number {
+    return this.evaluatePositionScore(carrier, passOption.position, opponentGoal, opponents)
   }
 }

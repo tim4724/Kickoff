@@ -19,13 +19,16 @@ import { PassEvaluator } from '../utils/PassEvaluator'
 
 export class DefensiveStrategy {
   private readonly ourGoal: Vector2D
+  private readonly opponentGoal: Vector2D
   private readonly teamId: Team
 
   constructor(teamId: Team) {
     this.teamId = teamId
     const ourGoalX = teamId === 'blue' ? 0 : GAME_CONFIG.FIELD_WIDTH
+    const opponentGoalX = teamId === 'blue' ? GAME_CONFIG.FIELD_WIDTH : 0
     const goalY = GAME_CONFIG.FIELD_HEIGHT / 2
     this.ourGoal = { x: ourGoalX, y: goalY }
+    this.opponentGoal = { x: opponentGoalX, y: goalY }
   }
 
   /**
@@ -41,73 +44,70 @@ export class DefensiveStrategy {
     let remainingPlayers = this.teamId === 'blue' ? gameState.bluePlayers : gameState.redPlayers
     let remainingOpponents = this.teamId === 'blue' ? gameState.redPlayers : gameState.bluePlayers
 
-    // Find who reaches ball first (our team or opponent team)
-    let weReachFirstBallPosition: Vector2D | null = null
+    let ballInterceptor: PlayerData | null = null
+    let ballInterceptPoint: Vector2D
 
-    const { interceptor, interceptPoint } = this.selectBestChaser(
-      remainingPlayers,
-      ball.position,
-      ball.velocity,
-      remainingOpponents
-    )
-
-    // Check if interceptor is on our team
-    if (remainingPlayers.some(p => p.id === interceptor.id)) {
-      // We reach ball first - assign our player to get it
-      roles.set(interceptor.id, { goal: 'getBall', target: interceptPoint })
-      remainingPlayers = remainingPlayers.filter(p => p.id !== interceptor.id)
-      weReachFirstBallPosition = interceptPoint
+    ballInterceptor = remainingOpponents.find(p => p.id === ball.possessedBy) || null
+    if (ballInterceptor === null) {
+      const result = this.selectBestChaser(
+        [...remainingPlayers, ...remainingOpponents],
+        ball.position,
+        ball.velocity
+      )
+      ballInterceptor = result.interceptor
+      ballInterceptPoint = result.interceptPoint
     } else {
-      // Opponent reaches ball first - assign our player to intercept them
-      const result = this.selectBestInterceptor(remainingPlayers, interceptor, this.ourGoal, ball)
-
-      // Simple rule: if close to ball (< 60px), go directly after it
-      const distToBall = InterceptionCalculator.distance(result.interceptor.position, ball.position)
-      const BALL_PURSUIT_THRESHOLD = 60
-
-      if (distToBall < BALL_PURSUIT_THRESHOLD) {
-        roles.set(result.interceptor.id, { goal: 'getBall', target: ball.position })
-      } else {
-        roles.set(result.interceptor.id, { goal: 'interceptOpponent', target: result.target })
-      }
-
-      remainingPlayers = remainingPlayers.filter(p => p.id !== result.interceptor.id)
-      remainingOpponents = remainingOpponents.filter(o => o.id !== interceptor.id)
+      ballInterceptPoint = ballInterceptor.position
     }
 
-    if (weReachFirstBallPosition) {
-      const sorted = [...remainingPlayers].sort((a, b) =>
+    // Check if interceptor is on our team
+    if (remainingPlayers.some(p => p.id === ballInterceptor.id)) {
+      // We reach ball first - assign our player to get it
+      roles.set(ballInterceptor.id, { goal: 'getBall', target: ballInterceptPoint })
+      remainingPlayers = remainingPlayers.filter(p => p.id !== ballInterceptor.id)
+
+      // Sort remaining players by distance to our goal (closest = most defensive)
+      remainingPlayers.sort((a, b) =>
         InterceptionCalculator.distance(a.position, this.ourGoal) - InterceptionCalculator.distance(b.position, this.ourGoal))
-      const defCount = Math.floor(remainingOpponents.length / 2)
-      const defensive = sorted.slice(0, defCount)
-      const offensive = sorted.slice(defCount)
-      const sortedOpp = [...remainingOpponents].sort((a, b) =>
+      remainingOpponents.sort((a, b) =>
         InterceptionCalculator.distance(a.position, this.ourGoal) - InterceptionCalculator.distance(b.position, this.ourGoal))
+
+      const defensive = remainingPlayers.slice(0,  Math.floor(remainingOpponents.length / 2))
 
       defensive.forEach((p, i) => {
-        roles.set(p.id, this.getDefensivePassReceivePosition(sortedOpp[i], this.ourGoal))
+        roles.set(p.id, this.getDefensivePassReceivePosition(remainingOpponents[i], this.ourGoal))
       })
 
-      // Calculate opponent goal for pass evaluation
-      const opponentGoal: Vector2D = {
-        x: this.ourGoal.x === 0 ? GAME_CONFIG.FIELD_WIDTH : 0,
-        y: GAME_CONFIG.FIELD_HEIGHT / 2,
-      }
+      // Remove defensive players from remainingPlayers (only offensive players remain)
+      remainingPlayers = remainingPlayers.slice(defensive.length)
 
       // Calculate pass options for offensive players
       const passOptions = PassEvaluator.evaluatePassOptions(
-        weReachFirstBallPosition,
-        offensive,
+        ballInterceptPoint,
+        remainingPlayers,
         remainingOpponents,
-        opponentGoal
+        this.opponentGoal
       )
 
       const spreadRoles = SpreadPositionStrategy.getSpreadPassReceivePositions(
-        offensive,
+        remainingPlayers,
         passOptions
       )
       spreadRoles.forEach((role, playerId) => roles.set(playerId, role))
     } else {
+      // Opponent reaches ball first - assign our player to intercept them
+      const predictPath = this.createOpponentPathPredictor(ballInterceptor, this.ourGoal)
+      const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
+        remainingPlayers,
+        predictPath,
+        0
+      )
+
+      roles.set(interceptor.id, { goal: 'interceptOpponent', target: interceptPoint })
+
+      remainingPlayers = remainingPlayers.filter(p => p.id !== interceptor.id)
+      remainingOpponents = remainingOpponents.filter(o => o.id !== ballInterceptor.id)
+
       // Defensive marking: mark all opponents
       const markingRoles = this.getOpponentMarking(remainingPlayers, remainingOpponents, ball.position, this.ourGoal)
       markingRoles.forEach((role, playerId) => roles.set(playerId, role))
@@ -121,10 +121,9 @@ export class DefensiveStrategy {
    * Returns the player (from any team) who can reach the ball first and the interception point
    */
   private selectBestChaser(
-    myPlayers: PlayerData[],
+    players: PlayerData[],
     ballPosition: Vector2D,
     ballVelocity: Vector2D,
-    opponents: PlayerData[]
   ): { interceptor: PlayerData; interceptPoint: Vector2D } {
     const ballSpeedSquared = ballVelocity.x ** 2 + ballVelocity.y ** 2
     const isBallMoving = ballSpeedSquared >= 1
@@ -135,10 +134,10 @@ export class DefensiveStrategy {
       : () => ballPosition
 
     // Find best interceptor among ALL players (ours + opponents)
-    const allPlayers = [...myPlayers, ...opponents]
     const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
-      allPlayers,
-      predictBallPosition
+      players,
+      predictBallPosition,
+      GAME_CONFIG.POSSESSION_RADIUS
     )
 
     return { interceptor, interceptPoint }
@@ -160,27 +159,6 @@ export class DefensiveStrategy {
     const direction = dist < 1 ? { x: 1, y: 0 } : { x: dx / dist, y: dy / dist }
 
     return (t: number) => InterceptionCalculator.predictPlayerBallPosition(opponent.position, direction, t)
-  }
-
-  /**
-   * Select best player to intercept opponent with ball
-   * Returns the player who can intercept the opponent's path to goal
-   */
-  private selectBestInterceptor(
-    myPlayers: PlayerData[],
-    opponent: PlayerData,
-    ourGoal: Vector2D,
-    _ball: { position: Vector2D; velocity: Vector2D }
-  ): { interceptor: PlayerData; target: Vector2D } {
-    const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
-
-    // Calculate interception using InterceptionCalculator
-    const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
-      myPlayers,
-      predictPath
-    )
-
-    return { interceptor, target: interceptPoint }
   }
 
   /**
@@ -278,7 +256,8 @@ export class DefensiveStrategy {
 
         const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
           availablePlayers,
-          predictPath
+          predictPath,
+          0
         )
 
         assignedPlayer = interceptor
