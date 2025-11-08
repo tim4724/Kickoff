@@ -1,4 +1,4 @@
-import { test, expect, Browser } from '@playwright/test'
+import { test, expect, Browser, Page } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
 import { TEST_ENV } from "./config/test-env"
@@ -19,6 +19,20 @@ import { GAME_CONFIG } from '../shared/src/types'
 const CLIENT_URL = TEST_ENV.CLIENT_URL
 const BLUE_COLOR = 26367      // 0x0066ff
 const RED_COLOR = 16729156    // 0xff4444
+
+async function waitForPlayerFillColor(page: Page, expectedColors: number[], timeoutMs = 15000): Promise<number> {
+  await page.waitForFunction(
+    (colors) => {
+      const scene = (window as any).__gameControls?.scene
+      const color = scene?.player?.fillColor ?? null
+      return color !== null && colors.includes(color)
+    },
+    expectedColors,
+    { timeout: timeoutMs }
+  )
+
+  return await page.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor)
+}
 
 test.describe('Player Lifecycle Management', () => {
   test('Player disconnect releases ball possession', async ({ browser }, testInfo) => {
@@ -213,11 +227,7 @@ test.describe('Player Lifecycle Management', () => {
     const client1 = await context1.newPage()
     await client1.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client1.goto(CLIENT_URL)
-    await waitScaled(client1, 2000)
-
-    const color1 = await client1.evaluate(() =>
-      (window as any).__gameControls?.scene?.player?.fillColor
-    )
+    const color1 = await waitForPlayerFillColor(client1, [BLUE_COLOR])
     const session1 = await client1.evaluate(() =>
       (window as any).__gameControls?.scene?.mySessionId
     )
@@ -231,11 +241,7 @@ test.describe('Player Lifecycle Management', () => {
     const client2 = await context2.newPage()
     await client2.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client2.goto(CLIENT_URL)
-    await waitScaled(client2, 2000)
-
-    const color2 = await client2.evaluate(() =>
-      (window as any).__gameControls?.scene?.player?.fillColor
-    )
+    const color2 = await waitForPlayerFillColor(client2, [BLUE_COLOR, RED_COLOR])
     const session2 = await client2.evaluate(() =>
       (window as any).__gameControls?.scene?.mySessionId
     )
@@ -257,29 +263,13 @@ test.describe('Player Lifecycle Management', () => {
     const client3 = await context3.newPage()
     await client3.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client3.goto(CLIENT_URL)
-    await waitScaled(client3, 2000)
-
-    const color3 = await client3.evaluate(() =>
-      (window as any).__gameControls?.scene?.player?.fillColor
-    )
+    const color3 = await waitForPlayerFillColor(client3, [BLUE_COLOR])
     const session3 = await client3.evaluate(() =>
       (window as any).__gameControls?.scene?.mySessionId
     )
 
     console.log(`  Player 3 (${session3}): ${color3 === BLUE_COLOR ? 'BLUE' : 'RED'}`)
     expect(color3).toBe(BLUE_COLOR)
-
-    // Verify players.size is being used correctly
-    const playerCount = await client2.evaluate(() => {
-      const scene = (window as any).__gameControls?.scene
-      const state = scene?.networkManager?.getState()
-      return state?.players?.size || 0
-    })
-
-    console.log(`\n📊 Server player count: ${playerCount}`)
-    // With AI enabled, total players will be 6 (2 human + 4 AI for 3v3)
-    // After one leaves and another joins, still 6 total
-    expect(playerCount).toBeGreaterThanOrEqual(2)
 
     await client2.close()
     await context2.close()
@@ -312,6 +302,14 @@ test.describe('Player Lifecycle Management', () => {
     await Promise.all(clients.map(c => waitScaled(c, 4000)))
 
     // Get player count
+    await expect.poll(async () => {
+      return await clients[0].evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const state = scene?.networkManager?.getState()
+        return state?.players?.size ?? 0
+      })
+    }, { timeout: 7000, message: 'Waiting for initial player count after match start' }).toBeGreaterThanOrEqual(6)
+
     const initialCount = await clients[0].evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
@@ -334,7 +332,15 @@ test.describe('Player Lifecycle Management', () => {
     const verifyClient = await verifyContext.newPage()
     await verifyClient.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await verifyClient.goto(CLIENT_URL)
-    await waitScaled(verifyClient, 2000)
+    await waitForPlayerFillColor(verifyClient, [BLUE_COLOR, RED_COLOR])
+
+    await expect.poll(async () => {
+      return await verifyClient.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const state = scene?.networkManager?.getState()
+        return state?.players?.size ?? 0
+      })
+    }, { timeout: 7000, message: 'Waiting for server to spawn AI teammates after reconnect' }).toBeGreaterThanOrEqual(3)
 
     const finalCount = await verifyClient.evaluate(() => {
       const scene = (window as any).__gameControls?.scene

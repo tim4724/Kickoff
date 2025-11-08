@@ -109,9 +109,23 @@ export async function waitScaled(page: Page, gameTimeMs: number): Promise<void> 
     return GameClock ? GameClock.getTimeScale() : 1
   })
 
+  // Safety check: prevent infinite wait if timeScale is 0 or invalid
+  const safeTimeScale = timeScale && timeScale > 0 ? timeScale : 1
+  
   // With time acceleration, game runs faster, so we wait LESS real time
-  const realTimeMs = gameTimeMs / timeScale
-  await page.waitForTimeout(realTimeMs)
+  const realTimeMs = gameTimeMs / safeTimeScale
+  
+  // Safety check: prevent infinite wait if realTimeMs is invalid
+  if (!isFinite(realTimeMs) || realTimeMs < 0 || realTimeMs > 30000) {
+    console.warn(`[waitScaled] Invalid wait time: ${realTimeMs}ms (timeScale: ${timeScale}, gameTimeMs: ${gameTimeMs})`)
+    // Fallback to reasonable wait time (max 5 seconds)
+    await page.waitForTimeout(Math.min(gameTimeMs, 5000))
+    return
+  }
+  
+  // Additional safety: cap wait time to prevent test timeouts
+  const cappedWaitTime = Math.min(realTimeMs, 10000) // Max 10 seconds
+  await page.waitForTimeout(cappedWaitTime)
 }
 
 /**

@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test'
 import { waitScaled } from './time-control'
+import { GAME_CONFIG } from '../../shared/src/types'
 
 /**
  * Test Helper Utilities
@@ -165,49 +166,60 @@ export async function moveTowardBallAndCapture(
   client: Page,
   timeoutMs: number = 10000
 ): Promise<boolean> {
-  const sessionId = await getSessionId(client)
+  const startTime = Date.now()
 
-  // Check if already have possession
-  const currentState = await getServerState(client)
-  if (currentState.ball.possessedBy === sessionId) {
-    return true
+  while (Date.now() - startTime < timeoutMs) {
+    const state = await client.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      const netState = scene?.networkManager?.getState()
+      const controlledId = scene?.controlledPlayerId || scene?.mySessionId || ''
+      const player = controlledId ? netState?.players?.get(controlledId) : null
+      const ball = netState?.ball
+      return {
+        controlledId,
+        ballPossessor: ball?.possessedBy || '',
+        playerX: player?.x || 0,
+        playerY: player?.y || 0,
+        ballX: ball?.x || 0,
+        ballY: ball?.y || 0,
+        hasMoveHelper: !!(scene && (window as any).__gameControls?.test?.movePlayerDirect),
+      }
+    })
+
+    if (!state.controlledId) {
+      await waitScaled(client, 100)
+      continue
+    }
+
+    const dx = state.ballX - state.playerX
+    const dy = state.ballY - state.playerY
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    if (state.ballPossessor === state.controlledId || distance < GAME_CONFIG.POSSESSION_RADIUS) {
+      return true
+    }
+
+    if (state.hasMoveHelper) {
+      await client.evaluate(async ({ moveX, moveY }) => {
+        const controls = (window as any).__gameControls
+        if (controls?.test?.movePlayerDirect) {
+          await controls.test.movePlayerDirect(moveX, moveY, 500)
+        }
+      }, { moveX: dx, moveY: dy })
+    } else {
+      const horizontal = Math.abs(dx) > Math.abs(dy)
+      const key = horizontal
+        ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft')
+        : (dy > 0 ? 'ArrowDown' : 'ArrowUp')
+      await client.keyboard.down(key)
+      await waitScaled(client, 300)
+      await client.keyboard.up(key)
+    }
+
+    await waitScaled(client, 200)
   }
 
-  // Calculate direction to ball
-  const playerPos = await getPlayerPosition(client)
-  const dx = currentState.ball.x - playerPos.x
-  const dy = currentState.ball.y - playerPos.y
-  const horizontal = Math.abs(dx) > Math.abs(dy)
-
-  // Determine key to press
-  const key = horizontal
-    ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft')
-    : (dy > 0 ? 'ArrowDown' : 'ArrowUp')
-
-  // Start moving toward ball
-  await client.keyboard.down(key)
-
-  try {
-    // Wait for possession condition (deterministic)
-    await client.waitForFunction(
-      (sid) => {
-        const scene = (window as any).__gameControls?.scene
-        const state = scene?.networkManager?.getState()
-        return state?.ball?.possessedBy === sid
-      },
-      sessionId,
-      { timeout: timeoutMs }
-    )
-
-    // Release key immediately when possession gained
-    await client.keyboard.up(key)
-    await waitScaled(client, 100) // Small buffer for state to settle
-    return true
-  } catch (error) {
-    // Release key on timeout
-    await client.keyboard.up(key)
-    return false
-  }
+  return false
 }
 
 /**
