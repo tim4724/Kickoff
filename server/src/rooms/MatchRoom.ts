@@ -51,9 +51,19 @@ export class MatchRoom extends Room<GameState> {
     // Start game loop at 60 Hz
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / GAME_CONFIG.TICK_RATE)
 
-    // Handle player input
+    // Handle player inputs (multiple inputs per message)
+    this.onMessage('inputs', (client, message) => {
+      this.onPlayerInputs(client, message)
+    })
+
+    // Legacy support for single input (backwards compatibility)
     this.onMessage('input', (client, message) => {
-      this.onPlayerInput(client, message)
+      // Convert single input to multi-input format
+      const multiInput = {
+        inputs: { [message.playerId || client.sessionId]: message },
+        timestamp: message.timestamp || Date.now(),
+      }
+      this.onPlayerInputs(client, multiInput)
     })
 
     // Handle ping for latency measurement
@@ -135,11 +145,31 @@ export class MatchRoom extends Room<GameState> {
     }
   }
 
-  private onPlayerInput(client: Client, input: any) {
-    // Input logging disabled for performance (60+ calls/sec per player)
-    // Use input.playerId if provided (for teammate switching), otherwise use client.sessionId
-    const targetPlayerId = input.playerId || client.sessionId
-    this.state.queueInput(targetPlayerId, input)
+  private onPlayerInputs(client: Client, message: any) {
+    // message.inputs is an object with playerId -> input mapping
+    if (!message.inputs || typeof message.inputs !== 'object') {
+      return
+    }
+
+    // Process each player input
+    const playerIds = Object.keys(message.inputs)
+    playerIds.forEach((playerId) => {
+      const input = message.inputs[playerId]
+      if (input && input.playerId) {
+        // Verify playerId matches (safety check)
+        if (input.playerId !== playerId) {
+          console.warn(`[MatchRoom] Input playerId mismatch: ${input.playerId} vs ${playerId}`)
+        }
+        this.state.queueInput(input.playerId, input)
+      } else {
+        console.warn(`[MatchRoom] Invalid input for player ${playerId}:`, input)
+      }
+    })
+
+    // Debug: Log occasionally
+    if (Math.random() < 0.05) { // 5% of the time
+      console.log(`[MatchRoom] Received inputs from ${client.sessionId} for ${playerIds.length} players:`, playerIds)
+    }
   }
 
   private startMatch() {

@@ -10,7 +10,12 @@ export interface PlayerInput {
   action: boolean
   actionPower?: number // 0.0-1.0, power for shooting (optional, defaults to 0.8)
   timestamp: number
-  playerId?: string // Player ID to control (for AI teammate switching)
+  playerId: string // Player ID this input is for
+}
+
+export interface MultiPlayerInput {
+  inputs: Map<string, PlayerInput> // Map of playerId -> input
+  timestamp: number
 }
 
 export interface RemotePlayer {
@@ -56,9 +61,8 @@ export class NetworkManager {
   private connected: boolean = false
   private sessionId: string = ''
 
-  // Input buffering
-  private inputBuffer: PlayerInput[] = []
-  private readonly MAX_BUFFER_SIZE = 1 // Send immediately
+  // Input buffering - collect all player inputs and send together
+  private inputBuffer: Map<string, PlayerInput> = new Map()
 
   // Event callbacks
   private onStateChange?: (state: GameStateData) => void
@@ -184,10 +188,10 @@ export class NetworkManager {
   }
 
   /**
-   * Send player input to the server
-   * Inputs are buffered to reduce network traffic
+   * Send input for a single player (adds to buffer, sends when ready)
+   * Note: Action inputs (shooting) are buffered and sent with other inputs, not immediately
    */
-  sendInput(movement: { x: number; y: number }, action: boolean, actionPower?: number, playerId?: string): void {
+  sendInput(movement: { x: number; y: number }, action: boolean, actionPower: number | undefined, playerId: string, isHuman: boolean = false): void {
     if (!this.connected || !this.room) {
       return
     }
@@ -195,34 +199,86 @@ export class NetworkManager {
     const input: PlayerInput = {
       movement,
       action,
-      actionPower, // Include power value if provided (for action button hold-to-power)
+      actionPower,
       timestamp: Date.now(),
-      playerId, // Include controlled player ID for AI teammate switching
+      playerId, // Always required - which player this input is for
     }
 
-    // Add to buffer
-    this.inputBuffer.push(input)
-
-    // Send if buffer is full or action is pressed
-    if (this.inputBuffer.length >= this.MAX_BUFFER_SIZE || action) {
-      this.flushInputBuffer()
+    // Add to buffer (overwrites previous input for same player)
+    // If player already has an input in buffer, merge appropriately
+    const existingInput = this.inputBuffer.get(playerId)
+    if (existingInput) {
+      // Safety: If existing input is from human and new input is from AI, preserve human input
+      // This prevents AI from overwriting human input
+      const existingIsHuman = (existingInput as any).isHuman ?? false
+      if (existingIsHuman && !isHuman) {
+        // Human input takes priority - don't overwrite with AI input
+        return
+      }
+      
+      if (action) {
+        // Shooting: preserve existing movement, add action
+        input.movement = existingInput.movement
+      } else if (existingInput.action) {
+        // Movement update: preserve action if it exists
+        input.action = existingInput.action
+        input.actionPower = existingInput.actionPower
+      }
     }
+
+    // Mark input source for priority handling
+    ;(input as any).isHuman = isHuman
+
+    this.inputBuffer.set(playerId, input)
+    // Don't flush immediately - let flushInputs() handle it at frame end
+  }
+
+  /**
+   * Send all buffered inputs to server (called every frame)
+   */
+  flushInputs(): void {
+    if (!this.room || this.inputBuffer.size === 0) {
+      return
+    }
+
+    // Always send if there's input - don't rate limit
+    // The server can handle the input rate
+    this.flushInputBuffer()
   }
 
   /**
    * Flush input buffer to server
    */
   private flushInputBuffer(): void {
-    if (!this.room || this.inputBuffer.length === 0) {
+    if (!this.room || this.inputBuffer.size === 0) {
       return
     }
 
-    // Send the latest input (most recent state)
-    const latestInput = this.inputBuffer[this.inputBuffer.length - 1]
-    this.room.send('input', latestInput)
+    // Convert Map to serializable format
+    const inputsMap: { [key: string]: PlayerInput } = {}
+    this.inputBuffer.forEach((input, playerId) => {
+      inputsMap[playerId] = input
+    })
 
-    // Clear buffer
-    this.inputBuffer = []
+    const multiInput: MultiPlayerInput = {
+      inputs: inputsMap as any, // Will be serialized as object
+      timestamp: Date.now(),
+    }
+
+    // Debug: Log what we're sending (occasionally)
+    if (Math.random() < 0.05) { // 5% of the time
+      const playerIds = Object.keys(inputsMap)
+      console.log(`[NetworkManager] Sending inputs for ${playerIds.length} players:`, playerIds)
+      playerIds.forEach(id => {
+        const input = inputsMap[id]
+        console.log(`  ${id}: move(${input.movement.x.toFixed(2)}, ${input.movement.y.toFixed(2)}), action=${input.action}`)
+      })
+    }
+
+    this.room.send('inputs', multiInput)
+
+    // Clear buffer after sending
+    this.inputBuffer.clear()
   }
 
   /**

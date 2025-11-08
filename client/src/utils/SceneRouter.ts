@@ -18,7 +18,7 @@ import Phaser from 'phaser'
 const ROUTES = {
   '/menu': 'MenuScene',
   '/singleplayer': 'SinglePlayerScene',
-  '/multiplayer': 'GameScene',
+  '/multiplayer': 'MultiplayerScene',
   '/ai-only': 'AIOnlyScene',
 } as const
 
@@ -196,7 +196,7 @@ export class SceneRouter {
    * Programmatically navigate to a scene by name
    * Updates the URL and transitions to the scene
    *
-   * @param sceneName - Phaser scene key (e.g., 'MenuScene', 'GameScene')
+   * @param sceneName - Phaser scene key (e.g., 'MenuScene', 'MultiplayerScene')
    */
   public navigateTo(sceneName: SceneKey): void {
     if (!this.game) {

@@ -234,7 +234,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.multiplayerButton.on('pointerup', () => {
       console.log('🌐 Starting Multiplayer mode')
-      sceneRouter.navigateTo('GameScene')
+      sceneRouter.navigateTo('MultiplayerScene')
     })
 
     this.aiOnlyButton.on('pointerup', () => {
@@ -264,7 +264,7 @@ export class MenuScene extends Phaser.Scene {
     if (typeof window !== 'undefined' && (window as any).__testRoomId) {
       console.log('🧪 Test mode detected - auto-starting multiplayer via router')
       this.time.delayedCall(100, () => {
-        sceneRouter.navigateTo('GameScene')
+        sceneRouter.navigateTo('MultiplayerScene')
       })
     }
   }

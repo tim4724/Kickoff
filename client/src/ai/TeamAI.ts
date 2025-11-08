@@ -69,4 +69,11 @@ export class TeamAI {
   public getPlayer(playerId: string): AIPlayer | undefined {
     return this.players.find(p => p.getPlayerId() === playerId)
   }
+
+  /**
+   * Get all player IDs managed by this TeamAI (for testing/debugging)
+   */
+  public getPlayerIds(): string[] {
+    return this.players.map(p => p.getPlayerId())
+  }
 }

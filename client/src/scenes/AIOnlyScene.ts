@@ -1,6 +1,5 @@
 import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
-import type { EnginePlayerData, EnginePlayerInput } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { AIManager } from '../ai'
@@ -13,8 +12,6 @@ import { StateAdapter } from '../utils/StateAdapter'
  * Useful for testing AI behavior and watching AI vs AI matches
  */
 export class AIOnlyScene extends BaseGameScene {
-  private gameEngine!: GameEngine
-  private aiManager!: AIManager
   private paused: boolean = false
   private gameSpeed: number = 1.0 // Initial speed: 1.0 (range: 0.01 to 1.0)
   private gameSpeedText!: Phaser.GameObjects.Text
@@ -80,30 +77,35 @@ export class AIOnlyScene extends BaseGameScene {
       (playerId, decision) => this.applyAIDecision(playerId, decision)
     )
 
-    // Set up callbacks
-    this.gameEngine.onGoal((event: { team: 'blue' | 'red'; time: number }) => {
-      console.log('⚽ Goal!', event.team)
-      if (!this.goalScored) {
-        this.onGoalScored(event.team)
-      }
-    })
-
-    this.gameEngine.onMatchEnd(() => {
-      console.log('🏁 Match ended')
-      if (!this.matchEnded) {
-        this.onMatchEnd()
-      }
-    })
-
-    this.gameEngine.onShoot((playerId: string, power: number) => {
-      console.log(`🎯 Player ${playerId} shot with power ${power.toFixed(2)}`)
-    })
+    // Set up common callbacks (including shoot callback)
+    this.setupGameEngineCallbacks(true)
 
     // Start match immediately
     this.gameEngine.startMatch()
 
+    // In AI-only mode, clear myPlayerId so the first player gets assigned to the main sprite
+    // This prevents the main sprite from staying at the center unassigned
+    this.myPlayerId = ''
+    this.controlledPlayerId = ''
+
     // Initialize player visuals from engine state
     this.syncPlayersFromEngine()
+
+    // After syncing, hide the main player sprite since all players should be rendered as remote players
+    // The main sprite was used for the first player, but we want all players to have consistent styling
+    // So we'll create a remote player for the first player and hide the main sprite
+    if (this.myPlayerId) {
+      const state = this.gameEngine.getState()
+      const firstPlayerData = state.players.get(this.myPlayerId)
+      if (firstPlayerData && !this.remotePlayers.has(this.myPlayerId)) {
+        // Create remote player for the first player (to match all other players)
+        this.createRemotePlayer(this.myPlayerId, firstPlayerData)
+        // Hide the main player sprite (it's not needed in AI-only mode)
+        this.player.setVisible(false)
+        // Clear myPlayerId so syncVisualsFromEngine treats all players as remote
+        this.myPlayerId = ''
+      }
+    }
 
     // Enable AI debug by default in AI-only mode
     this.debugEnabled = true
@@ -118,27 +120,18 @@ export class AIOnlyScene extends BaseGameScene {
     // Set initial GameClock time scale to match game speed
     GameClock.setTimeScale(this.gameSpeed)
 
-    // Expose controls for testing (development only)
-    if (typeof window !== 'undefined' && import.meta.env.DEV) {
-      ;(window as any).__gameControls = {
-        scene: this,
-        test: {
-          getState: () => ({
-            paused: this.paused,
-            gameSpeed: this.gameSpeed,
-            debugEnabled: this.debugEnabled,
-          }),
-        },
-      }
-      // Expose GameClock for time control in tests
-      ;(window as any).GameClock = GameClock
-      console.log('🧪 Testing API exposed: window.__gameControls')
-      console.log('🕐 GameClock exposed for time control')
-    }
+    // Set up test API with AIOnlyScene-specific methods
+    this.setupTestAPI({
+      getState: () => ({
+        paused: this.paused,
+        gameSpeed: this.gameSpeed,
+        debugEnabled: this.debugEnabled,
+      }),
+    })
   }
 
   protected getGameState(): any {
-    return this.gameEngine.getState()
+    return this.gameEngine!.getState()
   }
 
   protected updateGameState(delta: number): void {
@@ -147,11 +140,11 @@ export class AIOnlyScene extends BaseGameScene {
     // Update AI and apply decisions when not paused
     // GameClock.pause() ensures cooldown timers don't advance during pause
     if (!this.paused) {
-      this.updateAI()
+      this.updateAIForGameEngine()
 
       // Scale delta by game speed
       const scaledDelta = delta * this.gameSpeed
-      this.gameEngine.update(scaledDelta)
+      this.gameEngine!.update(scaledDelta)
     }
 
     // Sync visuals from engine state (always update visuals even when paused)
@@ -172,7 +165,7 @@ export class AIOnlyScene extends BaseGameScene {
    * Get unified game state (implements BaseGameScene abstract method)
    */
   protected getUnifiedState() {
-    const engineState = this.gameEngine.getState()
+    const engineState = this.gameEngine!.getState()
     return StateAdapter.fromGameEngine(engineState)
   }
 
@@ -263,76 +256,8 @@ export class AIOnlyScene extends BaseGameScene {
     }
   }
 
-  private syncPlayersFromEngine() {
-    const state = this.gameEngine.getState()
-
-    // In AI-only mode, we don't have a "myPlayerId"
-    // Create all players as remote players for rendering
-    let isFirstPlayer = true
-
-    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
-      if (isFirstPlayer) {
-        // Use the main player sprite for the first AI player (visual consistency)
-        this.player.setPosition(playerData.x, playerData.y)
-        const color =
-          playerData.team === 'blue'
-            ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
-            : VISUAL_CONSTANTS.PLAYER_RED_COLOR
-        this.player.setFillStyle(color)
-        this.player.isFilled = true
-        this.playerTeamColor = color
-        // In AI-only mode, use no border and 80% opacity (no human control)
-        this.player.setStrokeStyle(
-          VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
-          VISUAL_CONSTANTS.BORDER_COLOR
-        )
-        this.player.setAlpha(0.8) // 80% opacity (no human control)
-        this.player.isFilled = true
-        // Store reference so we can update it
-        this.myPlayerId = playerId
-        isFirstPlayer = false
-      } else {
-        this.createRemotePlayer(playerId, playerData)
-      }
-    })
-  }
-
-  private syncVisualsFromEngine() {
-    const state = this.gameEngine.getState()
-
-    // Update ball
-    this.ball.setPosition(state.ball.x, state.ball.y)
-    this.ballShadow.setPosition(state.ball.x + 2, state.ball.y + 3)
-
-    // Update players
-    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
-      if (playerId === this.myPlayerId) {
-        // Update the main player sprite
-        this.player.setPosition(playerData.x, playerData.y)
-        this.player.setFillStyle(this.playerTeamColor)
-        this.player.isFilled = true
-      } else {
-        // Update remote player sprites
-        const sprite = this.remotePlayers.get(playerId)
-        if (sprite) {
-          sprite.setPosition(playerData.x, playerData.y)
-        }
-      }
-    })
-
-    // Update UI
-    this.scoreText.setText(`${state.scoreBlue} - ${state.scoreRed}`)
-
-    const minutes = Math.floor(state.matchTime / 60)
-    const seconds = Math.floor(state.matchTime % 60)
-    this.timerText.setText(`${minutes}:${seconds.toString().padStart(2, '0')}`)
-
-    if (state.matchTime <= 30 && state.matchTime > 0) {
-      this.timerText.setColor('#ff4444')
-    } else {
-      this.timerText.setColor('#ffffff')
-    }
-  }
+  // syncPlayersFromEngine and syncVisualsFromEngine are inherited from BaseGameScene
+  // The base implementation handles AI-only mode correctly (myPlayerId is set to first player)
 
   /**
    * Override updatePlayerBorders to prevent human control indicator in AI-only mode
@@ -357,107 +282,11 @@ export class AIOnlyScene extends BaseGameScene {
   }
 
   /**
-   * Update AI and apply decisions to game engine
-   */
-  private updateAI() {
-    const engineState = this.gameEngine.getState()
-
-    // Convert GameEngineState to GameStateData format
-    const gameStateData = this.convertEngineStateToGameStateData(engineState)
-
-    // Update AI Manager (this will call TeamAI.update() which calls each AIPlayer.update())
-    this.aiManager.update(gameStateData)
-  }
-
-  /**
    * Apply AI decision by queuing input to game engine
+   * In AI-only mode, all players are AI-controlled, so skipControlled=false
    */
   private applyAIDecision(playerId: string, decision: any) {
-
-    const input: EnginePlayerInput = {
-      movement: {
-        x: decision.moveX,
-        y: decision.moveY,
-      },
-      action: decision.shootPower !== null,
-      actionPower: decision.shootPower ?? 0,
-      timestamp: this.gameEngine.frameCount,
-      playerId: playerId,
-    }
-
-    this.gameEngine.queueInput(playerId, input)
-  }
-
-  /**
-   * Convert GameEngineState to GameStateData format for AI
-   */
-  private convertEngineStateToGameStateData(engineState: any): any {
-    // Convert players map
-    const playersMap = new Map()
-    engineState.players.forEach((player: EnginePlayerData, playerId: string) => {
-      playersMap.set(playerId, {
-        id: player.id,
-        team: player.team,
-        isHuman: player.isHuman,
-        isControlled: player.isControlled,
-        position: { x: player.x, y: player.y },
-        velocity: { x: player.velocityX, y: player.velocityY },
-        state: player.state,
-        direction: player.direction,
-      })
-    })
-
-    // Convert ball
-    const ball = {
-      position: { x: engineState.ball.x, y: engineState.ball.y },
-      velocity: { x: engineState.ball.velocityX, y: engineState.ball.velocityY },
-      possessedBy: engineState.ball.possessedBy,
-    }
-
-    return {
-      players: playersMap,
-      ball: ball,
-      scoreBlue: engineState.scoreBlue,
-      scoreRed: engineState.scoreRed,
-      matchTime: engineState.matchTime,
-      phase: engineState.phase,
-    }
-  }
-
-  /**
-   * Update AI debug visualization (called from BaseGameScene when debug is enabled)
-   */
-  protected updateAIDebugLabels(): void {
-    const state = this.gameEngine.getState()
-
-    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
-      // Get AI player instance from AIManager
-      const teamAI = this.aiManager.getTeamAI(playerData.team)
-      const aiPlayer = teamAI?.getPlayer(playerId)
-
-      // Get goal text from AIPlayer (debug label)
-      const goal = aiPlayer?.getGoal()
-      let goalText = goal ? goal.toUpperCase() : ''
-
-      // Update goal label
-      this.aiDebugRenderer.updatePlayerLabel(
-        playerId,
-        { x: playerData.x, y: playerData.y },
-        goalText,
-        playerData.team
-      )
-
-      // Get target position from AIPlayer
-      const targetPos = aiPlayer?.getTargetPosition()
-      if (targetPos) {
-        // Draw target line to AI's actual target position
-        this.aiDebugRenderer.updateTargetLine(
-          playerId,
-          { x: playerData.x, y: playerData.y },
-          targetPos,
-          playerData.team
-        )
-      }
-    })
+    // Use base class method with skipControlled=false (all players are AI)
+    this.applyAIDecisionForGameEngine(playerId, decision, false)
   }
 }

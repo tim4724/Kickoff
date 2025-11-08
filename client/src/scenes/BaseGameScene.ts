@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { GAME_CONFIG } from '@shared/types'
-import type { EnginePlayerData } from '@shared'
+import type { EnginePlayerData, EnginePlayerInput } from '@shared'
+import { GameEngine } from '@shared'
 import { VirtualJoystick } from '../controls/VirtualJoystick'
 import { ActionButton } from '../controls/ActionButton'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
@@ -10,6 +11,8 @@ import { CameraManager } from '../utils/CameraManager'
 import { AIDebugRenderer } from '../utils/AIDebugRenderer'
 import { sceneRouter } from '../utils/SceneRouter'
 import { StateAdapter, type UnifiedGameState } from '../utils/StateAdapter'
+import { AIManager } from '../ai'
+import { gameClock as GameClock } from '@shared/engine/GameClock'
 
 /**
  * Base Game Scene
@@ -64,6 +67,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected lastBallPossessor: string = ''
   protected autoSwitchEnabled: boolean = true
 
+  // Optional GameEngine and AI support (used by SinglePlayerScene and AIOnlyScene)
+  protected gameEngine?: GameEngine
+  protected aiManager?: AIManager
+
   // Abstract methods that subclasses must implement
   protected abstract initializeGameState(): void
   protected abstract getGameState(): any
@@ -79,7 +86,251 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
   // Optional method for AI debug - subclasses can override if they have AI
   protected updateAIDebugLabels(): void {
-    // Default: no-op. Subclasses with AI should override this.
+    // Default implementation for GameEngine-based scenes
+    if (!this.gameEngine || !this.aiManager) {
+      return
+    }
+
+    const state = this.gameEngine.getState()
+    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
+      // Get AI player instance from AIManager
+      const teamAI = this.aiManager!.getTeamAI(playerData.team)
+      const aiPlayer = teamAI?.getPlayer(playerId)
+
+      // Get goal text from AIPlayer (debug label)
+      const goal = aiPlayer?.getGoal()
+      let goalText = goal ? goal.toUpperCase() : ''
+
+      // Update goal label
+      this.aiDebugRenderer.updatePlayerLabel(
+        playerId,
+        { x: playerData.x, y: playerData.y },
+        goalText,
+        playerData.team
+      )
+
+      // Get target position from AIPlayer
+      const targetPos = aiPlayer?.getTargetPosition()
+      if (targetPos) {
+        // Draw target line to AI's actual target position
+        this.aiDebugRenderer.updateTargetLine(
+          playerId,
+          { x: playerData.x, y: playerData.y },
+          targetPos,
+          playerData.team
+        )
+      }
+    })
+  }
+
+  // ========== COMMON HELPER METHODS FOR GAME ENGINE SCENES ==========
+
+  /**
+   * Convert GameEngineState to GameStateData format for AI
+   * Used by SinglePlayerScene and AIOnlyScene
+   */
+  protected convertEngineStateToGameStateData(engineState: any): any {
+    // Convert players map
+    const playersMap = new Map()
+    engineState.players.forEach((player: EnginePlayerData, playerId: string) => {
+      playersMap.set(playerId, {
+        id: player.id,
+        team: player.team,
+        isHuman: player.isHuman,
+        isControlled: player.isControlled,
+        position: { x: player.x, y: player.y },
+        velocity: { x: player.velocityX, y: player.velocityY },
+        state: player.state,
+        direction: player.direction,
+      })
+    })
+
+    // Convert ball
+    const ball = {
+      position: { x: engineState.ball.x, y: engineState.ball.y },
+      velocity: { x: engineState.ball.velocityX, y: engineState.ball.velocityY },
+      possessedBy: engineState.ball.possessedBy,
+    }
+
+    return {
+      players: playersMap,
+      ball: ball,
+      scoreBlue: engineState.scoreBlue,
+      scoreRed: engineState.scoreRed,
+      matchTime: engineState.matchTime,
+      phase: engineState.phase,
+    }
+  }
+
+  /**
+   * Update AI for GameEngine-based scenes
+   * Used by SinglePlayerScene and AIOnlyScene
+   */
+  protected updateAIForGameEngine(): void {
+    if (!this.gameEngine || !this.aiManager) {
+      return
+    }
+
+    const engineState = this.gameEngine.getState()
+    const gameStateData = this.convertEngineStateToGameStateData(engineState)
+    this.aiManager.update(gameStateData)
+  }
+
+  /**
+   * Apply AI decision to GameEngine
+   * Used by SinglePlayerScene and AIOnlyScene
+   * @param skipControlled - If true, skip players that are controlled (for SinglePlayerScene)
+   */
+  protected applyAIDecisionForGameEngine(
+    playerId: string,
+    decision: any,
+    skipControlled: boolean = false
+  ): void {
+    if (!this.gameEngine) {
+      return
+    }
+
+    // Check if player is controlled (for SinglePlayerScene)
+    if (skipControlled) {
+      const engineState = this.gameEngine.getState()
+      const player = engineState.players.get(playerId)
+      if (player && player.isControlled) {
+        return
+      }
+    }
+
+    const input: EnginePlayerInput = {
+      movement: {
+        x: decision.moveX,
+        y: decision.moveY,
+      },
+      action: decision.shootPower !== null,
+      actionPower: decision.shootPower ?? 0,
+      timestamp: this.gameEngine.frameCount,
+      playerId: playerId,
+    }
+
+    this.gameEngine.queueInput(playerId, input)
+  }
+
+  /**
+   * Sync player sprites from GameEngine state
+   * Used by SinglePlayerScene and AIOnlyScene
+   */
+  protected syncPlayersFromEngine(): void {
+    if (!this.gameEngine) {
+      return
+    }
+
+    const state = this.gameEngine.getState()
+    let isFirstPlayer = true
+
+    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
+      if (playerId === this.myPlayerId || (isFirstPlayer && !this.myPlayerId)) {
+        // Use the main player sprite
+        this.player.setPosition(playerData.x, playerData.y)
+        const color =
+          playerData.team === 'blue'
+            ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
+            : VISUAL_CONSTANTS.PLAYER_RED_COLOR
+        this.player.setFillStyle(color)
+        this.player.isFilled = true
+        this.playerTeamColor = color
+
+        // In AI-only mode, use no border and 80% opacity (handled by updatePlayerBorders override)
+        if (!this.myPlayerId) {
+          this.player.setStrokeStyle(
+            VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
+            VISUAL_CONSTANTS.BORDER_COLOR
+          )
+          this.player.setAlpha(0.8)
+          this.player.isFilled = true
+        }
+
+        if (!this.myPlayerId) {
+          this.myPlayerId = playerId
+        }
+        isFirstPlayer = false
+      } else {
+        this.createRemotePlayer(playerId, playerData)
+      }
+    })
+  }
+
+  /**
+   * Sync visual elements from GameEngine state
+   * Used by SinglePlayerScene and AIOnlyScene
+   */
+  protected syncVisualsFromEngine(): void {
+    if (!this.gameEngine) {
+      return
+    }
+
+    const state = this.gameEngine.getState()
+
+    // Update ball
+    this.ball.setPosition(state.ball.x, state.ball.y)
+    this.ballShadow.setPosition(state.ball.x + 2, state.ball.y + 3)
+
+    // Update players - sync all sprites based on their actual IDs
+    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
+      if (playerId === this.myPlayerId) {
+        // Always update the main player sprite (represents original human player)
+        this.player.setPosition(playerData.x, playerData.y)
+        // Ensure color is always set
+        this.player.setFillStyle(this.playerTeamColor)
+        this.player.isFilled = true
+      } else {
+        // Update remote player sprites (teammates and opponents)
+        const sprite = this.remotePlayers.get(playerId)
+        if (sprite) {
+          sprite.setPosition(playerData.x, playerData.y)
+        }
+      }
+    })
+
+    // Update UI
+    this.scoreText.setText(`${state.scoreBlue} - ${state.scoreRed}`)
+
+    const minutes = Math.floor(state.matchTime / 60)
+    const seconds = Math.floor(state.matchTime % 60)
+    this.timerText.setText(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+
+    if (state.matchTime <= 30 && state.matchTime > 0) {
+      this.timerText.setColor('#ff4444')
+    } else {
+      this.timerText.setColor('#ffffff')
+    }
+  }
+
+  /**
+   * Set up common GameEngine callbacks (goal, match end)
+   * Used by SinglePlayerScene and AIOnlyScene
+   */
+  protected setupGameEngineCallbacks(includeShoot: boolean = false): void {
+    if (!this.gameEngine) {
+      return
+    }
+
+    this.gameEngine.onGoal((event: { team: 'blue' | 'red'; time: number }) => {
+      console.log('⚽ Goal!', event.team)
+      if (!this.goalScored) {
+        this.onGoalScored(event.team)
+      }
+    })
+
+    this.gameEngine.onMatchEnd(() => {
+      console.log('🏁 Match ended')
+      if (!this.matchEnded) {
+        this.onMatchEnd()
+      }
+    })
+
+    if (includeShoot) {
+      this.gameEngine.onShoot((playerId: string, power: number) => {
+        console.log(`🎯 Player ${playerId} shot with power ${power.toFixed(2)}`)
+      })
+    }
   }
 
   create() {
@@ -482,6 +733,46 @@ export abstract class BaseGameScene extends Phaser.Scene {
   }
 
   /**
+   * Collect movement input from keyboard (arrow keys + WASD) and joystick
+   * Returns normalized movement vector { x, y }
+   */
+  protected collectMovementInput(): { x: number; y: number } {
+    let moveX = 0
+    let moveY = 0
+
+    // Joystick input (if available)
+    if (this.joystick && this.joystick.isPressed()) {
+      const joystickInput = this.joystick.getInput()
+      moveX = joystickInput.x
+      moveY = joystickInput.y
+    } else {
+      // Keyboard input
+      // Arrow keys
+      if (this.cursors.left.isDown) moveX = -1
+      else if (this.cursors.right.isDown) moveX = 1
+
+      if (this.cursors.up.isDown) moveY = -1
+      else if (this.cursors.down.isDown) moveY = 1
+
+      // WASD keys (override arrow keys if pressed)
+      if (this.wasd.a.isDown) moveX = -1
+      else if (this.wasd.d.isDown) moveX = 1
+
+      if (this.wasd.w.isDown) moveY = -1
+      else if (this.wasd.s.isDown) moveY = 1
+
+      // Normalize diagonal movement
+      const length = Math.sqrt(moveX * moveX + moveY * moveY)
+      if (length > 0) {
+        moveX /= length
+        moveY /= length
+      }
+    }
+
+    return { x: moveX, y: moveY }
+  }
+
+  /**
    * Switch to next teammate (manual switching)
    */
   protected switchToNextTeammate() {
@@ -741,6 +1032,90 @@ export abstract class BaseGameScene extends Phaser.Scene {
     if (this.debugEnabled) {
       this.updateAIDebugLabels()
     }
+  }
+
+  /**
+   * Set up test API for development/testing
+   * Subclasses can override to add scene-specific test methods
+   * @param customTestMethods - Optional object with scene-specific test methods to add
+   */
+  protected setupTestAPI(customTestMethods?: Record<string, any>): void {
+    if (typeof window === 'undefined' || !import.meta.env.DEV) {
+      return
+    }
+
+    // Common test API structure
+    const testAPI: any = {
+      scene: this,
+    }
+
+    // Add joystick and button references if available (not in AI-only mode)
+    if (this.joystick && this.actionButton) {
+      testAPI.joystick = this.joystick
+      testAPI.button = this.actionButton
+
+      // Base getState that includes joystick/button
+      const baseGetState = () => ({
+        joystick: this.joystick.__test_getState(),
+        button: this.actionButton.__test_getState(),
+      })
+
+      // Common test methods for joystick and button
+      const baseTestMethods = {
+        touchJoystick: (x: number, y: number) => {
+          this.joystick.__test_simulateTouch(x, y)
+        },
+        dragJoystick: (x: number, y: number) => {
+          this.joystick.__test_simulateDrag(x, y)
+        },
+        releaseJoystick: () => {
+          this.joystick.__test_simulateRelease()
+        },
+        pressButton: () => {
+          this.actionButton.__test_simulatePress()
+        },
+        releaseButton: (holdMs: number = 500) => {
+          this.actionButton.__test_simulateRelease(holdMs)
+        },
+        getState: baseGetState,
+      }
+
+      // Merge custom test methods, handling getState specially
+      const customMethods = { ...(customTestMethods || {}) }
+      if (customMethods.getState) {
+        // Merge custom getState with base getState
+        const customGetState = customMethods.getState
+        customMethods.getState = () => ({
+          ...baseGetState(),
+          ...customGetState(),
+        })
+      }
+
+      testAPI.test = {
+        ...baseTestMethods,
+        ...customMethods,
+      }
+    } else {
+      // AI-only mode: no joystick/button, just basic test API
+      testAPI.test = {
+        getState: () => ({}),
+        // Merge in custom test methods from subclass
+        ...(customTestMethods || {}),
+      }
+    }
+
+    // Expose GameClock for time control in tests
+    ;(window as any).GameClock = GameClock
+
+    // Expose test API
+    ;(window as any).__gameControls = testAPI
+
+    console.log('🧪 Testing API exposed: window.__gameControls')
+    console.log('🕐 GameClock exposed for time control')
+  }
+
+  protected shouldAllowAIControl(playerId: string): boolean {
+    return playerId !== this.controlledPlayerId
   }
 
   shutdown() {

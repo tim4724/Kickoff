@@ -13,7 +13,7 @@ interface PlayerInput {
   action: boolean
   actionPower?: number // 0.0-1.0, power for shooting (optional, defaults to 0.8)
   timestamp: number
-  playerId?: string // Player ID to control (for AI teammate switching)
+  playerId: string // Player ID this input is for (always required)
 }
 
 export class Player extends Schema {
@@ -157,17 +157,10 @@ export class GameState extends Schema {
     console.log(`Removed player ${sessionId} and their teammates (remaining players: ${this.players.size})`)
   }
 
-  queueInput(sessionId: string, input: PlayerInput) {
-    // Use playerId from input if provided (for teammate switching)
-    const targetPlayerId = input.playerId || sessionId
-
-    // Update control status in GameEngine if switching players
-    if (input.playerId && input.playerId !== sessionId) {
-      this.gameEngine.setPlayerControl(sessionId, targetPlayerId)
-    }
-
-    // Queue input to GameEngine
-    this.gameEngine.queueInput(targetPlayerId, {
+  queueInput(playerId: string, input: PlayerInput) {
+    // Simplified: Just queue the input for the specified player
+    // No knowledge of human/AI, no control switching logic
+    this.gameEngine.queueInput(playerId, {
       movement: input.movement,
       action: input.action,
       actionPower: input.actionPower,
@@ -202,18 +195,31 @@ export class GameState extends Schema {
     this.ball.possessedBy = state.ball.possessedBy
     this.ball.pressureLevel = state.ball.pressureLevel
 
-    // Sync players
+    // Sync players - ensure all engine players exist in schema
     state.players.forEach((enginePlayer: EnginePlayerData, playerId: string) => {
-      const schemaPlayer = this.players.get(playerId)
-      if (schemaPlayer) {
-        schemaPlayer.x = enginePlayer.x
-        schemaPlayer.y = enginePlayer.y
-        schemaPlayer.velocityX = enginePlayer.velocityX
-        schemaPlayer.velocityY = enginePlayer.velocityY
-        schemaPlayer.state = enginePlayer.state
-        schemaPlayer.direction = enginePlayer.direction
-        schemaPlayer.isControlled = enginePlayer.isControlled
+      let schemaPlayer = this.players.get(playerId)
+      
+      // Create player in schema if it doesn't exist (can happen if AI bots are created after match start)
+      if (!schemaPlayer) {
+        schemaPlayer = new Player(
+          enginePlayer.id,
+          enginePlayer.team,
+          enginePlayer.x,
+          enginePlayer.y,
+          enginePlayer.isHuman,
+          enginePlayer.role
+        )
+        this.players.set(playerId, schemaPlayer)
       }
+      
+      // Update existing player properties
+      schemaPlayer.x = enginePlayer.x
+      schemaPlayer.y = enginePlayer.y
+      schemaPlayer.velocityX = enginePlayer.velocityX
+      schemaPlayer.velocityY = enginePlayer.velocityY
+      schemaPlayer.state = enginePlayer.state
+      schemaPlayer.direction = enginePlayer.direction
+      schemaPlayer.isControlled = enginePlayer.isControlled
     })
 
     // Sync timer

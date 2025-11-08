@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { MenuScene } from './scenes/MenuScene'
-import { GameScene } from './scenes/GameScene'
+import { MultiplayerScene } from './scenes/MultiplayerScene'
 import { SinglePlayerScene } from './scenes/SinglePlayerScene'
 import { AIOnlyScene } from './scenes/AIOnlyScene'
 import { sceneRouter } from './utils/SceneRouter'
@@ -26,7 +26,7 @@ const config: Phaser.Types.Core.GameConfig = {
     // Enable multi-touch for simultaneous joystick + action button
     activePointers: 2, // Support 2 simultaneous touches minimum
   },
-  scene: [MenuScene, GameScene, SinglePlayerScene, AIOnlyScene],
+  scene: [MenuScene, MultiplayerScene, SinglePlayerScene, AIOnlyScene],
 }
 
 // Remove loading text
@@ -103,8 +103,8 @@ if ('ontouchstart' in window) {
             // Resume the game if it was paused
             if (game && game.scene.isPaused('SinglePlayerScene')) {
               game.scene.resume('SinglePlayerScene')
-            } else if (game && game.scene.isPaused('GameScene')) {
-              game.scene.resume('GameScene')
+            } else if (game && game.scene.isPaused('MultiplayerScene')) {
+              game.scene.resume('MultiplayerScene')
             } else if (game && game.scene.isPaused('AIOnlyScene')) {
               game.scene.resume('AIOnlyScene')
             }
@@ -121,8 +121,8 @@ if ('ontouchstart' in window) {
         // Resume the game if it was paused
         if (game && game.scene.isPaused('SinglePlayerScene')) {
           game.scene.resume('SinglePlayerScene')
-        } else if (game && game.scene.isPaused('GameScene')) {
-          game.scene.resume('GameScene')
+        } else if (game && game.scene.isPaused('MultiplayerScene')) {
+          game.scene.resume('MultiplayerScene')
         } else if (game && game.scene.isPaused('AIOnlyScene')) {
           game.scene.resume('AIOnlyScene')
         }
@@ -150,8 +150,8 @@ if ('ontouchstart' in window) {
       // Pause the game
       if (game && game.scene.isActive('SinglePlayerScene')) {
         game.scene.pause('SinglePlayerScene')
-      } else if (game && game.scene.isActive('GameScene')) {
-        game.scene.pause('GameScene')
+      } else if (game && game.scene.isActive('MultiplayerScene')) {
+        game.scene.pause('MultiplayerScene')
       } else if (game && game.scene.isActive('AIOnlyScene')) {
         game.scene.pause('AIOnlyScene')
       }
@@ -165,7 +165,7 @@ if ('ontouchstart' in window) {
 // Prevent context menu on right click (mobile)
 window.addEventListener('contextmenu', (e) => e.preventDefault())
 
-// RESIZE mode with dual camera setup in GameScene handles viewport management
+// RESIZE mode with dual camera setup in MultiplayerScene handles viewport management
 
 // Export for debugging
 ;(window as any).game = game
