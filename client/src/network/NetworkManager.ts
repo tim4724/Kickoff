@@ -191,6 +191,7 @@ export class NetworkManager {
   /**
    * Send input for a single player (adds to buffer, sends when ready)
    * Note: Action inputs (shooting) are buffered and sent with other inputs, not immediately
+   * Movement inputs from human players are sent immediately for lower latency
    */
   sendInput(movement: { x: number; y: number }, action: boolean, actionPower: number | undefined, playerId: string, isHuman: boolean = false): void {
     if (!this.connected || !this.room) {
@@ -231,7 +232,12 @@ export class NetworkManager {
     ;(input as any).isHuman = isHuman
 
     this.inputBuffer.set(playerId, input)
-    // Don't flush immediately - let flushInputs() handle it at frame end
+    
+    // Send immediately for human movement inputs (reduces latency by ~16ms)
+    // Action inputs (shooting) are still buffered to merge with movement
+    if (isHuman && !action && (Math.abs(movement.x) > 0.01 || Math.abs(movement.y) > 0.01)) {
+      this.flushInputBuffer()
+    }
   }
 
   /**

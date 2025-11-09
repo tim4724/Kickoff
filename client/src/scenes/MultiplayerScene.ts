@@ -151,7 +151,7 @@ export class MultiplayerScene extends BaseGameScene {
       this.networkManager.flushInputs()
     }
 
-    // Update from server state
+    // Update from server state (process immediately for lower latency)
     if (this.isMultiplayer && this.networkManager) {
       const state = this.networkManager.getState()
       if (state) {
@@ -502,6 +502,7 @@ export class MultiplayerScene extends BaseGameScene {
     const deltaY = Math.abs(this.player.y - serverY)
 
     // Adaptive reconciliation factor based on error magnitude
+    // Higher factors = faster correction = lower perceived lag
     let reconcileFactor: number = VISUAL_CONSTANTS.BASE_RECONCILE_FACTOR
 
     if (deltaX > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD || deltaY > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD) {
@@ -513,7 +514,7 @@ export class MultiplayerScene extends BaseGameScene {
       reconcileFactor = VISUAL_CONSTANTS.MODERATE_RECONCILE_FACTOR
     }
 
-    // Blend toward server position
+    // Blend toward server position (faster correction for better responsiveness)
     this.player.x += (serverX - this.player.x) * reconcileFactor
     this.player.y += (serverY - this.player.y) * reconcileFactor
   }
@@ -529,7 +530,7 @@ export class MultiplayerScene extends BaseGameScene {
       if (!sprite) return
     }
 
-    // Interpolate toward server position
+    // Interpolate toward server position (higher factor = faster sync = lower latency)
     const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
     sprite.x += (playerState.x - sprite.x) * lerpFactor
     sprite.y += (playerState.y - sprite.y) * lerpFactor

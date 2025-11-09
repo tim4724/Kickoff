@@ -7,14 +7,14 @@ export const VISUAL_CONSTANTS = {
   CONTROLLED_PLAYER_BORDER: 4, // Thicker border for controlled player
   UNCONTROLLED_PLAYER_BORDER: 2, // Thin border for uncontrolled players (better visibility)
 
-  // Interpolation factors
-  BALL_LERP_FACTOR: 0.3,
-  REMOTE_PLAYER_LERP_FACTOR: 0.3,
+  // Interpolation factors (reduced for lower latency)
+  BALL_LERP_FACTOR: 0.5, // Increased from 0.3 for faster ball sync
+  REMOTE_PLAYER_LERP_FACTOR: 0.5, // Increased from 0.3 for faster remote player sync
 
-  // Reconciliation factors
-  BASE_RECONCILE_FACTOR: 0.05,
-  MODERATE_RECONCILE_FACTOR: 0.3,
-  STRONG_RECONCILE_FACTOR: 0.6,
+  // Reconciliation factors (increased for faster correction)
+  BASE_RECONCILE_FACTOR: 0.2, // Increased from 0.05 for faster correction
+  MODERATE_RECONCILE_FACTOR: 0.5, // Increased from 0.3
+  STRONG_RECONCILE_FACTOR: 0.8, // Increased from 0.6
 
   // Error thresholds for reconciliation
   MODERATE_ERROR_THRESHOLD: 25,
