@@ -27,6 +27,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected remotePlayers: Map<string, Phaser.GameObjects.Arc> = new Map()
   protected gameObjects: Phaser.GameObjects.GameObject[] = []
   protected uiObjects: Phaser.GameObjects.GameObject[] = []
+  protected controlArrow?: Phaser.GameObjects.Graphics
 
   // UI elements
   protected scoreText!: Phaser.GameObjects.Text
@@ -395,6 +396,12 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     this.gameObjects.push(this.player)
     this.cameraManager.getUICamera().ignore([this.player])
+
+    this.controlArrow = this.add.graphics()
+    this.controlArrow.setDepth(11)
+    this.controlArrow.setVisible(false)
+    this.cameraManager.getUICamera().ignore([this.controlArrow])
+    this.gameObjects.push(this.controlArrow)
   }
 
   protected createUI() {
@@ -614,6 +621,82 @@ export abstract class BaseGameScene extends Phaser.Scene {
         playerSprite.isFilled = true // Restore fill after setStrokeStyle
       }
     })
+
+    this.updateControlArrow()
+  }
+
+  protected updateControlArrow(): void {
+    if (!this.controlArrow) {
+      return
+    }
+
+    const unifiedState = this.getUnifiedState()
+    if (!unifiedState || !this.controlledPlayerId) {
+      this.controlArrow.clear()
+      this.controlArrow.setVisible(false)
+      return
+    }
+
+    const playerState = unifiedState.players.get(this.controlledPlayerId)
+    if (!playerState) {
+      this.controlArrow.clear()
+      this.controlArrow.setVisible(false)
+      return
+    }
+
+    const sprite =
+      this.controlledPlayerId === this.myPlayerId
+        ? this.player
+        : this.remotePlayers.get(this.controlledPlayerId)
+
+    if (!sprite) {
+      this.controlArrow.clear()
+      this.controlArrow.setVisible(false)
+      return
+    }
+
+    const direction = playerState.direction
+    if (direction === undefined || direction === null || Number.isNaN(direction)) {
+      this.controlArrow.clear()
+      this.controlArrow.setVisible(false)
+      return
+    }
+
+    const radius = (sprite as Phaser.GameObjects.Arc).radius ?? 36
+    const baseDistance = radius + 12
+    const tipDistance = baseDistance + 24
+    const baseHalfWidth = 18
+
+    const dirX = Math.cos(direction)
+    const dirY = Math.sin(direction)
+    const perpX = Math.cos(direction + Math.PI / 2)
+    const perpY = Math.sin(direction + Math.PI / 2)
+
+    const baseCenterX = sprite.x + dirX * baseDistance
+    const baseCenterY = sprite.y + dirY * baseDistance
+    const tipX = sprite.x + dirX * tipDistance
+    const tipY = sprite.y + dirY * tipDistance
+
+    const baseLeftX = baseCenterX + perpX * baseHalfWidth
+    const baseLeftY = baseCenterY + perpY * baseHalfWidth
+    const baseRightX = baseCenterX - perpX * baseHalfWidth
+    const baseRightY = baseCenterY - perpY * baseHalfWidth
+
+    this.controlArrow.clear()
+    this.controlArrow.setVisible(true)
+    this.controlArrow.lineStyle(4, 0xffffff, 0.95)
+
+    // Left edge
+    this.controlArrow.beginPath()
+    this.controlArrow.moveTo(tipX, tipY)
+    this.controlArrow.lineTo(baseLeftX, baseLeftY)
+    this.controlArrow.strokePath()
+
+    // Right edge
+    this.controlArrow.beginPath()
+    this.controlArrow.moveTo(tipX, tipY)
+    this.controlArrow.lineTo(baseRightX, baseRightY)
+    this.controlArrow.strokePath()
   }
 
   protected updateBallColor(state: any) {
@@ -1021,9 +1104,13 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Update ball color based on possession
     const state = this.getGameState()
-    if (!state) return // Wait for state to be available
+    if (!state) {
+      this.updateControlArrow()
+      return // Wait for state to be available
+    }
 
     this.updateBallColor(state)
+    this.updateControlArrow()
 
     // Auto-switch on possession change
     this.checkAutoSwitchOnPossession()
@@ -1132,6 +1219,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
     }
     if (this.cameraManager) {
       this.cameraManager.destroy()
+    }
+    if (this.controlArrow) {
+      this.controlArrow.destroy()
+      this.controlArrow = undefined
     }
 
     this.cleanupGameState()
