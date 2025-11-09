@@ -570,7 +570,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
       VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
       VISUAL_CONSTANTS.BORDER_COLOR
     )
-    remotePlayer.setAlpha(0.8) // Start with 80% opacity (non-controlled by default)
+    remotePlayer.setAlpha(1.0)
     // Ensure circle is filled (setStrokeStyle can clear isFilled flag)
     remotePlayer.isFilled = true
     remotePlayer.setDepth(10)
@@ -593,7 +593,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
         VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
         VISUAL_CONSTANTS.BORDER_COLOR
       )
-      this.player.setAlpha(0.8) // 80% opacity for non-controlled players
+      this.player.setAlpha(1.0)
       this.player.isFilled = true // Restore fill after setStrokeStyle
     }
 
@@ -610,7 +610,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
           VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
           VISUAL_CONSTANTS.BORDER_COLOR
         )
-        playerSprite.setAlpha(0.8) // 80% opacity for non-controlled players
+        playerSprite.setAlpha(1.0)
         playerSprite.isFilled = true // Restore fill after setStrokeStyle
       }
     })
