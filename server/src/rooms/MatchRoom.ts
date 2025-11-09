@@ -1,5 +1,6 @@
 import Colyseus from 'colyseus'
 import { GameState } from '../schema/GameState'
+import { gameClock } from '@shared/engine/GameClock'
 
 const { Room } = Colyseus
 type Client = Colyseus.Client
@@ -61,7 +62,7 @@ export class MatchRoom extends Room<GameState> {
       // Convert single input to multi-input format
       const multiInput = {
         inputs: { [message.playerId || client.sessionId]: message },
-        timestamp: message.timestamp || Date.now(),
+        timestamp: message.timestamp || gameClock.now(),
       }
       this.onPlayerInputs(client, multiInput)
     })

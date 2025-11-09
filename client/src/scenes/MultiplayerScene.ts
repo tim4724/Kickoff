@@ -3,6 +3,7 @@ import { NetworkManager } from '../network/NetworkManager'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { StateAdapter, type UnifiedGameState } from '../utils/StateAdapter'
+import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '../ai'
 
 /**
@@ -34,6 +35,12 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   protected initializeGameState(): void {
+    if (GameClock.isMockMode()) {
+      console.warn('🕐 MultiplayerScene detected mock GameClock mode - switching to real time')
+    }
+    GameClock.useRealTime()
+    GameClock.resetTimeScale()
+
     // Connect to multiplayer server
     this.connectToMultiplayer()
   }

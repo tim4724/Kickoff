@@ -22,7 +22,14 @@ export class SinglePlayerScene extends BaseGameScene {
   }
 
   protected initializeGameState(): void {
+    // Ensure we resume real-time mode (tests may have left the clock in mock mode)
+    if (GameClock.isMockMode()) {
+      console.warn('🕐 SinglePlayerScene detected mock GameClock mode - switching to real time')
+    }
+    GameClock.useRealTime()
+
     // Set GameClock to normal speed (1.0x) to prevent state pollution from other scenes
+    GameClock.resetTimeScale()
     GameClock.setTimeScale(1.0)
 
     // Initialize game engine

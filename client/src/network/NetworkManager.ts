@@ -1,4 +1,5 @@
 import { Client, Room } from 'colyseus.js'
+import { gameClock } from '@shared/engine/GameClock'
 
 export interface NetworkConfig {
   serverUrl: string
@@ -200,7 +201,7 @@ export class NetworkManager {
       movement,
       action,
       actionPower,
-      timestamp: Date.now(),
+      timestamp: gameClock.now(),
       playerId, // Always required - which player this input is for
     }
 
@@ -262,7 +263,7 @@ export class NetworkManager {
 
     const multiInput: MultiPlayerInput = {
       inputs: inputsMap as any, // Will be serialized as object
-      timestamp: Date.now(),
+      timestamp: gameClock.now(),
     }
 
     // Debug: Log what we're sending (occasionally)

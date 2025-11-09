@@ -54,6 +54,11 @@ export class AIOnlyScene extends BaseGameScene {
   }
 
   protected initializeGameState(): void {
+    if (GameClock.isMockMode()) {
+      console.warn('🕐 AIOnlyScene detected mock GameClock mode - switching to real time')
+    }
+    GameClock.useRealTime()
+
     // Initialize game engine
     this.gameEngine = new GameEngine({
       matchDuration: GAME_CONFIG.MATCH_DURATION,
@@ -118,6 +123,7 @@ export class AIOnlyScene extends BaseGameScene {
     this.setupSpectatorControls()
 
     // Set initial GameClock time scale to match game speed
+    GameClock.resetTimeScale()
     GameClock.setTimeScale(this.gameSpeed)
 
     // Set up test API with AIOnlyScene-specific methods

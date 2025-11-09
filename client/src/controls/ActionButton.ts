@@ -5,6 +5,7 @@
  */
 
 import { HapticFeedback } from '../utils/HapticFeedback'
+import { gameClock } from '@shared/engine/GameClock'
 
 export class ActionButton {
   private scene: Phaser.Scene
@@ -107,7 +108,7 @@ export class ActionButton {
 
   private onPress() {
     this.isPressed = true
-    this.pressStartTime = Date.now()
+    this.pressStartTime = gameClock.now()
 
     // Visual feedback - use lighter team color when pressed
     this.button.setFillStyle(this.teamColorLight, 0.7)
@@ -124,7 +125,7 @@ export class ActionButton {
 
   private onRelease() {
     this.isPressed = false
-    const holdDurationMs = Date.now() - this.pressStartTime
+    const holdDurationMs = gameClock.now() - this.pressStartTime
     const holdDuration = holdDurationMs / 1000 // Convert to seconds
 
     // Reset visual - use team color
@@ -167,7 +168,7 @@ export class ActionButton {
   public getPower(): number {
     if (!this.isPressed) return 0
 
-    const duration = (Date.now() - this.pressStartTime) / 1000
+    const duration = (gameClock.now() - this.pressStartTime) / 1000
     return Math.min(duration / 1.0, 1)
   }
 

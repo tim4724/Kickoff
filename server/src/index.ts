@@ -4,6 +4,7 @@ import express from 'express'
 import cors from 'cors'
 import { monitor } from '@colyseus/monitor'
 import { MatchRoom } from './rooms/MatchRoom'
+import { gameClock } from '@shared/engine/GameClock'
 
 const { Server } = Colyseus
 
@@ -36,7 +37,7 @@ app.use('/colyseus', monitor())
 app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
-    timestamp: Date.now(),
+    timestamp: gameClock.now(),
     server: 'Kickoff v0.2.0',
   })
 })
