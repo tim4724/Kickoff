@@ -12,14 +12,13 @@ Current implementation documentation and specifications for Socca2.
 
 - **[TEST_SUMMARY.md](TEST_SUMMARY.md)** - Latest test results and pass rates
 
+## Implementation Details
+
+- **[TEST_SERVER_AUTO_START.md](TEST_SERVER_AUTO_START.md)** - Automated test server setup
+- **[PORT_ISOLATION_AND_TEST_FIXES.md](PORT_ISOLATION_AND_TEST_FIXES.md)** - Test infrastructure improvements
+- **[TEST_IMPROVEMENT_FINAL_SUMMARY.md](TEST_IMPROVEMENT_FINAL_SUMMARY.md)** - GameClock integration and time acceleration
+- **[MOBILE_FULLSCREEN.md](MOBILE_FULLSCREEN.md)** - Mobile fullscreen implementation
+
 ## Future Work
 
 - **[AI_REQUIREMENTS.md](AI_REQUIREMENTS.md)** - Specification for AI bot teammates (planned feature)
-
-## Archive
-
-Historical implementation workflows and phase reports are in `archive/`:
-- Week-by-week development summaries
-- Phase completion reports
-- Initial test reports and bug analyses
-- Implementation workflows for completed features

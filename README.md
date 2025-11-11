@@ -43,14 +43,12 @@ socca2/
 - [QUICKSTART.md](QUICKSTART.md) - Development guide and commands
 - [MVP_ROADMAP.md](MVP_ROADMAP.md) - Development roadmap and progress
 
-### Recent Work
+### Technical Documentation
 - [claudedocs/TEST_SUMMARY.md](claudedocs/TEST_SUMMARY.md) - Latest test results (79-80 tests, 98-100% pass rate)
-- [claudedocs/TEST_IMPROVEMENT_FINAL_SUMMARY.md](claudedocs/TEST_IMPROVEMENT_FINAL_SUMMARY.md) - GameClock integration and 10x time acceleration
 - [claudedocs/LAG_OPTIMIZATION_SUMMARY.md](claudedocs/LAG_OPTIMIZATION_SUMMARY.md) - Input lag optimization (85% reduction achieved)
+- [claudedocs/BALL_CAPTURE_MECHANISM.md](claudedocs/BALL_CAPTURE_MECHANISM.md) - Ball possession system details
+- [claudedocs/SHOOTING_IMPLEMENTATION_RESULTS.md](claudedocs/SHOOTING_IMPLEMENTATION_RESULTS.md) - Shooting mechanics
 - [client/src/ai/AI_STRUCTURE.md](client/src/ai/AI_STRUCTURE.md) - AI system architecture
-
-### Archive
-- Historical sprint reports and analysis: `claudedocs/archive/`
 
 ## Current Status
 
