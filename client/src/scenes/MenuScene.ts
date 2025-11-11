@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { sceneRouter } from '../utils/SceneRouter'
 
 export class MenuScene extends Phaser.Scene {
   // UI element references for responsive layout
@@ -226,20 +225,26 @@ export class MenuScene extends Phaser.Scene {
     })
 
     // Button click handlers - Using 'pointerup' for touch device compatibility
-    // Note: Fullscreen is handled globally in main.ts on first touch
+    // Navigate using path-based routing (single HTML file)
     this.singlePlayerButton.on('pointerup', () => {
       console.log('🎮 Starting Single Player mode')
-      sceneRouter.navigateTo('SinglePlayerScene')
+      window.history.pushState({ scene: 'SinglePlayerScene' }, '', '/singleplayer')
+      this.scene.stop()
+      this.scene.start('SinglePlayerScene')
     })
 
     this.multiplayerButton.on('pointerup', () => {
       console.log('🌐 Starting Multiplayer mode')
-      sceneRouter.navigateTo('MultiplayerScene')
+      window.history.pushState({ scene: 'MultiplayerScene' }, '', '/multiplayer')
+      this.scene.stop()
+      this.scene.start('MultiplayerScene')
     })
 
     this.aiOnlyButton.on('pointerup', () => {
       console.log('🤖 Starting AI-Only mode')
-      sceneRouter.navigateTo('AIOnlyScene')
+      window.history.pushState({ scene: 'AIOnlyScene' }, '', '/ai-only')
+      this.scene.stop()
+      this.scene.start('AIOnlyScene')
     })
 
     // Initial layout
@@ -262,9 +267,11 @@ export class MenuScene extends Phaser.Scene {
 
     // Auto-start multiplayer for tests
     if (typeof window !== 'undefined' && (window as any).__testRoomId) {
-      console.log('🧪 Test mode detected - auto-starting multiplayer via router')
+      console.log('🧪 Test mode detected - auto-starting multiplayer')
       this.time.delayedCall(100, () => {
-        sceneRouter.navigateTo('MultiplayerScene')
+        window.history.pushState({ scene: 'MultiplayerScene' }, '', '/multiplayer')
+        this.scene.stop()
+        this.scene.start('MultiplayerScene')
       })
     }
   }

@@ -3,7 +3,36 @@ import { MenuScene } from './scenes/MenuScene'
 import { MultiplayerScene } from './scenes/MultiplayerScene'
 import { SinglePlayerScene } from './scenes/SinglePlayerScene'
 import { AIOnlyScene } from './scenes/AIOnlyScene'
-import { sceneRouter } from './utils/SceneRouter'
+
+/**
+ * Determine which scene to start based on the current URL path
+ */
+function getInitialScene(): string {
+  const path = window.location.pathname.toLowerCase()
+  
+  // Check for query parameter first (for direct scene specification)
+  const urlParams = new URLSearchParams(window.location.search)
+  const sceneParam = urlParams.get('scene')
+  if (sceneParam) {
+    return sceneParam
+  }
+  
+  // Check pathname
+  if (path.includes('/singleplayer')) {
+    return 'SinglePlayerScene'
+  }
+  if (path.includes('/multiplayer')) {
+    return 'MultiplayerScene'
+  }
+  if (path.includes('/ai-only')) {
+    return 'AIOnlyScene'
+  }
+  
+  // Default to menu
+  return 'MenuScene'
+}
+
+const initialScene = getInitialScene()
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -26,7 +55,8 @@ const config: Phaser.Types.Core.GameConfig = {
     // Enable multi-touch for simultaneous joystick + action button
     activePointers: 2, // Support 2 simultaneous touches minimum
   },
-  scene: [MenuScene, MultiplayerScene, SinglePlayerScene, AIOnlyScene],
+  // Don't auto-start any scene - we'll manually register and start the one we need
+  scene: [],
 }
 
 // Remove loading text
@@ -38,8 +68,30 @@ if (loading) {
 // Initialize game
 const game = new Phaser.Game(config)
 
-// Initialize scene router for URL navigation
-sceneRouter.init(game)
+// Manually register all scenes (prevents auto-start)
+game.scene.add('MenuScene', MenuScene)
+game.scene.add('MultiplayerScene', MultiplayerScene)
+game.scene.add('SinglePlayerScene', SinglePlayerScene)
+game.scene.add('AIOnlyScene', AIOnlyScene)
+
+// Start only the scene we want based on URL path
+console.log(`▶️ Starting initial scene: ${initialScene}`)
+game.scene.start(initialScene)
+
+// Handle browser back/forward navigation
+window.addEventListener('popstate', () => {
+  const scene = getInitialScene()
+  const activeScenes = game.scene.getScenes(true)
+  
+  // Stop all active scenes
+  for (const activeScene of activeScenes) {
+    game.scene.stop(activeScene.scene.key)
+  }
+  
+  // Start the scene for the new path
+  console.log(`🔄 Browser navigation: Starting scene ${scene}`)
+  game.scene.start(scene)
+})
 
 // Mobile optimizations
 if ('ontouchstart' in window) {

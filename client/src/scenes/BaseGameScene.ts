@@ -9,7 +9,6 @@ import { FieldRenderer } from '../utils/FieldRenderer'
 import { BallRenderer } from '../utils/BallRenderer'
 import { CameraManager } from '../utils/CameraManager'
 import { AIDebugRenderer } from '../utils/AIDebugRenderer'
-import { sceneRouter } from '../utils/SceneRouter'
 import { StateAdapter, type UnifiedGameState } from '../utils/StateAdapter'
 import { AIManager } from '../ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
@@ -544,7 +543,9 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     this.backButton.on('pointerdown', () => {
       console.log('🔙 Back to menu')
-      sceneRouter.navigateTo('MenuScene')
+      window.history.pushState({ scene: 'MenuScene' }, '', '/')
+      this.scene.stop()
+      this.scene.start('MenuScene')
     })
 
     this.backButton.on('pointerover', () => {
@@ -991,8 +992,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.cameraManager.getGameCamera().ignore([overlay, resultText, scoreText, restartText])
 
     this.input.once('pointerdown', () => {
-      console.log('🔙 Match ended - returning to menu via router')
-      sceneRouter.navigateTo('MenuScene')
+      console.log('🔙 Match ended - returning to menu')
+      window.history.pushState({ scene: 'MenuScene' }, '', '/')
+      this.scene.stop()
+      this.scene.start('MenuScene')
     })
   }
 
