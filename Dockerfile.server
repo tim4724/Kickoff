@@ -22,6 +22,10 @@ RUN npm run build --workspace=server
 FROM node:18-alpine
 WORKDIR /app
 
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
 # Copy workspace root package.json
 COPY package*.json ./
 
@@ -35,6 +39,12 @@ COPY --from=builder /app/server/dist ./server/dist
 
 # Install production dependencies (workspace linking needs the full structure)
 RUN npm ci --workspace=server --workspace=shared --production=true
+
+# Change ownership to non-root user
+RUN chown -R nodejs:nodejs /app
+
+# Switch to non-root user
+USER nodejs
 
 EXPOSE 3000
 

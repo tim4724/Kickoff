@@ -13,14 +13,14 @@ services:
   client:
     image: ghcr.io/tim4724/kickoff-client:latest
     ports:
-      - "${CLIENT_PORT:-80}:80"
+      - "${CLIENT_PORT:-80}:8080"
     environment:
       - SERVER_URL=${SERVER_URL:-http://server:3000}
     restart: unless-stopped
     networks:
       - socca2-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
