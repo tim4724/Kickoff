@@ -2,17 +2,24 @@ import Colyseus from 'colyseus'
 import { createServer } from 'http'
 import express from 'express'
 import cors from 'cors'
-import { monitor } from '@colyseus/monitor'
-import { MatchRoom } from './rooms/MatchRoom'
-import { gameClock } from '@shared/engine/GameClock'
+// import { monitor } from '@colyseus/monitor' // Disabled in production due to missing dependencies
+import { MatchRoom } from './rooms/MatchRoom.js'
+import { gameClock } from '@kickoff/shared/engine/GameClock'
 
 const { Server } = Colyseus
 
 const app = express()
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3000
 
-// CORS for local development
-app.use(cors())
+// CORS configuration
+// In production with separate pods, configure allowed origins
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN 
+    ? process.env.CORS_ORIGIN.split(',')
+    : '*', // Allow all origins in development
+  credentials: true,
+}
+app.use(cors(corsOptions))
 app.use(express.json())
 
 // Create HTTP server
@@ -30,8 +37,8 @@ const gameServer = new Server({
 // - Production: All players with same roomName join same room
 gameServer.define('match', MatchRoom).filterBy(['roomName'])
 
-// Colyseus monitor (dev tool)
-app.use('/colyseus', monitor())
+// Colyseus monitor (dev tool) - Disabled in production
+// app.use('/colyseus', monitor())
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
@@ -43,7 +50,9 @@ app.get('/health', (_req, res) => {
 })
 
 // Start server
-gameServer.listen(port, '0.0.0.0')
+// Listen on :: (IPv6 all interfaces) which also handles IPv4 if dual-stack is available
+// For IPv6-only servers, this ensures proper binding
+gameServer.listen(port, '::')
 
-console.log(`🚀 Kickoff Server listening on http://0.0.0.0:${port}`)
-console.log(`📊 Colyseus Monitor: http://0.0.0.0:${port}/colyseus`)
+console.log(`🚀 Kickoff Server listening on http://[::]:${port}`)
+console.log(`📊 Colyseus Monitor: http://[::]:${port}/colyseus`)

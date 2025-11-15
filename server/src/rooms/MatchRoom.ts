@@ -1,6 +1,6 @@
 import Colyseus from 'colyseus'
-import { GameState } from '../schema/GameState'
-import { gameClock } from '@shared/engine/GameClock'
+import { GameState } from '../schema/GameState.js'
+import { gameClock } from '@kickoff/shared/engine/GameClock'
 
 const { Room } = Colyseus
 type Client = Colyseus.Client

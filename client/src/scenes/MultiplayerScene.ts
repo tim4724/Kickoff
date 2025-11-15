@@ -301,10 +301,37 @@ export class MultiplayerScene extends BaseGameScene {
 
   private async connectToMultiplayer() {
     try {
-      const hostname = window.location.hostname
-      // Use environment variable for server port (3000 for dev, 3001 for test)
-      const serverPort = import.meta.env.VITE_SERVER_PORT || '3000'
-      const serverUrl = `ws://${hostname}:${serverPort}`
+      // Runtime server URL configuration (for separate pods/deployment)
+      // Priority: window.__SERVER_URL__ > meta tag > build-time env > default
+      let serverUrl: string
+      
+      // Check window variable (injected by deployment)
+      if ((window as any).__SERVER_URL__) {
+        serverUrl = (window as any).__SERVER_URL__
+      } 
+      // Check meta tag (for HTML injection)
+      else {
+        const metaTag = document.querySelector('meta[name="server-url"]')
+        if (metaTag) {
+          serverUrl = metaTag.getAttribute('content') || ''
+        }
+        // Fall back to build-time configuration
+        else {
+          const hostname = window.location.hostname
+          const serverPort = import.meta.env.VITE_SERVER_PORT || '3000'
+          serverUrl = `ws://${hostname}:${serverPort}`
+        }
+      }
+      
+      // Ensure WebSocket protocol
+      if (serverUrl.startsWith('http://')) {
+        serverUrl = serverUrl.replace('http://', 'ws://')
+      } else if (serverUrl.startsWith('https://')) {
+        serverUrl = serverUrl.replace('https://', 'wss://')
+      } else if (!serverUrl.startsWith('ws://') && !serverUrl.startsWith('wss://')) {
+        // If no protocol, assume ws://
+        serverUrl = `ws://${serverUrl}`
+      }
 
       this.networkManager = new NetworkManager({
         serverUrl,

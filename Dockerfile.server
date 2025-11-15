@@ -1,0 +1,45 @@
+# Server Dockerfile - Colyseus game server
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+# Build shared package first
+COPY package*.json ./
+COPY shared/package.json ./shared/
+RUN npm ci --workspace=shared
+COPY shared ./shared
+RUN npm run build --workspace=shared
+
+# Build server
+COPY server/package.json ./server/
+COPY shared/package.json ./shared/
+# shared/dist is already built in this stage, no need to copy from another stage
+RUN npm ci --workspace=server --workspace=shared --production=false
+COPY server ./server
+COPY shared ./shared
+RUN npm run build --workspace=server
+
+# Production runtime
+FROM node:18-alpine
+WORKDIR /app
+
+# Copy workspace root package.json
+COPY package*.json ./
+
+# Copy entire shared directory (needed for @shared path resolution)
+COPY shared ./shared
+COPY --from=builder /app/shared/dist ./shared/dist
+
+# Copy server package
+COPY server/package.json ./server/
+COPY --from=builder /app/server/dist ./server/dist
+
+# Install production dependencies (workspace linking needs the full structure)
+RUN npm ci --workspace=server --workspace=shared --production=true
+
+EXPOSE 3000
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+CMD ["node", "server/dist/index.js"]
+

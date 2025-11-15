@@ -4,10 +4,10 @@
  * Shared between client single-player and server multiplayer
  */
 
-import type { EnginePlayerData, EngineBallData, PhysicsConfig, EnginePlayerInput } from './types'
-import type { Team } from '../types'
-import { GAME_CONFIG } from '../types'
-import { gameClock } from './GameClock'
+import type { EnginePlayerData, EngineBallData, PhysicsConfig, EnginePlayerInput } from './types.js'
+import type { Team } from '../types.js'
+import { GAME_CONFIG } from '../types.js'
+import { gameClock } from './GameClock.js'
 
 export class PhysicsEngine {
   private config: PhysicsConfig

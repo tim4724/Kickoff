@@ -4,8 +4,8 @@
  * Shared between client single-player and server multiplayer
  */
 
-import { PhysicsEngine } from './PhysicsEngine'
-import { gameClock } from './GameClock'
+import { PhysicsEngine } from './PhysicsEngine.js'
+import { gameClock } from './GameClock.js'
 import type {
   EnginePlayerData,
   EngineBallData,
@@ -13,9 +13,9 @@ import type {
   EnginePlayerInput,
   PhysicsConfig,
   GoalEvent,
-} from './types'
-import type { Team, GamePhase } from '../types'
-import { GAME_CONFIG } from '../types'
+} from './types.js'
+import type { Team, GamePhase } from '../types.js'
+import { GAME_CONFIG } from '../types.js'
 
 export interface GameEngineConfig {
   matchDuration: number // seconds

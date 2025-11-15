@@ -5,6 +5,36 @@
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
+    },
+    "./types": {
+      "import": "./dist/src/types.js",
+      "types": "./dist/src/types.d.ts"
+    },
+    "./engine/GameClock": {
+      "import": "./dist/src/engine/GameClock.js",
+      "types": "./dist/src/engine/GameClock.d.ts"
+    },
+    "./engine/GameEngine": {
+      "import": "./dist/src/engine/GameEngine.js",
+      "types": "./dist/src/engine/GameEngine.d.ts"
+    },
+    "./engine/PhysicsEngine": {
+      "import": "./dist/src/engine/PhysicsEngine.js",
+      "types": "./dist/src/engine/PhysicsEngine.d.ts"
+    },
+    "./engine/types": {
+      "import": "./dist/src/engine/types.js",
+      "types": "./dist/src/engine/types.d.ts"
+    },
+    "./utils/geometry": {
+      "import": "./dist/src/utils/geometry.js",
+      "types": "./dist/src/utils/geometry.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch"

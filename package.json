@@ -37,7 +37,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "tsc-alias": "^1.8.16"
   },
   "engines": {
     "node": ">=18.0.0",

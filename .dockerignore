@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs (will be built in Docker)
+**/dist/
+**/build/
+
+# Test files and results
+test-results/
+playwright-report/
+.playwright-mcp/
+**/test-results/
+**/playwright-report/
+
+# Development files
+.git/
+.gitignore
+*.md
+!README.md
+claudedocs/
+Socca2-test-improvements/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (don't copy into image)
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Playwright
+.playwright/
+
+

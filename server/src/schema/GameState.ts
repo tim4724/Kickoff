@@ -1,7 +1,7 @@
 import { Schema, type, MapSchema } from '@colyseus/schema'
-import { GAME_CONFIG } from '@shared/types'
-import { GameEngine } from '@shared/engine/GameEngine'
-import type { GameEngineState, EnginePlayerData } from '@shared/engine/types'
+import { GAME_CONFIG } from '@kickoff/shared/types'
+import { GameEngine } from '@kickoff/shared/engine/GameEngine'
+import type { GameEngineState, EnginePlayerData } from '@kickoff/shared/engine/types'
 
 // Shared types
 type Team = 'blue' | 'red'
