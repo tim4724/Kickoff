@@ -656,6 +656,27 @@ export abstract class BaseGameScene extends Phaser.Scene {
       return
     }
 
+    // Hide arrow if player is not moving
+    // Use velocity check (more accurate than state due to inertia)
+    const vx = playerState.velocityX ?? 0
+    const vy = playerState.velocityY ?? 0
+    
+    // Check for invalid values
+    if (isNaN(vx) || isNaN(vy) || !isFinite(vx) || !isFinite(vy)) {
+      this.controlArrow.clear()
+      this.controlArrow.setVisible(false)
+      return
+    }
+    
+    const speed = Math.sqrt(vx ** 2 + vy ** 2)
+    const MIN_SPEED_THRESHOLD = 15 // pixels per second - threshold to account for inertia decay
+    
+    if (speed < MIN_SPEED_THRESHOLD) {
+      this.controlArrow.clear()
+      this.controlArrow.setVisible(false)
+      return
+    }
+
     const direction = playerState.direction
     if (direction === undefined || direction === null || Number.isNaN(direction)) {
       this.controlArrow.clear()

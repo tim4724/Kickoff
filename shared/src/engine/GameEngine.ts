@@ -256,19 +256,21 @@ export class GameEngine {
 
   /**
    * Process all queued inputs
+   * IMPORTANT: Processes ALL players, even without queued inputs, so velocity can decay properly
    */
   private processInputs(dt: number): void {
     this.state.players.forEach((player) => {
       const queue = this.inputQueues.get(player.id)
-      if (queue && queue.length > 0) {
-        // Merge all queued inputs: use latest movement, but preserve any action
-        const mergedInput: EnginePlayerInput = {
-          movement: { x: 0, y: 0 },
-          action: false,
-          actionPower: 0,
-          timestamp: this.frameCount,
-        }
+      
+      // Merge all queued inputs: use latest movement, but preserve any action
+      const mergedInput: EnginePlayerInput = {
+        movement: { x: 0, y: 0 },
+        action: false,
+        actionPower: 0,
+        timestamp: this.frameCount,
+      }
 
+      if (queue && queue.length > 0) {
         // Use latest movement
         const latestInput = queue[queue.length - 1]
         mergedInput.movement = latestInput.movement
@@ -284,19 +286,20 @@ export class GameEngine {
         }
 
         this.inputQueues.set(player.id, [])
+      }
+      // If no queued input, mergedInput defaults to {x: 0, y: 0} which allows velocity to decay
 
-        // Update player
-        this.physics.processPlayerInput(player, mergedInput, dt)
+      // Update player (always process, even with zero input, so velocity decays)
+      this.physics.processPlayerInput(player, mergedInput, dt)
 
-        // Handle action
-        if (mergedInput.action) {
-          this.physics.handlePlayerAction(
-            player,
-            this.state.ball,
-            mergedInput.actionPower,
-            this.onShootCallback
-          )
-        }
+      // Handle action
+      if (mergedInput.action) {
+        this.physics.handlePlayerAction(
+          player,
+          this.state.ball,
+          mergedInput.actionPower,
+          this.onShootCallback
+        )
       }
     })
   }
