@@ -48,6 +48,8 @@ TypeScript's `bundler` moduleResolution setting properly resolves these imports:
 
 ### Quick Start
 
+**Option 1: Build locally**
+
 ```bash
 # Build and start all services
 docker-compose -f docker-compose.multi-pod.yml up --build
@@ -57,6 +59,19 @@ CLIENT_PORT=8080 SERVER_PORT=3001 docker-compose -f docker-compose.multi-pod.yml
 
 # Stop all services
 docker-compose -f docker-compose.multi-pod.yml down
+```
+
+**Option 2: Use pre-built images from GitHub Container Registry**
+
+```bash
+# Pull and start services using published images
+docker-compose -f docker-compose.ghcr.yml up
+
+# For private repositories, login first:
+echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+
+# Stop all services
+docker-compose -f docker-compose.ghcr.yml down
 ```
 
 ### Environment Variables
@@ -116,16 +131,33 @@ curl http://localhost:3001/health
 
 ```
 Socca2/
-├── docker-compose.multi-pod.yml    # Orchestration config
+├── docker-compose.multi-pod.yml    # Build and run locally
+├── docker-compose.ghcr.yml         # Use pre-built images from GitHub
 ├── Dockerfile.client               # Client build (nginx)
 ├── Dockerfile.server               # Server build (node)
 ├── docker/
 │   ├── nginx-client.conf          # Nginx config for SPA routing
 │   └── client-entrypoint.sh       # Runtime URL injection
+├── .github/
+│   └── workflows/
+│       └── docker-publish.yml     # GitHub Actions for image publishing
 ├── client/                        # Vite frontend
 ├── server/                        # Colyseus backend
 └── shared/                        # Shared game logic with exports
 ```
+
+### CI/CD - Automated Image Publishing
+
+Images are automatically built and published to GitHub Container Registry on every push to `main`:
+
+- `ghcr.io/tim4724/kickoff-client:latest`
+- `ghcr.io/tim4724/kickoff-server:latest`
+
+See [.github/workflows/README.md](.github/workflows/README.md) for details on:
+- Automatic builds on push/tag
+- Semantic versioning
+- Multi-platform support (amd64, arm64)
+- Making packages public
 
 ### Production Deployment
 
