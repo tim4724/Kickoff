@@ -13,8 +13,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME_CLIENT: ${{ github.repository }}-client
-  IMAGE_NAME_SERVER: ${{ github.repository }}-server
 
 jobs:
   build-and-push:
@@ -23,6 +21,16 @@ jobs:
       contents: read
       packages: write
       id-token: write
+    
+    strategy:
+      matrix:
+        include:
+          - service: client
+            dockerfile: Dockerfile.client
+            image_suffix: -client
+          - service: server
+            dockerfile: Dockerfile.server
+            image_suffix: -server
 
     steps:
       - name: Checkout repository
@@ -38,11 +46,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for client
-        id: meta-client
+      - name: Extract metadata for ${{ matrix.service }}
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_CLIENT }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}${{ matrix.image_suffix }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -52,40 +60,15 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Extract metadata for server
-        id: meta-server
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_SERVER }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push client image
+      - name: Build and push ${{ matrix.service }} image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.client
+          file: ./${{ matrix.dockerfile }}
           push: true
-          tags: ${{ steps.meta-client.outputs.tags }}
-          labels: ${{ steps.meta-client.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
-
-      - name: Build and push server image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.server
-          push: true
-          tags: ${{ steps.meta-server.outputs.tags }}
-          labels: ${{ steps.meta-server.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           platforms: linux/amd64,linux/arm64
 
