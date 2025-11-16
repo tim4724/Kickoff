@@ -192,7 +192,8 @@ export async function waitForPlayerReady(
 ): Promise<void> {
   await page.waitForFunction(() => {
     const scene = (window as any).__gameControls?.scene
-    // Player is ready when we have both sessionId and it exists in the players map
-    return scene?.mySessionId && scene?.networkManager?.getState()?.players?.has(scene.mySessionId)
+    // Player is ready when we have myPlayerId and it exists in the players map
+    // myPlayerId format: "sessionId-p1" (includes the -p1 suffix)
+    return scene?.myPlayerId && scene?.networkManager?.getState()?.players?.has(scene.myPlayerId)
   }, { timeout: timeoutMs })
 }

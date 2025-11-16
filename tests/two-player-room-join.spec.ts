@@ -59,14 +59,17 @@ test.describe('Two-Player Room Joining', () => {
     console.log('\n📤 Step 3: Verifying team assignments...')
 
     // Get team assignments from server state
+    // Note: Players are now keyed by myPlayerId (sessionId-p1), not sessionId
     const [team1, team2] = await Promise.all([
       client1.evaluate((sid) => {
         const state = (window as any).__gameControls?.scene?.networkManager?.getState()
-        return state?.players?.get(sid)?.team || null
+        const playerId = `${sid}-p1` // Player IDs now include -p1 suffix
+        return state?.players?.get(playerId)?.team || null
       }, session1),
       client2.evaluate((sid) => {
         const state = (window as any).__gameControls?.scene?.networkManager?.getState()
-        return state?.players?.get(sid)?.team || null
+        const playerId = `${sid}-p1` // Player IDs now include -p1 suffix
+        return state?.players?.get(playerId)?.team || null
       }, session2)
     ])
 
@@ -81,9 +84,16 @@ test.describe('Two-Player Room Joining', () => {
     console.log('\n📤 Step 4: Verifying player colors match teams...')
 
     // Get player colors from client-side sprites
+    // Note: No longer using scene.player, now using unified players Map with myPlayerId
     const [color1, color2] = await Promise.all([
-      client1.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor),
-      client2.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor)
+      client1.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        return scene?.players?.get(scene?.myPlayerId)?.fillColor
+      }),
+      client2.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        return scene?.players?.get(scene?.myPlayerId)?.fillColor
+      })
     ])
 
     console.log(`  Client 1 color: ${color1}`)

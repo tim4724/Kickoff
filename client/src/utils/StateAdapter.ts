@@ -115,6 +115,39 @@ export class StateAdapter {
   }
 
   /**
+   * Convert UnifiedGameState to GameStateData format (for AI)
+   * This is the format expected by AIManager
+   */
+  static toGameStateData(state: UnifiedGameState): any {
+    const playersMap = new Map()
+    state.players.forEach((player, id) => {
+      playersMap.set(id, {
+        id: player.id,
+        team: player.team,
+        isHuman: player.isHuman,
+        isControlled: player.isControlled,
+        position: { x: player.x, y: player.y },
+        velocity: { x: player.velocityX, y: player.velocityY },
+        state: player.state,
+        direction: player.direction,
+      })
+    })
+
+    return {
+      players: playersMap,
+      ball: {
+        position: { x: state.ball.x, y: state.ball.y },
+        velocity: { x: state.ball.velocityX, y: state.ball.velocityY },
+        possessedBy: state.ball.possessedBy,
+      },
+      scoreBlue: state.scoreBlue,
+      scoreRed: state.scoreRed,
+      matchTime: state.matchTime,
+      phase: state.phase,
+    }
+  }
+
+  /**
    * Convert NetworkManager state (Multiplayer) to unified format
    */
   static fromNetwork(state: GameStateData): UnifiedGameState {

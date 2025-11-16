@@ -55,8 +55,22 @@ export abstract class BaseGameScene extends Phaser.Scene {
   }
 
   // State
-  protected myPlayerId: string = 'player1-p1' // Still needed for multiplayer network messages
+  /**
+   * myPlayerId: The player identity that belongs to THIS client/session (NEVER changes).
+   * - Determines team membership and teammates
+   * - Used for network reconciliation in multiplayer
+   * - Example: "session1-p1" (the human player for this session)
+   */
+  protected myPlayerId: string = 'player1-p1'
+  
+  /**
+   * controlledPlayerId: The player currently being controlled via input (CHANGES when switching).
+   * - Can be any teammate: "session1-p1", "session1-p2", "session1-p3"
+   * - Changes when pressing SPACE to switch teammates
+   * - Determines which player receives joystick/button input
+   */
   protected controlledPlayerId: string = 'player1-p1'
+  
   protected previousBallPossessor?: string
   protected playerTeamColor: number = VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
   protected goalScored: boolean = false
@@ -125,53 +139,22 @@ export abstract class BaseGameScene extends Phaser.Scene {
   // ========== COMMON HELPER METHODS FOR GAME ENGINE SCENES ==========
 
   /**
-   * Convert GameEngineState to GameStateData format for AI
-   * Used by SinglePlayerScene and AIOnlyScene
-   */
-  protected convertEngineStateToGameStateData(engineState: any): any {
-    // Convert players map
-    const playersMap = new Map()
-    engineState.players.forEach((player: EnginePlayerData, playerId: string) => {
-      playersMap.set(playerId, {
-        id: player.id,
-        team: player.team,
-        isHuman: player.isHuman,
-        isControlled: player.isControlled,
-        position: { x: player.x, y: player.y },
-        velocity: { x: player.velocityX, y: player.velocityY },
-        state: player.state,
-        direction: player.direction,
-      })
-    })
-
-    // Convert ball
-    const ball = {
-      position: { x: engineState.ball.x, y: engineState.ball.y },
-      velocity: { x: engineState.ball.velocityX, y: engineState.ball.velocityY },
-      possessedBy: engineState.ball.possessedBy,
-    }
-
-    return {
-      players: playersMap,
-      ball: ball,
-      scoreBlue: engineState.scoreBlue,
-      scoreRed: engineState.scoreRed,
-      matchTime: engineState.matchTime,
-      phase: engineState.phase,
-    }
-  }
-
-  /**
    * Update AI for GameEngine-based scenes
    * Used by SinglePlayerScene and AIOnlyScene
+   * 
+   * Converts: GameEngine → UnifiedGameState → GameStateData → AI
    */
   protected updateAIForGameEngine(): void {
     if (!this.gameEngine || !this.aiManager) {
       return
     }
 
-    const engineState = this.gameEngine.getState()
-    const gameStateData = this.convertEngineStateToGameStateData(engineState)
+    const unifiedState = this.getUnifiedState()
+    if (!unifiedState) {
+      return
+    }
+
+    const gameStateData = StateAdapter.toGameStateData(unifiedState)
     this.aiManager.update(gameStateData)
   }
 
@@ -358,7 +341,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const ballObjects = BallRenderer.createBall(this, this.gameObjects, this.cameraManager.getUICamera())
     this.ball = ballObjects.ball
     this.ballShadow = ballObjects.shadow
-    // Players will be created dynamically during initializeGameState
+    // All player sprites are created uniformly in this.players Map during scene initialization
     this.createUI()
     this.setupInput()
     this.createMobileControls()
