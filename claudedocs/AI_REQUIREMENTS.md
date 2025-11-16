@@ -293,8 +293,8 @@ Positions calculated relative to field size (1920x1080) for vertical symmetry:
 // Calculated: forwardX = 0.36 * width, defenderX = 0.19 * width
 positions = {
   human: { x: 691, y: 540, role: 'forward' },     // Center forward (0.36w, 0.5h)
-  bot1:  { x: 365, y: 270, role: 'defender' },    // Top defender (0.19w, 0.25h)
-  bot2:  { x: 365, y: 810, role: 'defender' }     // Bottom defender (0.19w, 0.75h)
+  p2:  { x: 365, y: 270, role: 'defender' },    // Top defender (0.19w, 0.25h)
+  p3:  { x: 365, y: 810, role: 'defender' }     // Bottom defender (0.19w, 0.75h)
 }
 ```
 
@@ -304,8 +304,8 @@ positions = {
 // Calculated: forwardX = 0.64 * width, defenderX = 0.81 * width
 positions = {
   human: { x: 1229, y: 540, role: 'forward' },    // Center forward (0.64w, 0.5h)
-  bot1:  { x: 1555, y: 810, role: 'defender' },   // Bottom defender (0.81w, 0.75h - mirrored)
-  bot2:  { x: 1555, y: 270, role: 'defender' }    // Top defender (0.81w, 0.25h - mirrored)
+  p2:  { x: 1555, y: 810, role: 'defender' },   // Bottom defender (0.81w, 0.75h - mirrored)
+  p3:  { x: 1555, y: 270, role: 'defender' }    // Top defender (0.81w, 0.25h - mirrored)
 }
 ```
 

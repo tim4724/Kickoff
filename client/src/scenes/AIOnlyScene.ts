@@ -77,8 +77,8 @@ export class AIOnlyScene extends BaseGameScene {
     // Game engine creates 3 equal players per team
     this.aiManager = new AIManager()
     this.aiManager.initialize(
-      ['ai-blue-team', 'ai-blue-team-bot1', 'ai-blue-team-bot2'],
-      ['ai-red-team', 'ai-red-team-bot1', 'ai-red-team-bot2'],
+      ['ai-blue-team-p1', 'ai-blue-team-p2', 'ai-blue-team-p3'],
+      ['ai-red-team-p1', 'ai-red-team-p2', 'ai-red-team-p3'],
       (playerId, decision) => this.applyAIDecision(playerId, decision)
     )
 
@@ -88,29 +88,8 @@ export class AIOnlyScene extends BaseGameScene {
     // Start match immediately
     this.gameEngine.startMatch()
 
-    // In AI-only mode, clear myPlayerId so the first player gets assigned to the main sprite
-    // This prevents the main sprite from staying at the center unassigned
-    this.myPlayerId = ''
-    this.controlledPlayerId = ''
-
     // Initialize player visuals from engine state
     this.syncPlayersFromEngine()
-
-    // After syncing, hide the main player sprite since all players should be rendered as remote players
-    // The main sprite was used for the first player, but we want all players to have consistent styling
-    // So we'll create a remote player for the first player and hide the main sprite
-    if (this.myPlayerId) {
-      const state = this.gameEngine.getState()
-      const firstPlayerData = state.players.get(this.myPlayerId)
-      if (firstPlayerData && !this.remotePlayers.has(this.myPlayerId)) {
-        // Create remote player for the first player (to match all other players)
-        this.createRemotePlayer(this.myPlayerId, firstPlayerData)
-        // Hide the main player sprite (it's not needed in AI-only mode)
-        this.player.setVisible(false)
-        // Clear myPlayerId so syncVisualsFromEngine treats all players as remote
-        this.myPlayerId = ''
-      }
-    }
 
     // Enable AI debug by default in AI-only mode
     this.debugEnabled = true
@@ -269,20 +248,12 @@ export class AIOnlyScene extends BaseGameScene {
    * Override updatePlayerBorders to prevent human control indicator in AI-only mode
    */
   protected updatePlayerBorders(): void {
-    // In AI-only mode, ALL players should have no borders and 80% opacity (no human control)
-    this.player.setStrokeStyle(
-      VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
-      VISUAL_CONSTANTS.BORDER_COLOR
-    )
-    this.player.setAlpha(0.8) // 80% opacity (no human control)
-    this.player.isFilled = true
-
-    this.remotePlayers.forEach((playerSprite) => {
+    // In AI-only mode, ALL players should have uncontrolled borders (no human control)
+    this.players.forEach((playerSprite) => {
       playerSprite.setStrokeStyle(
         VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
         VISUAL_CONSTANTS.BORDER_COLOR
       )
-      playerSprite.setAlpha(0.8) // 80% opacity (no human control)
       playerSprite.isFilled = true
     })
   }

@@ -333,7 +333,7 @@ tests/
 7. **3v3 Team Composition**
    - Each team always has 3 players (1 human + 2 AI bots)
    - GameEngine automatically creates bot players when human joins
-   - Bot IDs follow pattern: `{sessionId}-bot1`, `{sessionId}-bot2`
+   - Player IDs follow pattern: `{sessionId}-p1`, `{sessionId}-p2`, `{sessionId}-p3`
    - Player roles: 1 forward (attacking), 2 defenders (defensive positions)
 
 ## Documentation References

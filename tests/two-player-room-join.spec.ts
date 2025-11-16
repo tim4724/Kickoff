@@ -297,21 +297,21 @@ test.describe('Two-Player Room Joining', () => {
     // Should have exactly 6 players
     expect(allPlayerIds.length).toBe(6)
 
-    // Verify session1's team (should be session1, session1-bot1, session1-bot2)
+    // Verify session1's team (should be session1-p1, session1-p2, session1-p3)
     const session1Team = allPlayerIds.filter(id => id.startsWith(session1))
     console.log(`  Session 1 team: ${session1Team.join(', ')}`)
     expect(session1Team.length).toBe(3)
-    expect(session1Team).toContain(session1)
-    expect(session1Team).toContain(`${session1}-bot1`)
-    expect(session1Team).toContain(`${session1}-bot2`)
+    expect(session1Team).toContain(`${session1}-p1`)
+    expect(session1Team).toContain(`${session1}-p2`)
+    expect(session1Team).toContain(`${session1}-p3`)
 
-    // Verify session2's team (should be session2, session2-bot1, session2-bot2)
+    // Verify session2's team (should be session2-p1, session2-p2, session2-p3)
     const session2Team = allPlayerIds.filter(id => id.startsWith(session2))
     console.log(`  Session 2 team: ${session2Team.join(', ')}`)
     expect(session2Team.length).toBe(3)
-    expect(session2Team).toContain(session2)
-    expect(session2Team).toContain(`${session2}-bot1`)
-    expect(session2Team).toContain(`${session2}-bot2`)
+    expect(session2Team).toContain(`${session2}-p1`)
+    expect(session2Team).toContain(`${session2}-p2`)
+    expect(session2Team).toContain(`${session2}-p3`)
 
     // Step 2: Verify isHuman flags
     console.log('\nStep 2: Verifying isHuman flags...')
@@ -325,13 +325,13 @@ test.describe('Two-Player Room Joining', () => {
       return flags
     })
 
-    // Only session players should have isHuman: true
-    expect(playerFlags[session1]).toBe(true)
-    expect(playerFlags[`${session1}-bot1`]).toBe(false)
-    expect(playerFlags[`${session1}-bot2`]).toBe(false)
-    expect(playerFlags[session2]).toBe(true)
-    expect(playerFlags[`${session2}-bot1`]).toBe(false)
-    expect(playerFlags[`${session2}-bot2`]).toBe(false)
+    // Only -p1 players should have isHuman: true (the human-controlled player)
+    expect(playerFlags[`${session1}-p1`]).toBe(true)
+    expect(playerFlags[`${session1}-p2`]).toBe(false)
+    expect(playerFlags[`${session1}-p3`]).toBe(false)
+    expect(playerFlags[`${session2}-p1`]).toBe(true)
+    expect(playerFlags[`${session2}-p2`]).toBe(false)
+    expect(playerFlags[`${session2}-p3`]).toBe(false)
 
     console.log('  Human players:', Object.entries(playerFlags).filter(([_, human]) => human).map(([id]) => id))
     console.log('  Bot players:', Object.entries(playerFlags).filter(([_, human]) => !human).map(([id]) => id))
@@ -349,16 +349,18 @@ test.describe('Two-Player Room Joining', () => {
     })
 
     // All players from session1 should be on same team
-    const session1TeamName = playerTeams[session1]
+    const session1TeamName = playerTeams[`${session1}-p1`]
     expect(session1TeamName).toBeTruthy()
-    expect(playerTeams[`${session1}-bot1`]).toBe(session1TeamName)
-    expect(playerTeams[`${session1}-bot2`]).toBe(session1TeamName)
+    expect(playerTeams[`${session1}-p1`]).toBe(session1TeamName)
+    expect(playerTeams[`${session1}-p2`]).toBe(session1TeamName)
+    expect(playerTeams[`${session1}-p3`]).toBe(session1TeamName)
 
     // All players from session2 should be on same team (different from session1)
-    const session2TeamName = playerTeams[session2]
+    const session2TeamName = playerTeams[`${session2}-p1`]
     expect(session2TeamName).toBeTruthy()
-    expect(playerTeams[`${session2}-bot1`]).toBe(session2TeamName)
-    expect(playerTeams[`${session2}-bot2`]).toBe(session2TeamName)
+    expect(playerTeams[`${session2}-p1`]).toBe(session2TeamName)
+    expect(playerTeams[`${session2}-p2`]).toBe(session2TeamName)
+    expect(playerTeams[`${session2}-p3`]).toBe(session2TeamName)
 
     // Teams should be different
     expect(session1TeamName).not.toBe(session2TeamName)

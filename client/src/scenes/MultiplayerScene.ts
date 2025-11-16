@@ -61,23 +61,8 @@ export class MultiplayerScene extends BaseGameScene {
       Math.abs(movement.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
 
     if (hasMovement) {
-      // Find the sprite for the controlled player
-      let controlledSprite: Phaser.GameObjects.Arc | undefined
-      let spriteTeamColor: number
-
-      if (this.controlledPlayerId === this.mySessionId) {
-        controlledSprite = this.player
-        spriteTeamColor = this.playerTeamColor
-      } else {
-        controlledSprite = this.remotePlayers.get(this.controlledPlayerId)
-        // Get team color from server state
-        const state = this.networkManager?.getState()
-        const controlledPlayer = state?.players.get(this.controlledPlayerId)
-        spriteTeamColor =
-          controlledPlayer?.team === 'blue'
-            ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
-            : VISUAL_CONSTANTS.PLAYER_RED_COLOR
-      }
+      // Find the sprite for the controlled player (unified approach)
+      const controlledSprite = this.players.get(this.controlledPlayerId)
 
       if (controlledSprite) {
         // Apply local prediction
@@ -94,29 +79,6 @@ export class MultiplayerScene extends BaseGameScene {
           GAME_CONFIG.PLAYER_MARGIN,
           GAME_CONFIG.FIELD_HEIGHT - GAME_CONFIG.PLAYER_MARGIN
         )
-
-        // Visual feedback: tint when moving
-        const movingColor =
-          spriteTeamColor === VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
-            ? VISUAL_CONSTANTS.PLAYER_BLUE_MOVING
-            : VISUAL_CONSTANTS.PLAYER_RED_MOVING
-        controlledSprite.setFillStyle(movingColor)
-      }
-    } else {
-      // Reset color when not moving
-      if (this.controlledPlayerId === this.mySessionId) {
-        this.player.setFillStyle(this.playerTeamColor)
-      } else {
-        const controlledSprite = this.remotePlayers.get(this.controlledPlayerId)
-        const state = this.networkManager?.getState()
-        const controlledPlayer = state?.players.get(this.controlledPlayerId)
-        const spriteTeamColor =
-          controlledPlayer?.team === 'blue'
-            ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
-            : VISUAL_CONSTANTS.PLAYER_RED_COLOR
-        if (controlledSprite) {
-          controlledSprite.setFillStyle(spriteTeamColor)
-        }
       }
     }
 
@@ -339,12 +301,12 @@ export class MultiplayerScene extends BaseGameScene {
       })
       await this.networkManager.connect()
       this.mySessionId = this.networkManager.getMySessionId()
-      // Set myPlayerId to match session ID (human-controlled player on this client)
-      // This is used for team detection and switching logic
-      this.myPlayerId = this.mySessionId
+      // Set myPlayerId to the first player ID (sessionId-p1)
+      // The server creates players with -p1, -p2, -p3 suffixes
+      this.myPlayerId = `${this.mySessionId}-p1`
       // Initialize controlledPlayerId to the human player
       // This can change when switching to teammates
-      this.controlledPlayerId = this.mySessionId
+      this.controlledPlayerId = `${this.mySessionId}-p1`
       this.isMultiplayer = true
       
       console.log('🎮 [Multiplayer] Human player initialized:', {
@@ -379,8 +341,9 @@ export class MultiplayerScene extends BaseGameScene {
       this.networkManager.on('playerJoin', (player: any) => {
         try {
           console.log('👤 Remote player joined:', player.id, player.team)
-          if (player.id !== this.mySessionId) {
-            this.createRemotePlayer(player.id, player)
+          // Create sprite for all players uniformly
+          if (!this.players.has(player.id)) {
+            this.createPlayerSprite(player.id, player.x, player.y, player.team)
           }
           // Re-initialize AI when players join to include new players
           this.initializeAI()
@@ -404,8 +367,18 @@ export class MultiplayerScene extends BaseGameScene {
       // State change event
       this.networkManager.on('stateChange', (state: any) => {
         try {
+          // Create player sprites for all players in the state (if not already created)
+          if (state?.players) {
+            state.players.forEach((player: any, playerId: string) => {
+              if (!this.players.has(playerId)) {
+                console.log(`🎭 Creating player sprite from state: ${playerId} (${player.team})`)
+                this.createPlayerSprite(playerId, player.x, player.y, player.team)
+              }
+            })
+          }
+
           // Initialize player color and position on first state update
-          if (!this.colorInitialized && state?.players?.has(this.mySessionId)) {
+          if (!this.colorInitialized && state?.players?.has(this.myPlayerId)) {
             console.log(`🎨 [Init] Initializing colors (colorInitialized=${this.colorInitialized})`)
             this.updateLocalPlayerColor()
 
@@ -416,14 +389,18 @@ export class MultiplayerScene extends BaseGameScene {
 
             this.colorInitialized = true
             console.log(`🎨 [Init] Color initialization complete`)
+            
+            // Initialize control arrow and update borders
+            this.initializeControlArrow()
+            this.updatePlayerBorders()
           }
           
           // Initialize AI after colors are set (we have valid state now)
           // Also ensure myPlayerId is still set (in case it wasn't set during connection)
           if (!this.myPlayerId && this.mySessionId) {
             console.warn('[MultiplayerScene] myPlayerId not set, initializing from sessionId')
-            this.myPlayerId = this.mySessionId
-            this.controlledPlayerId = this.mySessionId
+            this.myPlayerId = `${this.mySessionId}-p1`
+            this.controlledPlayerId = `${this.mySessionId}-p1`
           }
           
           // Initialize AI whenever we have valid state (can happen multiple times as players join)
@@ -466,10 +443,10 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   private removeRemotePlayer(sessionId: string) {
-    const sprite = this.remotePlayers.get(sessionId)
+    const sprite = this.players.get(sessionId)
     if (sprite) {
       sprite.destroy()
-      this.remotePlayers.delete(sessionId)
+      this.players.delete(sessionId)
     }
     console.log('🗑️ Remote player removed:', sessionId)
   }
@@ -498,13 +475,13 @@ export class MultiplayerScene extends BaseGameScene {
     }
 
     // Update all players from server state
-    state.players.forEach((player: any, sessionId: string) => {
-      if (sessionId === this.mySessionId) {
-        // Server reconciliation for local player
+    state.players.forEach((player: any, playerId: string) => {
+      if (playerId === this.myPlayerId) {
+        // Server reconciliation for local player (my controlled player)
         this.reconcileLocalPlayer(player)
       } else {
         // Update or create remote player
-        this.updateRemotePlayer(sessionId, player)
+        this.updateRemotePlayer(playerId, player)
       }
     })
 
@@ -523,10 +500,13 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   private reconcileLocalPlayer(playerState: any) {
+    const myPlayerSprite = this.players.get(this.myPlayerId)
+    if (!myPlayerSprite) return
+
     const serverX = playerState.x
     const serverY = playerState.y
-    const deltaX = Math.abs(this.player.x - serverX)
-    const deltaY = Math.abs(this.player.y - serverY)
+    const deltaX = Math.abs(myPlayerSprite.x - serverX)
+    const deltaY = Math.abs(myPlayerSprite.y - serverY)
 
     // Adaptive reconciliation factor based on error magnitude
     // Higher factors = faster correction = lower perceived lag
@@ -542,18 +522,18 @@ export class MultiplayerScene extends BaseGameScene {
     }
 
     // Blend toward server position (faster correction for better responsiveness)
-    this.player.x += (serverX - this.player.x) * reconcileFactor
-    this.player.y += (serverY - this.player.y) * reconcileFactor
+    myPlayerSprite.x += (serverX - myPlayerSprite.x) * reconcileFactor
+    myPlayerSprite.y += (serverY - myPlayerSprite.y) * reconcileFactor
   }
 
   private updateRemotePlayer(sessionId: string, playerState: any) {
-    let sprite = this.remotePlayers.get(sessionId)
+    let sprite = this.players.get(sessionId)
 
     // Create sprite if it doesn't exist (lazy creation for AI bots)
     if (!sprite) {
-      console.log('🎭 Creating remote player (lazy):', sessionId, playerState.team)
-      this.createRemotePlayer(sessionId, playerState)
-      sprite = this.remotePlayers.get(sessionId)
+      console.log('🎭 Creating player (lazy):', sessionId, playerState.team)
+      this.createPlayerSprite(sessionId, playerState.x, playerState.y, playerState.team)
+      sprite = this.players.get(sessionId)
       if (!sprite) return
     }
 
@@ -570,15 +550,16 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   private updateLocalPlayerColor() {
-    if (!this.isMultiplayer || !this.networkManager || !this.mySessionId) return
+    if (!this.isMultiplayer || !this.networkManager || !this.myPlayerId) return
 
     try {
       const state = this.networkManager.getState()
       if (!state || !state.players) return
 
-      const localPlayer = state.players.get(this.mySessionId)
+      // Use myPlayerId (sessionId-p1) instead of mySessionId
+      const localPlayer = state.players.get(this.myPlayerId)
       if (!localPlayer) {
-        console.warn('⚠️ Local player not found in server state')
+        console.warn('⚠️ Local player not found in server state:', this.myPlayerId)
         return
       }
 
@@ -586,7 +567,12 @@ export class MultiplayerScene extends BaseGameScene {
         localPlayer.team === 'blue' ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR : VISUAL_CONSTANTS.PLAYER_RED_COLOR
 
       this.playerTeamColor = teamColor
-      this.player.setFillStyle(this.playerTeamColor)
+      
+      // Update sprite color
+      const myPlayerSprite = this.players.get(this.myPlayerId)
+      if (myPlayerSprite) {
+        myPlayerSprite.setFillStyle(this.playerTeamColor)
+      }
 
       if (this.joystick) {
         this.joystick.setTeamColor(this.playerTeamColor)
@@ -603,19 +589,22 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   private syncLocalPlayerPosition() {
-    if (!this.isMultiplayer || !this.networkManager || !this.mySessionId) return
+    if (!this.isMultiplayer || !this.networkManager || !this.myPlayerId) return
 
     try {
       const state = this.networkManager.getState()
       if (!state || !state.players) return
 
-      const localPlayer = state.players.get(this.mySessionId)
+      const localPlayer = state.players.get(this.myPlayerId)
       if (!localPlayer) {
         console.warn('⚠️ Local player not found in server state for position sync')
         return
       }
 
-      this.player.setPosition(localPlayer.x, localPlayer.y)
+      const myPlayerSprite = this.players.get(this.myPlayerId)
+      if (myPlayerSprite) {
+        myPlayerSprite.setPosition(localPlayer.x, localPlayer.y)
+      }
     } catch (error) {
       console.error('[MultiplayerScene] Error syncing local player position:', error)
     }
@@ -635,16 +624,16 @@ export class MultiplayerScene extends BaseGameScene {
     const state = this.networkManager.getState()
     if (!state || !state.players || state.players.size === 0) return
 
-    // Verify mySessionId is set
-    if (!this.mySessionId) {
-      console.warn('[MultiplayerScene] Cannot initialize AI: mySessionId not set')
+    // Verify myPlayerId is set
+    if (!this.myPlayerId) {
+      console.warn('[MultiplayerScene] Cannot initialize AI: myPlayerId not set')
       return
     }
 
-    // Find which team the local player is on
-    const localPlayer = state.players.get(this.mySessionId)
+    // Find which team the local player is on (use myPlayerId which is sessionId-p1)
+    const localPlayer = state.players.get(this.myPlayerId)
     if (!localPlayer) {
-      console.warn('[MultiplayerScene] Cannot initialize AI: local player not found in state')
+      console.warn('[MultiplayerScene] Cannot initialize AI: local player not found in state', this.myPlayerId)
       return
     }
 
@@ -700,7 +689,8 @@ export class MultiplayerScene extends BaseGameScene {
 
     console.log(`🤖 AI initialized for ${myTeam} team (our team)`)
     console.log(`   Our team: ${myTeamPlayerIds.length} players (${humanTeammates} human, ${aiTeammates} AI teammates)`)
-    console.log(`   Local player: ${this.mySessionId} (currently controlled: ${this.controlledPlayerId ?? 'unknown'})`)
+    console.log(`   Team player IDs: ${myTeamPlayerIds.join(', ')}`)
+    console.log(`   Local player: ${this.myPlayerId} (currently controlled: ${this.controlledPlayerId ?? 'unknown'})`)
     console.log(`   Opponent team: controlled by other client (not initialized here)`)
   }
 

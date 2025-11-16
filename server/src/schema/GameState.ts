@@ -113,9 +113,13 @@ export class GameState extends Schema {
 
     try {
       // Defensive check: prevent duplicate player additions
-      if (this.players.has(sessionId)) {
-        console.warn(`⚠️ Player ${sessionId} already exists, skipping add`)
-        return { team: this.players.get(sessionId)!.team }
+      // Check for the first player ID (sessionId-p1) since that's what GameEngine creates
+      const firstPlayerId = `${sessionId}-p1`
+      if (this.players.has(firstPlayerId)) {
+        console.warn(`⚠️ Player ${sessionId} already exists (found ${firstPlayerId}), skipping add`)
+        // Find the team from any of the session's players
+        const existingPlayer = this.players.get(firstPlayerId)
+        return { team: existingPlayer!.team }
       }
 
       // Count only human players to determine team assignment
@@ -147,13 +151,13 @@ export class GameState extends Schema {
   }
 
   removePlayer(sessionId: string) {
-    // Remove from GameEngine
+    // Remove from GameEngine (which removes sessionId-p1, sessionId-p2, sessionId-p3)
     this.gameEngine.removePlayer(sessionId)
 
-    // Remove from Schema
-    this.players.delete(sessionId)
-    this.players.delete(`${sessionId}-bot1`)
-    this.players.delete(`${sessionId}-bot2`)
+    // Remove from Schema (use the new ID format)
+    this.players.delete(`${sessionId}-p1`)
+    this.players.delete(`${sessionId}-p2`)
+    this.players.delete(`${sessionId}-p3`)
     console.log(`Removed player ${sessionId} and their teammates (remaining players: ${this.players.size})`)
   }
 

@@ -19,11 +19,10 @@ import { gameClock as GameClock } from '@shared/engine/GameClock'
  * for both single-player and multiplayer game modes.
  */
 export abstract class BaseGameScene extends Phaser.Scene {
-  // Visual objects
-  protected player!: Phaser.GameObjects.Arc
+  // Visual objects - unified player sprites
+  protected players: Map<string, Phaser.GameObjects.Arc> = new Map()
   protected ball!: Phaser.GameObjects.Ellipse
   protected ballShadow!: Phaser.GameObjects.Ellipse
-  protected remotePlayers: Map<string, Phaser.GameObjects.Arc> = new Map()
   protected gameObjects: Phaser.GameObjects.GameObject[] = []
   protected uiObjects: Phaser.GameObjects.GameObject[] = []
   protected controlArrow?: Phaser.GameObjects.Graphics
@@ -56,8 +55,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
   }
 
   // State
-  protected myPlayerId: string = 'player1'
-  protected controlledPlayerId: string = 'player1'
+  protected myPlayerId: string = 'player1-p1' // Still needed for multiplayer network messages
+  protected controlledPlayerId: string = 'player1-p1'
   protected previousBallPossessor?: string
   protected playerTeamColor: number = VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
   protected goalScored: boolean = false
@@ -216,6 +215,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
   /**
    * Sync player sprites from GameEngine state
    * Used by SinglePlayerScene and AIOnlyScene
+   * Creates all player sprites uniformly
    */
   protected syncPlayersFromEngine(): void {
     if (!this.gameEngine) {
@@ -223,38 +223,45 @@ export abstract class BaseGameScene extends Phaser.Scene {
     }
 
     const state = this.gameEngine.getState()
-    let isFirstPlayer = true
 
+    // Find the human-controlled player (for SinglePlayerScene)
+    let humanPlayerId: string | undefined
     state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
-      if (playerId === this.myPlayerId || (isFirstPlayer && !this.myPlayerId)) {
-        // Use the main player sprite
-        this.player.setPosition(playerData.x, playerData.y)
-        const color =
-          playerData.team === 'blue'
-            ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
-            : VISUAL_CONSTANTS.PLAYER_RED_COLOR
-        this.player.setFillStyle(color)
-        this.player.isFilled = true
-        this.playerTeamColor = color
-
-        // In AI-only mode, use no border and 80% opacity (handled by updatePlayerBorders override)
-        if (!this.myPlayerId) {
-          this.player.setStrokeStyle(
-            VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
-            VISUAL_CONSTANTS.BORDER_COLOR
-          )
-          this.player.setAlpha(0.8)
-          this.player.isFilled = true
-        }
-
-        if (!this.myPlayerId) {
-          this.myPlayerId = playerId
-        }
-        isFirstPlayer = false
-      } else {
-        this.createRemotePlayer(playerId, playerData)
+      if (playerData.isHuman && playerData.isControlled) {
+        humanPlayerId = playerId
       }
     })
+
+    // Create sprites for all players uniformly
+    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
+      if (!this.players.has(playerId)) {
+        this.createPlayerSprite(playerId, playerData.x, playerData.y, playerData.team)
+        
+        // Set myPlayerId to human player if found, otherwise first player
+        if (!this.myPlayerId || this.myPlayerId === 'player1-p1') {
+          if (humanPlayerId && playerId === humanPlayerId) {
+            this.myPlayerId = playerId
+            this.controlledPlayerId = playerId
+            this.playerTeamColor = playerData.team === 'blue' 
+              ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR 
+              : VISUAL_CONSTANTS.PLAYER_RED_COLOR
+          } else if (!humanPlayerId) {
+            // AI-only mode: just pick first player
+            this.myPlayerId = playerId
+            this.controlledPlayerId = playerId
+            this.playerTeamColor = playerData.team === 'blue' 
+              ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR 
+              : VISUAL_CONSTANTS.PLAYER_RED_COLOR
+          }
+        }
+      }
+    })
+
+    // Initialize control arrow
+    this.initializeControlArrow()
+
+    // Update borders to reflect controlled player
+    this.updatePlayerBorders()
   }
 
   /**
@@ -272,20 +279,11 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.ball.setPosition(state.ball.x, state.ball.y)
     this.ballShadow.setPosition(state.ball.x + 2, state.ball.y + 3)
 
-    // Update players - sync all sprites based on their actual IDs
+    // Update all player sprites uniformly
     state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
-      if (playerId === this.myPlayerId) {
-        // Always update the main player sprite (represents original human player)
-        this.player.setPosition(playerData.x, playerData.y)
-        // Ensure color is always set
-        this.player.setFillStyle(this.playerTeamColor)
-        this.player.isFilled = true
-      } else {
-        // Update remote player sprites (teammates and opponents)
-        const sprite = this.remotePlayers.get(playerId)
-        if (sprite) {
-          sprite.setPosition(playerData.x, playerData.y)
-        }
+      const sprite = this.players.get(playerId)
+      if (sprite) {
+        sprite.setPosition(playerData.x, playerData.y)
       }
     })
 
@@ -360,7 +358,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const ballObjects = BallRenderer.createBall(this, this.gameObjects, this.cameraManager.getUICamera())
     this.ball = ballObjects.ball
     this.ballShadow = ballObjects.shadow
-    this.createPlayer()
+    // Players will be created dynamically during initializeGameState
     this.createUI()
     this.setupInput()
     this.createMobileControls()
@@ -379,28 +377,41 @@ export abstract class BaseGameScene extends Phaser.Scene {
     console.log(`✅ ${this.scene.key} ready`)
   }
 
-  protected createPlayer() {
-    this.player = this.add.circle(
-      GAME_CONFIG.FIELD_WIDTH / 2,
-      GAME_CONFIG.FIELD_HEIGHT / 2,
-      36, // 20% larger than original (30 * 1.2)
-      this.playerTeamColor
-    )
-    this.player.setStrokeStyle(
-      VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER,
+  /**
+   * Create a player sprite (unified method for all players)
+   */
+  protected createPlayerSprite(playerId: string, x: number, y: number, team: 'blue' | 'red'): Phaser.GameObjects.Arc {
+    const color =
+      team === 'blue'
+        ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
+        : VISUAL_CONSTANTS.PLAYER_RED_COLOR
+
+    const playerSprite = this.add.circle(x, y, 36, color) // 20% larger than original (30 * 1.2)
+    playerSprite.setStrokeStyle(
+      VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
       VISUAL_CONSTANTS.BORDER_COLOR
     )
-    // Ensure circle is filled (setStrokeStyle can clear isFilled flag)
-    this.player.isFilled = true
+    playerSprite.isFilled = true
+    playerSprite.setDepth(10)
 
-    this.gameObjects.push(this.player)
-    this.cameraManager.getUICamera().ignore([this.player])
+    this.gameObjects.push(playerSprite)
+    this.cameraManager.getUICamera().ignore([playerSprite])
+    this.players.set(playerId, playerSprite)
 
-    this.controlArrow = this.add.graphics()
-    this.controlArrow.setDepth(11)
-    this.controlArrow.setVisible(false)
-    this.cameraManager.getUICamera().ignore([this.controlArrow])
-    this.gameObjects.push(this.controlArrow)
+    return playerSprite
+  }
+
+  /**
+   * Initialize control arrow (created once, updated per frame)
+   */
+  protected initializeControlArrow() {
+    if (!this.controlArrow) {
+      this.controlArrow = this.add.graphics()
+      this.controlArrow.setDepth(11)
+      this.controlArrow.setVisible(false)
+      this.cameraManager.getUICamera().ignore([this.controlArrow])
+      this.gameObjects.push(this.controlArrow)
+    }
   }
 
   protected createUI() {
@@ -567,60 +578,18 @@ export abstract class BaseGameScene extends Phaser.Scene {
     }
   }
 
-  protected createRemotePlayer(sessionId: string, playerState: EnginePlayerData) {
-    const color =
-      playerState.team === 'blue'
-        ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
-        : VISUAL_CONSTANTS.PLAYER_RED_COLOR
 
-    const remotePlayer = this.add.circle(playerState.x, playerState.y, 36, color) // 20% larger (30 * 1.2)
-    remotePlayer.setStrokeStyle(
-      VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
-      VISUAL_CONSTANTS.BORDER_COLOR
-    )
-    remotePlayer.setAlpha(1.0)
-    // Ensure circle is filled (setStrokeStyle can clear isFilled flag)
-    remotePlayer.isFilled = true
-    remotePlayer.setDepth(10)
-
-    this.gameObjects.push(remotePlayer)
-    this.cameraManager.getUICamera().ignore([remotePlayer])
-    this.remotePlayers.set(sessionId, remotePlayer)
-  }
-
+  /**
+   * Update player borders - simplified with unified player map
+   */
   protected updatePlayerBorders() {
-    if (this.myPlayerId === this.controlledPlayerId) {
-      this.player.setStrokeStyle(
-        VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER,
+    this.players.forEach((playerSprite, playerId) => {
+      const isControlled = playerId === this.controlledPlayerId
+      playerSprite.setStrokeStyle(
+        isControlled ? VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER : VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
         VISUAL_CONSTANTS.BORDER_COLOR
       )
-      this.player.setAlpha(1.0) // Full opacity for controlled player
-      this.player.isFilled = true // Restore fill after setStrokeStyle
-    } else {
-      this.player.setStrokeStyle(
-        VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
-        VISUAL_CONSTANTS.BORDER_COLOR
-      )
-      this.player.setAlpha(1.0)
-      this.player.isFilled = true // Restore fill after setStrokeStyle
-    }
-
-    this.remotePlayers.forEach((playerSprite, sessionId) => {
-      if (sessionId === this.controlledPlayerId) {
-        playerSprite.setStrokeStyle(
-          VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER,
-          VISUAL_CONSTANTS.BORDER_COLOR
-        )
-        playerSprite.setAlpha(1.0) // Full opacity for controlled player
-        playerSprite.isFilled = true // Restore fill after setStrokeStyle
-      } else {
-        playerSprite.setStrokeStyle(
-          VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
-          VISUAL_CONSTANTS.BORDER_COLOR
-        )
-        playerSprite.setAlpha(1.0)
-        playerSprite.isFilled = true // Restore fill after setStrokeStyle
-      }
+      playerSprite.isFilled = true // Restore fill after setStrokeStyle
     })
 
     this.updateControlArrow()
@@ -645,11 +614,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
       return
     }
 
-    const sprite =
-      this.controlledPlayerId === this.myPlayerId
-        ? this.player
-        : this.remotePlayers.get(this.controlledPlayerId)
-
+    const sprite = this.players.get(this.controlledPlayerId)
     if (!sprite) {
       this.controlArrow.clear()
       this.controlArrow.setVisible(false)

@@ -44,8 +44,8 @@ export class SinglePlayerScene extends BaseGameScene {
     // Initialize AI system for both teams
     this.aiManager = new AIManager()
     this.aiManager.initialize(
-      ['player1', 'player1-bot1', 'player1-bot2'], // Blue team (human + 2 AI teammates)
-      ['player2', 'player2-bot1', 'player2-bot2'], // Red team (3 AI opponents)
+      ['player1-p1', 'player1-p2', 'player1-p3'], // Blue team (human + 2 AI teammates)
+      ['player2-p1', 'player2-p2', 'player2-p3'], // Red team (3 AI opponents)
       (playerId, decision) => this.applyAIDecision(playerId, decision)
     )
 

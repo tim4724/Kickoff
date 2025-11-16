@@ -397,18 +397,20 @@ export class PhysicsEngine {
    * Reset players to formation positions
    */
   resetPlayers(players: Map<string, EnginePlayerData>, fieldWidth: number, fieldHeight: number): void {
-    players.forEach((player, sessionId) => {
+    players.forEach((player, playerId) => {
       if (player.team === 'blue') {
         const forwardX = Math.round(fieldWidth * 0.36)
         const defenderX = Math.round(fieldWidth * 0.19)
 
-        if (sessionId.endsWith('-bot1')) {
+        // New ID format: sessionId-p1 (forward), sessionId-p2 (defender top), sessionId-p3 (defender bottom)
+        if (playerId.endsWith('-p2')) {
           player.x = defenderX
           player.y = Math.round(fieldHeight * 0.25)
-        } else if (sessionId.endsWith('-bot2')) {
+        } else if (playerId.endsWith('-p3')) {
           player.x = defenderX
           player.y = Math.round(fieldHeight * 0.75)
         } else {
+          // -p1 or any other ID gets forward position
           player.x = forwardX
           player.y = Math.round(fieldHeight * 0.5)
         }
@@ -416,13 +418,15 @@ export class PhysicsEngine {
         const forwardX = Math.round(fieldWidth * 0.64)
         const defenderX = Math.round(fieldWidth * 0.81)
 
-        if (sessionId.endsWith('-bot1')) {
+        // New ID format: sessionId-p1 (forward), sessionId-p2 (defender top), sessionId-p3 (defender bottom)
+        if (playerId.endsWith('-p2')) {
           player.x = defenderX
           player.y = Math.round(fieldHeight * 0.75)
-        } else if (sessionId.endsWith('-bot2')) {
+        } else if (playerId.endsWith('-p3')) {
           player.x = defenderX
           player.y = Math.round(fieldHeight * 0.25)
         } else {
+          // -p1 or any other ID gets forward position
           player.x = forwardX
           player.y = Math.round(fieldHeight * 0.5)
         }

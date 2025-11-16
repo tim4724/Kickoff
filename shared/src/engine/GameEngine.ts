@@ -93,10 +93,15 @@ export class GameEngine {
 
   /**
    * Add a player to the game (always creates 3 players per team for 3v3)
+   * All players are named uniformly: ${sessionId}-p1, ${sessionId}-p2, ${sessionId}-p3
    */
   addPlayer(sessionId: string, team: Team, isHuman: boolean = true): void {
-    if (this.state.players.has(sessionId)) {
-      console.warn(`Player ${sessionId} already exists`)
+    const p1Id = `${sessionId}-p1`
+    const p2Id = `${sessionId}-p2`
+    const p3Id = `${sessionId}-p3`
+
+    if (this.state.players.has(p1Id)) {
+      console.warn(`Player ${p1Id} already exists`)
       return
     }
 
@@ -106,7 +111,7 @@ export class GameEngine {
         const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.19)
 
         const player1: EnginePlayerData = {
-          id: sessionId,
+          id: p1Id,
           team,
           isHuman: isHuman,
           isControlled: isHuman,
@@ -120,7 +125,7 @@ export class GameEngine {
         }
 
         const player2: EnginePlayerData = {
-          id: `${sessionId}-bot1`,
+          id: p2Id,
           team,
           isHuman: false,
           isControlled: false,
@@ -134,7 +139,7 @@ export class GameEngine {
         }
 
         const player3: EnginePlayerData = {
-          id: `${sessionId}-bot2`,
+          id: p3Id,
           team,
           isHuman: false,
           isControlled: false,
@@ -147,16 +152,16 @@ export class GameEngine {
           role: 'defender',
         }
 
-      this.state.players.set(sessionId, player1)
-      this.state.players.set(`${sessionId}-bot1`, player2)
-      this.state.players.set(`${sessionId}-bot2`, player3)
+      this.state.players.set(p1Id, player1)
+      this.state.players.set(p2Id, player2)
+      this.state.players.set(p3Id, player3)
     } else {
       // Red team
       const forwardX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.64)
       const defenderX = Math.round(GAME_CONFIG.FIELD_WIDTH * 0.81)
 
       const player1: EnginePlayerData = {
-        id: sessionId,
+        id: p1Id,
         team,
         isHuman: isHuman,
         isControlled: isHuman,
@@ -170,7 +175,7 @@ export class GameEngine {
       }
 
       const player2: EnginePlayerData = {
-        id: `${sessionId}-bot1`,
+        id: p2Id,
         team,
         isHuman: false,
         isControlled: false,
@@ -184,7 +189,7 @@ export class GameEngine {
       }
 
       const player3: EnginePlayerData = {
-        id: `${sessionId}-bot2`,
+        id: p3Id,
         team,
         isHuman: false,
         isControlled: false,
@@ -197,9 +202,9 @@ export class GameEngine {
         role: 'defender',
       }
 
-      this.state.players.set(sessionId, player1)
-      this.state.players.set(`${sessionId}-bot1`, player2)
-      this.state.players.set(`${sessionId}-bot2`, player3)
+      this.state.players.set(p1Id, player1)
+      this.state.players.set(p2Id, player2)
+      this.state.players.set(p3Id, player3)
     }
   }
 
@@ -207,18 +212,22 @@ export class GameEngine {
    * Remove a player from the game
    */
   removePlayer(sessionId: string): void {
+    const p1Id = `${sessionId}-p1`
+    const p2Id = `${sessionId}-p2`
+    const p3Id = `${sessionId}-p3`
+
     // Release ball if player had it
     if (
-      this.state.ball.possessedBy === sessionId ||
-      this.state.ball.possessedBy === `${sessionId}-bot1` ||
-      this.state.ball.possessedBy === `${sessionId}-bot2`
+      this.state.ball.possessedBy === p1Id ||
+      this.state.ball.possessedBy === p2Id ||
+      this.state.ball.possessedBy === p3Id
     ) {
       this.state.ball.possessedBy = ''
     }
 
-    this.state.players.delete(sessionId)
-    this.state.players.delete(`${sessionId}-bot1`)
-    this.state.players.delete(`${sessionId}-bot2`)
+    this.state.players.delete(p1Id)
+    this.state.players.delete(p2Id)
+    this.state.players.delete(p3Id)
   }
 
   /**

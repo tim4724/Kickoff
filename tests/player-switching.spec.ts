@@ -218,19 +218,19 @@ test('can switch to AI teammate', async ({ page }) => {
 
   // Verify we're controlling an AI bot
   expect(beforeMovement.isBot).toBe(true)
-  expect(beforeMovement.playerId).not.toBe(beforeMovement.playerId.split('-')[0]) // Should have -bot suffix
+  expect(beforeMovement.playerId).toMatch(/-p[123]$/) // Should have -p1, -p2, or -p3 suffix
 
   // Verify the controlled player ID changed
   const afterSwitchCheck = await page.evaluate(() => {
     const gameScene = (window as any).__gameControls?.scene
     return {
       controlled: gameScene.controlledPlayerId,
-      hasSprite: gameScene.remotePlayers.has(gameScene.controlledPlayerId)
+      hasSprite: gameScene.players.has(gameScene.controlledPlayerId)
     }
   })
 
-  // Controlled player should be a bot and should have a sprite
-  expect(afterSwitchCheck.controlled).toContain('-bot')
+  // Controlled player should be a teammate (with -p suffix) and should have a sprite
+  expect(afterSwitchCheck.controlled).toMatch(/-p[123]$/)
   expect(afterSwitchCheck.hasSprite).toBe(true)
 
   console.log('✓ Successfully switched to AI teammate with sprite')
