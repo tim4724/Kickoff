@@ -24,14 +24,19 @@ async function waitForPlayerFillColor(page: Page, expectedColors: number[], time
   await page.waitForFunction(
     (colors) => {
       const scene = (window as any).__gameControls?.scene
-      const color = scene?.player?.fillColor ?? null
+      const myPlayerId = scene?.myPlayerId
+      const color = scene?.players?.get(myPlayerId)?.fillColor ?? null
       return color !== null && colors.includes(color)
     },
     expectedColors,
     { timeout: timeoutMs }
   )
 
-  return await page.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor)
+  return await page.evaluate(() => {
+    const scene = (window as any).__gameControls?.scene
+    const myPlayerId = scene?.myPlayerId
+    return scene?.players?.get(myPlayerId)?.fillColor
+  })
 }
 
 test.describe('Player Lifecycle Management', () => {
@@ -64,10 +69,12 @@ test.describe('Player Lifecycle Management', () => {
     console.log('\n📤 Step 2: Client 1 gaining possession...')
 
     // Determine which direction to move based on team
-    const team1 = await client1.evaluate((sid) => {
-      const state = (window as any).__gameControls?.scene?.networkManager?.getState()
-      return state?.players?.get(sid)?.team || 'blue'
-    }, session1)
+    const team1 = await client1.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      const state = scene?.networkManager?.getState()
+      const myPlayerId = scene?.myPlayerId
+      return state?.players?.get(myPlayerId)?.team || 'blue'
+    })
 
     // Blue team (left side) moves right, red team (right side) moves left
     const moveKey = team1 === 'blue' ? 'ArrowRight' : 'ArrowLeft'
@@ -76,13 +83,16 @@ test.describe('Player Lifecycle Management', () => {
     // Start moving toward ball
     await client1.keyboard.down(moveKey)
 
-    // Wait for possession to be gained
+    // Wait for possession to be gained (check if ball is possessed by any player from this client's session)
     await client1.waitForFunction(
-      ({ sessionId }) => {
-        const state = (window as any).__gameControls?.scene?.networkManager?.getState()
-        return state?.ball?.possessedBy === sessionId
+      () => {
+        const scene = (window as any).__gameControls?.scene
+        const state = scene?.networkManager?.getState()
+        const mySessionId = scene?.mySessionId
+        const possessedBy = state?.ball?.possessedBy
+        // Check if ball is possessed by any player from this client's session
+        return possessedBy && possessedBy.startsWith(mySessionId)
       },
-      { sessionId: session1 },
       { timeout: 10000 }
     )
 
@@ -92,10 +102,12 @@ test.describe('Player Lifecycle Management', () => {
     // Stabilize after gaining possession
     await waitScaled(client1, 500)
 
-    const ballState = await client1.evaluate((sid) => {
+    const ballState = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
-      const player = state?.players?.get(sid)
+      const myPlayerId = scene?.myPlayerId
+      const player = state?.players?.get(myPlayerId)
+      const mySessionId = scene?.mySessionId
       return {
         possessedBy: state?.ball?.possessedBy || '',
         ballX: state?.ball?.x || 0,
@@ -103,9 +115,10 @@ test.describe('Player Lifecycle Management', () => {
         playerX: player?.x || 0,
         playerY: player?.y || 0,
         playerTeam: player?.team || 'unknown',
-        phase: state?.phase || 'unknown'
+        phase: state?.phase || 'unknown',
+        mySessionId
       }
-    }, session1)
+    })
 
     const dist = Math.sqrt((ballState.ballX - ballState.playerX)**2 + (ballState.ballY - ballState.playerY)**2)
     console.log(`  Match phase: ${ballState.phase}`)
@@ -115,8 +128,8 @@ test.describe('Player Lifecycle Management', () => {
     console.log(`  Distance: ${dist.toFixed(1)}px (possession radius: ${GAME_CONFIG.POSSESSION_RADIUS}px)`)
     console.log(`  Ball possessed by: ${ballState.possessedBy || 'none'}`)
 
-    // Verify Client 1 has possession
-    expect(ballState.possessedBy).toBe(session1)
+    // Verify Client 1 has possession (possessedBy should start with client's session ID)
+    expect(ballState.possessedBy.startsWith(ballState.mySessionId)).toBe(true)
 
     // Client 1 disconnects
     console.log('\n📤 Step 3: Client 1 disconnecting...')
@@ -174,8 +187,11 @@ test.describe('Player Lifecycle Management', () => {
     // Client 1 should see Client 2 as remote player
     const remotePlayerBefore = await client1.evaluate((remoteId) => {
       const scene = (window as any).__gameControls?.scene
-      const remotePlayers = scene?.remotePlayers
-      return remotePlayers?.has(remoteId) || false
+      const myPlayerId = scene?.myPlayerId
+      // Check if any player with the remote sessionId exists (e.g., "remoteId-p1")
+      const remotePlayers = Array.from(scene?.players?.keys() || [])
+        .filter((id: string) => id !== myPlayerId && id.startsWith(remoteId))
+      return remotePlayers.length > 0
     }, session2)
 
     console.log(`  Client 1 sees Client 2: ${remotePlayerBefore}`)
@@ -191,8 +207,11 @@ test.describe('Player Lifecycle Management', () => {
     // Client 1 should no longer see Client 2
     const remotePlayerAfter = await client1.evaluate((remoteId) => {
       const scene = (window as any).__gameControls?.scene
-      const remotePlayers = scene?.remotePlayers
-      return remotePlayers?.has(remoteId) || false
+      const myPlayerId = scene?.myPlayerId
+      // Check if any player with the remote sessionId exists (e.g., "remoteId-p1")
+      const remotePlayers = Array.from(scene?.players?.keys() || [])
+        .filter((id: string) => id !== myPlayerId && id.startsWith(remoteId))
+      return remotePlayers.length > 0
     }, session2)
 
     console.log(`  Client 1 sees Client 2: ${remotePlayerAfter}`)

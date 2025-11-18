@@ -38,14 +38,16 @@ test.describe('Core Features Regression Suite', () => {
 
     const playerData = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      if (!scene?.player) return null
+      const myPlayerId = scene?.myPlayerId
+      const playerSprite = scene?.players?.get(myPlayerId)
+      if (!playerSprite) return null
 
       return {
         exists: true,
-        x: scene.player.x,
-        y: scene.player.y,
-        visible: scene.player.visible,
-        active: scene.player.active
+        x: playerSprite.x,
+        y: playerSprite.y,
+        visible: playerSprite.visible,
+        active: playerSprite.active
       }
     })
 
@@ -98,7 +100,9 @@ test.describe('Core Features Regression Suite', () => {
 
     const initialPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      return { x: scene.player.x, y: scene.player.y }
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
+      return { x: player?.x || 0, y: player?.y || 0 }
     })
 
     // Press right arrow for 1000ms (longer to ensure movement)
@@ -109,7 +113,9 @@ test.describe('Core Features Regression Suite', () => {
 
     const finalPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      return { x: scene.player.x, y: scene.player.y }
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
+      return { x: player?.x || 0, y: player?.y || 0 }
     })
 
     const moved = Math.abs(finalPos.x - initialPos.x)
@@ -126,7 +132,9 @@ test.describe('Core Features Regression Suite', () => {
 
     const initialPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      return { x: scene.player.x, y: scene.player.y }
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
+      return { x: player?.x || 0, y: player?.y || 0 }
     })
 
     // Move player using direct input method
@@ -139,7 +147,9 @@ test.describe('Core Features Regression Suite', () => {
 
     const finalPos = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      return { x: scene.player.x, y: scene.player.y }
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
+      return { x: player?.x || 0, y: player?.y || 0 }
     })
 
     const moved = Math.abs(finalPos.x - initialPos.x)
@@ -215,7 +225,9 @@ test.describe('Core Features Regression Suite', () => {
     // Wait for player to reach boundary (checking every 500ms)
     await page.waitForFunction(() => {
       const scene = (window as any).__gameControls?.scene
-      return scene.player.x <= 70
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
+      return player && player.x <= 70
     }, { timeout: 10000 }) // Give it 10 seconds to reach boundary
 
     await page.keyboard.up('ArrowLeft')
@@ -223,7 +235,9 @@ test.describe('Core Features Regression Suite', () => {
 
     const position = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      return { x: scene.player.x, y: scene.player.y }
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
+      return { x: player?.x || 0, y: player?.y || 0 }
     })
 
     // Should be clamped to minimum boundary (PLAYER_MARGIN = 60px)
@@ -287,14 +301,21 @@ test.describe('Core Features Regression Suite', () => {
     // Wait for client1 to see client2 as remote player (increased timeout from 5s to 8s)
     await client1.waitForFunction((remoteId) => {
       const scene = (window as any).__gameControls?.scene
-      const remotePlayer = scene?.remotePlayers?.get(remoteId)
-      return !!remotePlayer
+      const myPlayerId = scene?.myPlayerId
+      // Check if any player with the remote sessionId exists (e.g., "remoteId-p1")
+      const remotePlayers = Array.from(scene?.players?.keys() || [])
+        .filter((id: string) => id !== myPlayerId && id.startsWith(remoteId))
+      return remotePlayers.length > 0
     }, session2, { timeout: 8000 })
 
     // Client 1 should see Client 2 as remote player
     const client1SeesRemote = await client1.evaluate((remoteId) => {
       const scene = (window as any).__gameControls?.scene
-      const remotePlayer = scene?.remotePlayers?.get(remoteId)
+      const myPlayerId = scene?.myPlayerId
+      // Find the first player with the remote sessionId (e.g., "remoteId-p1")
+      const remotePlayerEntry = Array.from(scene?.players?.entries() || [])
+        .find(([id]) => id !== myPlayerId && id.startsWith(remoteId))
+      const remotePlayer = remotePlayerEntry ? remotePlayerEntry[1] : null
 
       return {
         exists: !!remotePlayer,
@@ -327,11 +348,16 @@ test.describe('Core Features Regression Suite', () => {
     const syncData = await page.evaluate((sid) => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
-      const serverPlayer = state?.players?.get(sid)
+      // Server player uses sessionId-p1 format
+      const serverPlayerId = `${sid}-p1`
+      const serverPlayer = state?.players?.get(serverPlayerId)
 
+      // Use controlledPlayerId because player switching can change the active player
+      const controlledPlayerId = scene?.controlledPlayerId || scene?.myPlayerId
+      const playerSprite = scene?.players?.get(controlledPlayerId)
       return {
-        clientX: scene.player.x,
-        clientY: scene.player.y,
+        clientX: playerSprite?.x || 0,
+        clientY: playerSprite?.y || 0,
         serverX: serverPlayer?.x || 0,
         serverY: serverPlayer?.y || 0
       }

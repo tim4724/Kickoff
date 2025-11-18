@@ -32,10 +32,16 @@ async function getLocalPlayerData(page: Page, sessionId: string) {
     const state = scene.networkManager.getState()
     if (!state) return null
 
-    const serverPlayer = state.players?.get(sid)
+    // Server player uses sessionId-p1 format (the human-controlled player)
+    const serverPlayerId = `${sid}-p1`
+    const serverPlayer = state.players?.get(serverPlayerId)
 
+    // Use controlledPlayerId because player switching can change which player is actively controlled
+    // This accounts for auto-switching to AI teammates when they gain possession
+    const controlledPlayerId = scene?.controlledPlayerId || scene?.myPlayerId
+    const playerSprite = scene?.players?.get(controlledPlayerId)
     return {
-      clientSprite: { x: scene.player.x, y: scene.player.y },
+      clientSprite: { x: playerSprite?.x || 0, y: playerSprite?.y || 0 },
       serverState: { x: serverPlayer?.x || 0, y: serverPlayer?.y || 0 }
     }
   }, sessionId)
@@ -55,9 +61,15 @@ async function getRemotePlayerView(page: Page, targetSessionId: string) {
       const state = scene.networkManager.getState()
       if (!state) return null
 
-      // What remote client's sprite shows
-      const remoteSprite = scene.remotePlayers?.get(sid)
-      const serverPlayer = state.players?.get(sid)
+      // What remote client's sprite shows - find player with matching session prefix
+      const myPlayerId = scene?.myPlayerId
+      const remotePlayerEntry = Array.from(scene?.players?.entries() || [])
+        .find(([id]) => id !== myPlayerId && id.startsWith(sid))
+      const remoteSprite = remotePlayerEntry ? remotePlayerEntry[1] : null
+      
+      // Server player also needs -p1 suffix
+      const serverPlayerId = `${sid}-p1`
+      const serverPlayer = state.players?.get(serverPlayerId)
 
       return {
         remoteSpritePosition: remoteSprite ? { x: remoteSprite.x, y: remoteSprite.y } : null,
@@ -83,8 +95,15 @@ async function getRemotePlayerView(page: Page, targetSessionId: string) {
     const state = scene.networkManager.getState()
     if (!state) return null
 
-    const remoteSprite = scene.remotePlayers?.get(sid)
-    const serverPlayer = state.players?.get(sid)
+    // What remote client's sprite shows - find player with matching session prefix
+    const myPlayerId = scene?.myPlayerId
+    const remotePlayerEntry = Array.from(scene?.players?.entries() || [])
+      .find(([id]) => id !== myPlayerId && id.startsWith(sid))
+    const remoteSprite = remotePlayerEntry ? remotePlayerEntry[1] : null
+    
+    // Server player also needs -p1 suffix
+    const serverPlayerId = `${sid}-p1`
+    const serverPlayer = state.players?.get(serverPlayerId)
 
     return {
       remoteSpritePosition: remoteSprite ? { x: remoteSprite.x, y: remoteSprite.y } : null,

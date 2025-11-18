@@ -103,13 +103,21 @@ test.describe('Socca2 Multiplayer Tests', () => {
       if (!gameControls) return null
 
       const scene = gameControls.scene
-      return {
-        localPlayerColor: scene.player?.fillColor,
-        remotePlayers: Array.from(scene.remotePlayers.values()).map((p: any) => ({
+      const myPlayerId = scene?.myPlayerId
+      const myPlayer = scene?.players?.get(myPlayerId)
+      
+      // Get remote players (all players except myPlayerId)
+      const remotePlayers = Array.from(scene?.players?.entries() || [])
+        .filter(([id]) => id !== myPlayerId)
+        .map(([_, p]: [string, any]) => ({
           color: p.fillColor,
           x: p.x,
           y: p.y
         }))
+      
+      return {
+        localPlayerColor: myPlayer?.fillColor,
+        remotePlayers
       }
     })
 
@@ -118,13 +126,21 @@ test.describe('Socca2 Multiplayer Tests', () => {
       if (!gameControls) return null
 
       const scene = gameControls.scene
-      return {
-        localPlayerColor: scene.player?.fillColor,
-        remotePlayers: Array.from(scene.remotePlayers.values()).map((p: any) => ({
+      const myPlayerId = scene?.myPlayerId
+      const myPlayer = scene?.players?.get(myPlayerId)
+      
+      // Get remote players (all players except myPlayerId)
+      const remotePlayers = Array.from(scene?.players?.entries() || [])
+        .filter(([id]) => id !== myPlayerId)
+        .map(([_, p]: [string, any]) => ({
           color: p.fillColor,
           x: p.x,
           y: p.y
         }))
+      
+      return {
+        localPlayerColor: myPlayer?.fillColor,
+        remotePlayers
       }
     })
 
@@ -194,7 +210,9 @@ test.describe('Socca2 Multiplayer Tests', () => {
     // Get initial player position from client 1
     const initialPos = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      return scene ? { x: scene.player.x, y: scene.player.y } : null
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
+      return player ? { x: player.x, y: player.y } : null
     })
 
     console.log('Initial position:', initialPos)
@@ -206,7 +224,9 @@ test.describe('Socca2 Multiplayer Tests', () => {
     // Check if position changed
     const afterPos = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      return scene ? { x: scene.player.x, y: scene.player.y } : null
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
+      return player ? { x: player.x, y: player.y } : null
     })
 
     console.log('After ArrowRight:', afterPos)
@@ -259,10 +279,14 @@ test.describe('Socca2 Multiplayer Tests', () => {
       const scene = (window as any).__gameControls?.scene
       if (!scene) return null
 
-      const remotePlayers = Array.from(scene.remotePlayers.values())
+      const myPlayerId = scene?.myPlayerId
+      // Get first remote player (any player that's not myPlayerId)
+      const remotePlayers = Array.from(scene?.players?.entries() || [])
+        .filter(([id]) => id !== myPlayerId)
+      
       return remotePlayers.length > 0 ? {
-        x: (remotePlayers[0] as any).x,
-        y: (remotePlayers[0] as any).y
+        x: remotePlayers[0][1].x,
+        y: remotePlayers[0][1].y
       } : null
     })
 
@@ -293,10 +317,13 @@ test.describe('Socca2 Multiplayer Tests', () => {
         const ballY = scene.ball.y
 
         // Move player very close to ball (within possession radius of 45px)
-        scene.player.x = ballX - 25  // 25px offset puts player well within radius
-        scene.player.y = ballY
-
-        console.log(`🎮 Moved player to (${scene.player.x}, ${scene.player.y}), ball at (${ballX}, ${ballY})`)
+        const myPlayerId = scene.myPlayerId
+        const playerSprite = scene.players?.get(myPlayerId)
+        if (playerSprite) {
+          playerSprite.x = ballX - 25  // 25px offset puts player well within radius
+          playerSprite.y = ballY
+          console.log(`🎮 Moved player to (${playerSprite.x}, ${playerSprite.y}), ball at (${ballX}, ${ballY})`)
+        }
       }
     })
 
@@ -423,7 +450,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
       return {
         sessionId: scene.mySessionId,
         isMultiplayer: scene.isMultiplayer,
-        remotePlayerCount: scene.remotePlayers.size,
+        remotePlayerCount: Array.from(scene?.players?.keys() || []).filter((id: string) => id !== scene?.myPlayerId).length,
         playerTeamColor: scene.playerTeamColor,
       }
     })
@@ -435,7 +462,7 @@ test.describe('Socca2 Multiplayer Tests', () => {
       return {
         sessionId: scene.mySessionId,
         isMultiplayer: scene.isMultiplayer,
-        remotePlayerCount: scene.remotePlayers.size,
+        remotePlayerCount: Array.from(scene?.players?.keys() || []).filter((id: string) => id !== scene?.myPlayerId).length,
         playerTeamColor: scene.playerTeamColor,
       }
     })

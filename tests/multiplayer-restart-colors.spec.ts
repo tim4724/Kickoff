@@ -38,8 +38,16 @@ test.describe('Multiplayer Restart Color Assignment', () => {
 
     // Get initial colors
     const initialColors = await Promise.all([
-      client1.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor),
-      client2.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor)
+      client1.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const myPlayerId = scene?.myPlayerId
+        return scene?.players?.get(myPlayerId)?.fillColor
+      }),
+      client2.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const myPlayerId = scene?.myPlayerId
+        return scene?.players?.get(myPlayerId)?.fillColor
+      })
     ])
 
     console.log(`Initial colors: Client1=${initialColors[0]}, Client2=${initialColors[1]}`)
@@ -78,8 +86,16 @@ test.describe('Multiplayer Restart Color Assignment', () => {
 
     // Get colors after restart
     const afterRestartColors = await Promise.all([
-      client1.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor),
-      client2.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor)
+      client1.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const myPlayerId = scene?.myPlayerId
+        return scene?.players?.get(myPlayerId)?.fillColor
+      }),
+      client2.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const myPlayerId = scene?.myPlayerId
+        return scene?.players?.get(myPlayerId)?.fillColor
+      })
     ])
 
     console.log(`After restart colors: Client1=${afterRestartColors[0]}, Client2=${afterRestartColors[1]}`)
@@ -105,11 +121,19 @@ test.describe('Multiplayer Restart Color Assignment', () => {
     // Also verify remote players have valid colors
     const [client1Remote, client2Remote] = await Promise.all([
       client1.evaluate(() => {
-        const remotePlayers = Array.from((window as any).__gameControls?.scene?.remotePlayers?.values() || [])
+        const scene = (window as any).__gameControls?.scene
+        const myPlayerId = scene?.myPlayerId
+        const remotePlayers = Array.from(scene?.players?.entries() || [])
+          .filter(([id]) => id !== myPlayerId)
+          .map(([_, p]) => p)
         return remotePlayers[0]?.fillColor
       }),
       client2.evaluate(() => {
-        const remotePlayers = Array.from((window as any).__gameControls?.scene?.remotePlayers?.values() || [])
+        const scene = (window as any).__gameControls?.scene
+        const myPlayerId = scene?.myPlayerId
+        const remotePlayers = Array.from(scene?.players?.entries() || [])
+          .filter(([id]) => id !== myPlayerId)
+          .map(([_, p]) => p)
         return remotePlayers[0]?.fillColor
       })
     ])
@@ -138,7 +162,8 @@ test.describe('Multiplayer Restart Color Assignment', () => {
         const joystickColor = joystickObjects[1]?.fillColor
         // Get button color from action button (first object)
         const buttonColor = buttonObjects[0]?.fillColor
-        const playerColor = scene?.player?.fillColor
+        const myPlayerId = scene?.myPlayerId
+        const playerColor = scene?.players?.get(myPlayerId)?.fillColor
 
         return { joystick: joystickColor, button: buttonColor, player: playerColor }
       }),
@@ -149,7 +174,8 @@ test.describe('Multiplayer Restart Color Assignment', () => {
 
         const joystickColor = joystickObjects[1]?.fillColor
         const buttonColor = buttonObjects[0]?.fillColor
-        const playerColor = scene?.player?.fillColor
+        const myPlayerId = scene?.myPlayerId
+        const playerColor = scene?.players?.get(myPlayerId)?.fillColor
 
         return { joystick: joystickColor, button: buttonColor, player: playerColor }
       })
@@ -204,8 +230,16 @@ test.describe('Multiplayer Restart Color Assignment', () => {
       ])
 
       const colors = await Promise.all([
-        client1.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor),
-        client2.evaluate(() => (window as any).__gameControls?.scene?.player?.fillColor)
+        client1.evaluate(() => {
+          const scene = (window as any).__gameControls?.scene
+          const myPlayerId = scene?.myPlayerId
+          return scene?.players?.get(myPlayerId)?.fillColor
+        }),
+        client2.evaluate(() => {
+          const scene = (window as any).__gameControls?.scene
+          const myPlayerId = scene?.myPlayerId
+          return scene?.players?.get(myPlayerId)?.fillColor
+        })
       ])
 
       const client1IsBlue = colors[0] === BLUE_COLOR

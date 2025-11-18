@@ -112,8 +112,8 @@ test('updates visual borders when switching players', async ({ page }) => {
     const borders: Record<string, number> = {}
 
     // Phaser circles use lineWidth, not strokeLineWidth
-    borders[gameScene.myPlayerId] = gameScene.player.lineWidth
-    gameScene.remotePlayers.forEach((sprite: any, id: string) => {
+    // Iterate over all players in the unified players map
+    gameScene.players.forEach((sprite: any, id: string) => {
       borders[id] = sprite.lineWidth
     })
 
@@ -144,8 +144,9 @@ test('updates visual borders when switching players', async ({ page }) => {
     const gameScene = (window as any).__gameControls?.scene
     const borders: Record<string, number> = {}
 
-    borders[gameScene.myPlayerId] = gameScene.player.lineWidth
-    gameScene.remotePlayers.forEach((sprite: any, id: string) => {
+    // Phaser circles use lineWidth, not strokeLineWidth
+    // Iterate over all players in the unified players map
+    gameScene.players.forEach((sprite: any, id: string) => {
       borders[id] = sprite.lineWidth
     })
 

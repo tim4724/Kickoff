@@ -170,6 +170,8 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
   let client2: Page
   let client1SessionId: string
   let client2SessionId: string
+  let client1PlayerId: string
+  let client2PlayerId: string
 
   test.beforeAll(async ({ browser }, testInfo) => {
     const context1 = await browser.newContext()
@@ -200,8 +202,14 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
       client2SessionId = await client2.evaluate(() => {
         return (window as any).__gameControls?.scene?.mySessionId
       })
+      client1PlayerId = await client1.evaluate(() => {
+        return (window as any).__gameControls?.scene?.myPlayerId
+      })
+      client2PlayerId = await client2.evaluate(() => {
+        return (window as any).__gameControls?.scene?.myPlayerId
+      })
 
-      if (client1SessionId && client2SessionId) {
+      if (client1SessionId && client2SessionId && client1PlayerId && client2PlayerId) {
         console.log(`✅ Connection established after ${attempt}s`)
         break
       }
@@ -215,7 +223,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
       }
     }
 
-    if (!client1SessionId || !client2SessionId) {
+    if (!client1SessionId || !client2PlayerId) {
       throw new Error(
         `Failed to establish connections after ${MAX_RETRIES}s\n` +
         `Client 1 Session: ${client1SessionId || 'undefined'}\n` +
@@ -233,8 +241,8 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log('\n🧪 TEST: Server-Authoritative Player Movement')
 
     // Get initial positions from server state
-    const client1InitialPos = await getServerPlayerState(client1, client1SessionId)
-    const client2InitialPos = await getServerPlayerState(client2, client2SessionId)
+    const client1InitialPos = await getServerPlayerState(client1, client1PlayerId)
+    const client2InitialPos = await getServerPlayerState(client2, client2PlayerId)
 
     console.log(`Initial C1 position (server): (${client1InitialPos.x}, ${client1InitialPos.y})`)
     console.log(`Initial C2 position (server): (${client2InitialPos.x}, ${client2InitialPos.y})`)
@@ -244,8 +252,8 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     await sendMovementInput(client1, 1, 0, 1000) // x=1 (right), y=0
 
     // Get updated positions from server
-    const client1AfterMove = await getServerPlayerState(client1, client1SessionId)
-    const client2ViewOfClient1 = await getServerPlayerState(client2, client1SessionId)
+    const client1AfterMove = await getServerPlayerState(client1, client1PlayerId)
+    const client2ViewOfClient1 = await getServerPlayerState(client2, client1PlayerId)
 
     console.log(`\nAfter move - C1 position (from C1): (${client1AfterMove.x}, ${client1AfterMove.y})`)
     console.log(`After move - C1 position (from C2): (${client2ViewOfClient1.x}, ${client2ViewOfClient1.y})`)
@@ -278,8 +286,8 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     await sendMovementInput(client2, 0, -1, 1000) // x=0, y=-1 (up)
 
     // Both clients should see Client 2's new position
-    const client2SelfView = await getServerPlayerState(client2, client2SessionId)
-    const client1ViewOfClient2 = await getServerPlayerState(client1, client2SessionId)
+    const client2SelfView = await getServerPlayerState(client2, client2PlayerId)
+    const client1ViewOfClient2 = await getServerPlayerState(client1, client2PlayerId)
 
     console.log(`\nC2 sees self at: (${client2SelfView.x}, ${client2SelfView.y})`)
     console.log(`C1 sees C2 at: (${client1ViewOfClient2.x}, ${client1ViewOfClient2.y})`)
@@ -305,7 +313,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log(`Ball at: (${ballState.x}, ${ballState.y})`)
 
     // Get Client 1 position
-    let playerState = await getServerPlayerState(client1, client1SessionId)
+    let playerState = await getServerPlayerState(client1, client1PlayerId)
     console.log(`Player at: (${playerState.x}, ${playerState.y})`)
 
     console.log(`\n📤 Moving toward ball: direction (${(ballState.x - playerState.x).toFixed(2)}, ${(ballState.y - playerState.y).toFixed(2)})`)
@@ -404,7 +412,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     await sendMovementInput(client1, 1, 0, 1500) // Move right
 
     const afterMoveBallState = await getServerBallState(client1)
-    const afterMovePlayerState = await getServerPlayerState(client1, client1SessionId)
+    const afterMovePlayerState = await getServerPlayerState(client1, client1PlayerId)
 
     console.log(`After move - Ball at: (${afterMoveBallState.x}, ${afterMoveBallState.y})`)
     console.log(`After move - Player at: (${afterMovePlayerState.x}, ${afterMovePlayerState.y})`)
@@ -417,7 +425,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log(`Distance player to ball: ${distanceToBall.toFixed(1)}px`)
 
     // Ball should stay close to player (within possession radius)
-    if (afterMoveBallState.possessedBy === client1SessionId) {
+    if (afterMoveBallState.possessedBy === client1PlayerId) {
       expect(distanceToBall).toBeLessThan(40) // Should be within ~30px + margin
       console.log('✅ Ball magnetism working (ball follows player)')
     } else {
@@ -437,7 +445,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
 
     // First, move player to ball to gain possession
     console.log('\n📤 Moving player to ball to gain possession...')
-    const playerState = await getServerPlayerState(client1, client1SessionId)
+    const playerState = await getServerPlayerState(client1, client1PlayerId)
 
     // Determine direction to ball (client1 starts on left at x=360, ball at x=960)
     const directionX = playerState.x < initialBallState.x ? 1 : -1
@@ -450,7 +458,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     await waitScaled(client1, 500)
 
     const afterMoveBallState = await getServerBallState(client1)
-    const afterMovePlayerState = await getServerPlayerState(client1, client1SessionId)
+    const afterMovePlayerState = await getServerPlayerState(client1, client1PlayerId)
     const distanceToBall = Math.sqrt(
       Math.pow(afterMoveBallState.x - afterMovePlayerState.x, 2) +
       Math.pow(afterMoveBallState.y - afterMovePlayerState.y, 2)
@@ -461,7 +469,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log(`Ball possession after move: "${afterMoveBallState.possessedBy}"`)
 
     // Verify possession before shooting
-    if (afterMoveBallState.possessedBy !== client1SessionId) {
+    if (afterMoveBallState.possessedBy !== client1PlayerId) {
       // Try moving closer if we don't have possession yet
       console.log('⚠️ No possession yet, moving closer...')
       await sendMovementInput(client1, directionX, 0, 500)
@@ -470,7 +478,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
       const retryBallState = await getServerBallState(client1)
       console.log(`Ball possession after retry: "${retryBallState.possessedBy}"`)
 
-      if (retryBallState.possessedBy !== client1SessionId) {
+      if (retryBallState.possessedBy !== client1PlayerId) {
         console.log('⚠️ Still no possession, test may be flaky')
         // Continue anyway to see what happens
       }
@@ -520,7 +528,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
   test('6. Network Resilience Test', async () => {
     console.log('\n🧪 TEST: Network Resilience (Rapid Inputs)')
 
-    const initialPos = await getServerPlayerState(client1, client1SessionId)
+    const initialPos = await getServerPlayerState(client1, client1PlayerId)
 
     // Send rapid movement inputs in different directions
     console.log('\n📤 Sending rapid direction changes...')
@@ -529,12 +537,12 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     await sendMovementInput(client1, -1, 0, 300) // Left
     await sendMovementInput(client1, 0, -1, 300) // Up
 
-    const finalPos = await getServerPlayerState(client1, client1SessionId)
+    const finalPos = await getServerPlayerState(client1, client1PlayerId)
 
     console.log(`Position changed from (${initialPos.x}, ${initialPos.y}) to (${finalPos.x}, ${finalPos.y})`)
 
     // Verify both clients see the same final position
-    const client2ViewPos = await getServerPlayerState(client2, client1SessionId)
+    const client2ViewPos = await getServerPlayerState(client2, client1PlayerId)
     const syncError = Math.abs(finalPos.x - client2ViewPos.x) +
                       Math.abs(finalPos.y - client2ViewPos.y)
 

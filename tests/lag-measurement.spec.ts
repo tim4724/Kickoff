@@ -34,7 +34,9 @@ async function measureInputLag(page: Page): Promise<number> {
   // Get initial position and send input (single-player mode)
   const initialPos = await page.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    return { x: scene.player.x, y: scene.player.y }
+    const myPlayerId = scene?.myPlayerId
+    const player = scene?.players?.get(myPlayerId)
+    return { x: player?.x || 0, y: player?.y || 0 }
   })
 
   // Send direct input (starts movement immediately without UI interaction)
@@ -48,10 +50,12 @@ async function measureInputLag(page: Page): Promise<number> {
     await page.waitForFunction(
       ({ initialX, initialY }) => {
         const scene = (window as any).__gameControls?.scene
-        if (!scene?.player) return false
+        const myPlayerId = scene?.myPlayerId
+        const player = scene?.players?.get(myPlayerId)
+        if (!player) return false
 
-        const deltaX = Math.abs(scene.player.x - initialX)
-        const deltaY = Math.abs(scene.player.y - initialY)
+        const deltaX = Math.abs(player.x - initialX)
+        const deltaY = Math.abs(player.y - initialY)
 
         return deltaX > 2 || deltaY > 2
       },

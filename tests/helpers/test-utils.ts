@@ -37,12 +37,13 @@ export async function disableAutoSwitch(page: Page): Promise<void> {
 }
 
 /**
- * Get player's team color
+ * Get player's team color (from unified players map)
  */
 export async function getPlayerColor(client: Page): Promise<number> {
   return client.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    return scene?.player?.fillColor || 0
+    const myPlayerId = scene?.myPlayerId
+    return scene?.players?.get(myPlayerId)?.fillColor || 0
   })
 }
 
@@ -81,26 +82,34 @@ export async function getServerState(client: Page) {
 }
 
 /**
- * Get player position
+ * Get player position (from unified players map)
+ * Uses controlledPlayerId to track the actively controlled player (accounts for player switching)
  */
 export async function getPlayerPosition(client: Page) {
   return client.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
+    // Use controlledPlayerId because that's the player being moved by input
+    // This accounts for player switching when AI teammates gain possession
+    const controlledPlayerId = scene?.controlledPlayerId || scene?.myPlayerId
+    const player = scene?.players?.get(controlledPlayerId)
     return {
-      x: scene?.player?.x || 0,
-      y: scene?.player?.y || 0
+      x: player?.x || 0,
+      y: player?.y || 0
     }
   })
 }
 
 /**
- * Check if client sees a remote player
+ * Check if client sees a remote player (in unified players map)
+ * Now checks for sessionId-p1 format in the unified players map
  */
 export async function hasRemotePlayer(client: Page, remoteSessionId: string): Promise<boolean> {
   return client.evaluate((sessionId) => {
     const scene = (window as any).__gameControls?.scene
-    const remotePlayers = Array.from(scene?.remotePlayers?.values() || [])
-    return remotePlayers.some((p: any) => p.sessionId === sessionId)
+    const myPlayerId = scene?.myPlayerId
+    // Check for the remote player's -p1 ID in unified players map
+    const remotePlayerId = `${sessionId}-p1`
+    return scene?.players?.has(remotePlayerId) && remotePlayerId !== myPlayerId
   }, remoteSessionId)
 }
 
@@ -121,16 +130,21 @@ export async function movePlayer(
 /**
  * Gain ball possession - uses deterministic condition waiting
  * instead of retry loops for better reliability under load
+ * Note: Ball possession now uses myPlayerId format (sessionId-p1, sessionId-p2, sessionId-p3)
  */
 export async function gainPossession(
   client: Page,
   timeoutMs: number = 10000
 ): Promise<boolean> {
-  const sessionId = await getSessionId(client)
+  // Get myPlayerId (e.g., "sessionId-p1") instead of just sessionId
+  const myPlayerId = await client.evaluate(() => {
+    const scene = (window as any).__gameControls?.scene
+    return scene?.myPlayerId || ''
+  })
 
   // Check if already have possession
   const currentState = await getServerState(client)
-  if (currentState.ball.possessedBy === sessionId) {
+  if (currentState.ball.possessedBy === myPlayerId) {
     return true
   }
 
@@ -140,12 +154,12 @@ export async function gainPossession(
   try {
     // Wait for possession to be gained (deterministic condition)
     await client.waitForFunction(
-      (sid) => {
+      (playerId) => {
         const scene = (window as any).__gameControls?.scene
         const state = scene?.networkManager?.getState()
-        return state?.ball?.possessedBy === sid
+        return state?.ball?.possessedBy === playerId
       },
-      sessionId,
+      myPlayerId,
       { timeout: timeoutMs }
     )
 

@@ -23,11 +23,13 @@ const CLIENT_URL = TEST_ENV.CLIENT_URL
 async function getPlayerPosition(page: Page) {
   return await page.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    if (!scene?.player) return null
+    const myPlayerId = scene?.myPlayerId
+    const player = scene?.players?.get(myPlayerId)
+    if (!player) return null
 
     return {
-      x: scene.player.x,
-      y: scene.player.y
+      x: player.x,
+      y: player.y
     }
   })
 }

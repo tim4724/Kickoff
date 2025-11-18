@@ -69,7 +69,7 @@ async function setupAIOnlyTest(page: Page, url: string): Promise<void> {
   // Wait for AI-only scene to be ready
   await page.waitForFunction(() => {
     const scene = (window as any).__gameControls?.scene
-    return scene?.scene?.key === 'AIOnlyScene' && scene?.player
+    return scene?.scene?.key === 'AIOnlyScene' && scene?.players?.size > 0
   }, { timeout: 10000 })
 
   // Set GameClock to 1.0x speed for this test (normal real-time gameplay)

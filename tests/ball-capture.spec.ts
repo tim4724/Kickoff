@@ -54,8 +54,10 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     // Get player and ball positions
     const positions = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
       return {
-        player: { x: scene.player.x, y: scene.player.y },
+        player: { x: player?.x || 0, y: player?.y || 0 },
         ball: { x: scene.ball.x, y: scene.ball.y }
       }
     })
@@ -88,8 +90,10 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     // Get player and ball positions
     const positions = await page.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
       return {
-        player: { x: scene.player.x, y: scene.player.y },
+        player: { x: player?.x || 0, y: player?.y || 0 },
         ball: { x: scene.ball.x, y: scene.ball.y }
       }
     })
@@ -117,15 +121,30 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     const positions = await sourcePage.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
-      const myPlayer = scene.player
+      
+      if (!state) return { source: null, target: null }
+      
+      // Use myPlayerId to get the controlled player from state (not sprites)
+      const myPlayerId = scene?.myPlayerId
+      const mySessionId = scene?.mySessionId
+      
+      // Get source player from game state
+      const myPlayer = state.players?.get(myPlayerId)
+      
+      // Find opponent by checking for different session ID prefix
       const players = Array.from(state?.players?.entries() || [])
-      const opponent = players.find(([id]: [string, any]) => id !== scene.mySessionId)?.[1]
+      const opponent = players.find(([id]: [string, any]) => !id.startsWith(mySessionId))?.[1]
 
       return {
-        source: { x: myPlayer.x, y: myPlayer.y },
+        source: myPlayer ? { x: myPlayer.x, y: myPlayer.y } : null,
         target: opponent ? { x: opponent.x, y: opponent.y } : null
       }
     })
+
+    if (!positions.source) {
+      console.log('⚠️  No source player found, skipping movement')
+      return
+    }
 
     if (!positions.target) {
       console.log('⚠️  No opponent found, skipping movement')
@@ -234,8 +253,10 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     // Get player positions
     const playerPositions = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
       return {
-        player: { x: scene.player.x, y: scene.player.y }
+        player: { x: player?.x || 0, y: player?.y || 0 }
       }
     })
     console.log(`  Player at: (${playerPositions.player.x.toFixed(0)}, ${playerPositions.player.y.toFixed(0)})`)
@@ -257,8 +278,10 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     const captureState = await getGameState(client1)
     const finalPositions = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
+      const myPlayerId = scene?.myPlayerId
+      const player = scene?.players?.get(myPlayerId)
       return {
-        player: { x: scene.player.x, y: scene.player.y }
+        player: { x: player?.x || 0, y: player?.y || 0 }
       }
     })
     console.log(`  Player moved to: (${finalPositions.player.x.toFixed(0)}, ${finalPositions.player.y.toFixed(0)})`)

@@ -168,7 +168,8 @@ export async function setupSinglePlayerTest(
   // Wait for single-player scene to be ready and expose test API
   await page.waitForFunction(() => {
     const scene = (window as any).__gameControls?.scene
-    return scene?.scene?.key === 'SinglePlayerScene' && scene?.player
+    // Check for unified player system - should have myPlayerId and players map
+    return scene?.scene?.key === 'SinglePlayerScene' && scene?.myPlayerId && scene?.players?.size > 0
   }, { timeout: 10000 })
 
   // Small delay for scene initialization

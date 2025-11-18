@@ -42,14 +42,18 @@ test.describe('Multiplayer AI Control', () => {
     const [session1, session2, team1, team2] = await Promise.all([
       client1.evaluate(() => (window as any).__gameControls?.scene?.mySessionId),
       client2.evaluate(() => (window as any).__gameControls?.scene?.mySessionId),
-      client1.evaluate((sid) => {
-        const state = (window as any).__gameControls?.scene?.networkManager?.getState()
-        return state?.players?.get(sid)?.team || null
-      }, await client1.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)),
-      client2.evaluate((sid) => {
-        const state = (window as any).__gameControls?.scene?.networkManager?.getState()
-        return state?.players?.get(sid)?.team || null
-      }, await client2.evaluate(() => (window as any).__gameControls?.scene?.mySessionId))
+      client1.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const state = scene?.networkManager?.getState()
+        const myPlayerId = scene?.myPlayerId
+        return state?.players?.get(myPlayerId)?.team || null
+      }),
+      client2.evaluate(() => {
+        const scene = (window as any).__gameControls?.scene
+        const state = scene?.networkManager?.getState()
+        const myPlayerId = scene?.myPlayerId
+        return state?.players?.get(myPlayerId)?.team || null
+      })
     ])
 
     console.log(`  Client 1: ${session1} on ${team1} team`)
@@ -150,8 +154,8 @@ test.describe('Multiplayer AI Control', () => {
 
     // Check that human players are set correctly
     const [blueHumanId, redHumanId] = await Promise.all([
-      blueClient.evaluate(() => (window as any).__gameControls?.scene?.mySessionId),
-      redClient.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
+      blueClient.evaluate(() => (window as any).__gameControls?.scene?.myPlayerId),
+      redClient.evaluate(() => (window as any).__gameControls?.scene?.myPlayerId)
     ])
 
     // Verify human players are in the correct teams
@@ -243,16 +247,16 @@ test.describe('Multiplayer AI Control', () => {
         return { error: 'Unified state unavailable' }
       }
 
-      const myId = scene.mySessionId
+      const myPlayerId = scene.myPlayerId
       const controlledBefore = scene.controlledPlayerId
-      if (!myId || !controlledBefore) {
-        return { error: 'Missing session or controlled player id' }
+      if (!myPlayerId || !controlledBefore) {
+        return { error: 'Missing player id or controlled player id' }
       }
 
       // Find an AI teammate (not the human-controlled player)
       const teammates: string[] = []
       unifiedState.players.forEach((player: any, playerId: string) => {
-        if (player.team === unifiedState.players.get(myId)?.team) {
+        if (player.team === unifiedState.players.get(myPlayerId)?.team) {
           teammates.push(playerId)
         }
       })
