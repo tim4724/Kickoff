@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { sceneRouter } from '../utils/SceneRouter'
 import { GAME_CONFIG } from '@shared/types'
 import type { EnginePlayerData, EnginePlayerInput } from '@shared'
 import { GameEngine } from '@shared'
@@ -62,7 +63,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
    * - Example: "session1-p1" (the human player for this session)
    */
   protected myPlayerId: string = 'player1-p1'
-  
+
   /**
    * controlledPlayerId: The player currently being controlled via input (CHANGES when switching).
    * - Can be any teammate: "session1-p1", "session1-p2", "session1-p3"
@@ -70,7 +71,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
    * - Determines which player receives joystick/button input
    */
   protected controlledPlayerId: string = 'player1-p1'
-  
+
   protected previousBallPossessor?: string
   protected playerTeamColor: number = VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
   protected goalScored: boolean = false
@@ -219,21 +220,21 @@ export abstract class BaseGameScene extends Phaser.Scene {
     state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
       if (!this.players.has(playerId)) {
         this.createPlayerSprite(playerId, playerData.x, playerData.y, playerData.team)
-        
+
         // Set myPlayerId to human player if found, otherwise first player
         if (!this.myPlayerId || this.myPlayerId === 'player1-p1') {
           if (humanPlayerId && playerId === humanPlayerId) {
             this.myPlayerId = playerId
             this.controlledPlayerId = playerId
-            this.playerTeamColor = playerData.team === 'blue' 
-              ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR 
+            this.playerTeamColor = playerData.team === 'blue'
+              ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
               : VISUAL_CONSTANTS.PLAYER_RED_COLOR
           } else if (!humanPlayerId) {
             // AI-only mode: just pick first player
             this.myPlayerId = playerId
             this.controlledPlayerId = playerId
-            this.playerTeamColor = playerData.team === 'blue' 
-              ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR 
+            this.playerTeamColor = playerData.team === 'blue'
+              ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
               : VISUAL_CONSTANTS.PLAYER_RED_COLOR
           }
         }
@@ -319,7 +320,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Clear menu scene flag (if coming from menu)
     if (typeof window !== 'undefined' && (window as any).__menuLoaded) {
-      ;(window as any).__menuLoaded = false
+      ; (window as any).__menuLoaded = false
       console.log('🧹 Cleared __menuLoaded flag from previous menu scene')
     }
 
@@ -353,6 +354,14 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Create particle texture for celebrations
     this.createParticleTexture()
+
+    // Expose for testing
+    if (typeof window !== 'undefined') {
+      ; (window as any).__gameControls = {
+        scene: this,
+        game: this.game,
+      }
+    }
 
     // Initialize game state (GameEngine or NetworkManager)
     this.initializeGameState()
@@ -536,10 +545,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
     )
 
     this.backButton.on('pointerdown', () => {
-      console.log('🔙 Back to menu')
-      window.history.pushState({ scene: 'MenuScene' }, '', '/')
-      this.scene.stop()
-      this.scene.start('MenuScene')
+      console.log('🔙 Back button clicked - returning to menu')
+      sceneRouter.navigateTo('MenuScene')
     })
 
     this.backButton.on('pointerover', () => {
@@ -608,17 +615,17 @@ export abstract class BaseGameScene extends Phaser.Scene {
     // Use velocity check (more accurate than state due to inertia)
     const vx = playerState.velocityX ?? 0
     const vy = playerState.velocityY ?? 0
-    
+
     // Check for invalid values
     if (isNaN(vx) || isNaN(vy) || !isFinite(vx) || !isFinite(vy)) {
       this.controlArrow.clear()
       this.controlArrow.setVisible(false)
       return
     }
-    
+
     const speed = Math.sqrt(vx ** 2 + vy ** 2)
     const MIN_SPEED_THRESHOLD = 15 // pixels per second - threshold to account for inertia decay
-    
+
     if (speed < MIN_SPEED_THRESHOLD) {
       this.controlArrow.clear()
       this.controlArrow.setVisible(false)
@@ -962,9 +969,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     this.input.once('pointerdown', () => {
       console.log('🔙 Match ended - returning to menu')
-      window.history.pushState({ scene: 'MenuScene' }, '', '/')
-      this.scene.stop()
-      this.scene.start('MenuScene')
+      sceneRouter.navigateTo('MenuScene')
     })
   }
 
@@ -1020,8 +1025,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
         gameSize.height - SAFE_MARGIN_Y
       )
       console.log(
-        `🎯 [BaseGameScene] Action button resized to: ${gameSize.width - SAFE_MARGIN_X}x${
-          gameSize.height - SAFE_MARGIN_Y
+        `🎯 [BaseGameScene] Action button resized to: ${gameSize.width - SAFE_MARGIN_X}x${gameSize.height - SAFE_MARGIN_Y
         }`
       )
     }
@@ -1099,12 +1103,17 @@ export abstract class BaseGameScene extends Phaser.Scene {
    * @param customTestMethods - Optional object with scene-specific test methods to add
    */
   protected setupTestAPI(customTestMethods?: Record<string, any>): void {
-    if (typeof window === 'undefined' || !import.meta.env.DEV) {
+    if (typeof window === 'undefined') {
       return
     }
 
-    // Common test API structure
+    // Get existing __gameControls or create new one
+    // This preserves any properties set by create() like 'game'
+    const existingControls = (window as any).__gameControls || {}
+
+    // Common test API structure - merge with existing
     const testAPI: any = {
+      ...existingControls,
       scene: this,
     }
 
@@ -1164,10 +1173,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
     }
 
     // Expose GameClock for time control in tests
-    ;(window as any).GameClock = GameClock
+    ; (window as any).GameClock = GameClock
 
-    // Expose test API
-    ;(window as any).__gameControls = testAPI
+      // Expose test API
+      ; (window as any).__gameControls = testAPI
 
     console.log('🧪 Testing API exposed: window.__gameControls')
     console.log('🕐 GameClock exposed for time control')

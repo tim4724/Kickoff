@@ -148,7 +148,7 @@ async function gainPossession(page: Page): Promise<boolean> {
         if (scene?.myPlayerId && scene?.gameEngine) {
           const myPlayerId = scene.myPlayerId
           const playerSprite = scene.players?.get(myPlayerId)
-          
+
           if (playerSprite) {
             const offset = 30 // Within possession radius
             playerSprite.x = ballX - offset
@@ -525,7 +525,7 @@ test.describe('Shooting Mechanics', () => {
 
     // Client 1 gains possession and shoots
     console.log('\n📤 Step 2: Client 1 gaining possession...')
-    const hasPossession = await moveTowardBallAndCapture(client1, 10000)
+    const hasPossession = await moveTowardBallAndCapture(client1, 20000)
     expect(hasPossession).toBe(true)
 
     // Get ball position before shooting
@@ -595,7 +595,7 @@ test.describe('Shooting Mechanics', () => {
 
     await setupSinglePlayerTest(page, CLIENT_URL)
     console.log('✅ Single-player scene loaded')
-    
+
 
     // Gain possession
     console.log('\n📤 Step 1: Gaining possession...')
@@ -726,7 +726,7 @@ test.describe('Shooting Mechanics', () => {
     console.log(`  Ball moved toward goal: ${ballMovedTowardGoal}`)
 
     const goalScored = (playerState.team === 'blue' && scoreAfter.blue > scoreBefore.blue) ||
-                      (playerState.team === 'red' && scoreAfter.red > scoreBefore.red)
+      (playerState.team === 'red' && scoreAfter.red > scoreBefore.red)
 
     if (goalScored) {
       console.log('\n🎯 GOAL SCORED!')

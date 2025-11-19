@@ -62,27 +62,46 @@ test.describe('Multiplayer Restart Color Assignment', () => {
     // Simulate match end and restart
     console.log('\n📤 Step 2: Simulating match restart...')
 
-    // Restart both scenes (this triggers the bug scenario)
+    // Restart clients SEQUENTIALLY to avoid race condition in team assignment
+    // This ensures deterministic color assignment
+    console.log('  Restarting client 1...')
+    await client1.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      if (scene) {
+        scene.scene.restart()
+      }
+    })
+
+    // Wait for client 1 to restart
+    await waitScaled(client1, 2000)
+
+    console.log('  Restarting client 2...')
+    await client2.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      if (scene) {
+        scene.scene.restart()
+      }
+    })
+
+    // Wait for both scenes to restart and reconnect (increased from 3s to 5s)
     await Promise.all([
+      waitScaled(client1, 5000),
+      waitScaled(client2, 5000)
+    ])
+
+    // Verify both clients are connected before checking colors
+    const [client1Connected, client2Connected] = await Promise.all([
       client1.evaluate(() => {
         const scene = (window as any).__gameControls?.scene
-        if (scene) {
-          scene.scene.restart()
-        }
+        return scene?.networkManager?.room?.connection?.isOpen || false
       }),
       client2.evaluate(() => {
         const scene = (window as any).__gameControls?.scene
-        if (scene) {
-          scene.scene.restart()
-        }
+        return scene?.networkManager?.room?.connection?.isOpen || false
       })
     ])
 
-    // Wait for scenes to restart and reconnect
-    await Promise.all([
-      waitScaled(client1, 3000),
-      waitScaled(client2, 3000)
-    ])
+    console.log(`Connection status: Client1=${client1Connected}, Client2=${client2Connected}`)
 
     // Get colors after restart
     const afterRestartColors = await Promise.all([
@@ -154,26 +173,30 @@ test.describe('Multiplayer Restart Color Assignment', () => {
     console.log(`\n📱 Verifying UI control colors...`)
     const [client1UI, client2UI] = await Promise.all([
       client1.evaluate(() => {
+        const state = (window as any).__gameControls?.test?.getState()
         const scene = (window as any).__gameControls?.scene
-        const joystickObjects = scene?.joystick?.getGameObjects() || []
         const buttonObjects = scene?.actionButton?.getGameObjects() || []
 
-        // Get stick color from joystick (second object)
-        const joystickColor = joystickObjects[1]?.fillColor
+        // Use exposed baseColor from test API for joystick
+        const joystickColor = state?.joystick?.baseColor
         // Get button color from action button (first object)
         const buttonColor = buttonObjects[0]?.fillColor
+
         const myPlayerId = scene?.myPlayerId
         const playerColor = scene?.players?.get(myPlayerId)?.fillColor
 
         return { joystick: joystickColor, button: buttonColor, player: playerColor }
       }),
       client2.evaluate(() => {
+        const state = (window as any).__gameControls?.test?.getState()
         const scene = (window as any).__gameControls?.scene
-        const joystickObjects = scene?.joystick?.getGameObjects() || []
         const buttonObjects = scene?.actionButton?.getGameObjects() || []
 
-        const joystickColor = joystickObjects[1]?.fillColor
+        // Use exposed baseColor from test API for joystick
+        const joystickColor = state?.joystick?.baseColor
+        // Get button color from action button (first object)
         const buttonColor = buttonObjects[0]?.fillColor
+
         const myPlayerId = scene?.myPlayerId
         const playerColor = scene?.players?.get(myPlayerId)?.fillColor
 

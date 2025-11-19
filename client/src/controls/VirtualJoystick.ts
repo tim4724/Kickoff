@@ -307,6 +307,7 @@ export class VirtualJoystick {
       baseY: this.baseY,
       stickX: this.stick.x,
       stickY: this.stick.y,
+      baseColor: this.base.fillColor,
       input: this.getInput(),
     }
   }

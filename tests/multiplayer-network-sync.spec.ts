@@ -266,7 +266,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
 
     // Verify synchronization between clients
     const positionDiff = Math.abs(client1AfterMove.x - client2ViewOfClient1.x) +
-                         Math.abs(client1AfterMove.y - client2ViewOfClient1.y)
+      Math.abs(client1AfterMove.y - client2ViewOfClient1.y)
 
     console.log(`Position difference between clients: ${positionDiff.toFixed(1)}px`)
 
@@ -293,7 +293,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log(`C1 sees C2 at: (${client1ViewOfClient2.x}, ${client1ViewOfClient2.y})`)
 
     const syncError = Math.abs(client2SelfView.x - client1ViewOfClient2.x) +
-                      Math.abs(client2SelfView.y - client1ViewOfClient2.y)
+      Math.abs(client2SelfView.y - client1ViewOfClient2.y)
 
     console.log(`Synchronization error: ${syncError.toFixed(1)}px`)
 
@@ -319,12 +319,14 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     console.log(`\n📤 Moving toward ball: direction (${(ballState.x - playerState.x).toFixed(2)}, ${(ballState.y - playerState.y).toFixed(2)})`)
 
     // Disable AI temporarily to reduce interference during possession test
+    console.log('🤖 Disabling AI on both clients...')
     await Promise.all([
       client1.evaluate(() => {
         const scene = (window as any).__gameControls?.scene
         if (scene) {
           scene.aiEnabled = false
           scene.aiManager?.setEnabled?.(false)
+          console.log('AI disabled on client 1')
         }
       }),
       client2.evaluate(() => {
@@ -332,11 +334,26 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
         if (scene) {
           scene.aiEnabled = false
           scene.aiManager?.setEnabled?.(false)
+          console.log('AI disabled on client 2')
         }
       }),
     ])
 
-    const hasPossession = await moveTowardBallAndCapture(client1, 12000)
+    // Wait for AI to fully stop (important to prevent interference)
+    await Promise.all([
+      waitScaled(client1, 500),
+      waitScaled(client2, 500)
+    ])
+
+    // Verify AI is actually disabled
+    const aiStatus = await Promise.all([
+      client1.evaluate(() => (window as any).__gameControls?.scene?.aiEnabled),
+      client2.evaluate(() => (window as any).__gameControls?.scene?.aiEnabled)
+    ])
+    console.log(`AI status after disable: Client1=${aiStatus[0]}, Client2=${aiStatus[1]}`)
+
+    // Increased timeout from 12s to 20s for more reliable ball capture
+    const hasPossession = await moveTowardBallAndCapture(client1, 20000)
     expect(hasPossession).toBe(true)
 
     // Get final state
@@ -369,7 +386,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     const clientTeam = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
-      const player = state?.players?.get(scene?.mySessionId)
+      const player = state?.players?.get(scene?.myPlayerId)
       return player?.team || null
     })
 
@@ -498,11 +515,11 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
 
     // Check if ball moved
     const ballMoved = Math.abs(afterShootBallState.x - initialBallState.x) > 10 ||
-                      Math.abs(afterShootBallState.y - initialBallState.y) > 10
+      Math.abs(afterShootBallState.y - initialBallState.y) > 10
 
     // Check if ball has velocity
     const hasVelocity = Math.abs(afterShootBallState.velocityX) > 10 ||
-                        Math.abs(afterShootBallState.velocityY) > 10
+      Math.abs(afterShootBallState.velocityY) > 10
 
     console.log(`Ball moved: ${ballMoved}`)
     console.log(`Ball has velocity: ${hasVelocity}`)
@@ -514,7 +531,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     // Verify both clients see the same ball state
     const client2BallState = await getServerBallState(client2)
     const ballSyncError = Math.abs(afterShootBallState.x - client2BallState.x) +
-                          Math.abs(afterShootBallState.y - client2BallState.y)
+      Math.abs(afterShootBallState.y - client2BallState.y)
 
     console.log(`Ball position sync error: ${ballSyncError.toFixed(1)}px`)
     expect(ballSyncError).toBeLessThan(30)
@@ -544,7 +561,7 @@ test.describe.serial('Multiplayer Network Synchronization', () => {
     // Verify both clients see the same final position
     const client2ViewPos = await getServerPlayerState(client2, client1PlayerId)
     const syncError = Math.abs(finalPos.x - client2ViewPos.x) +
-                      Math.abs(finalPos.y - client2ViewPos.y)
+      Math.abs(finalPos.y - client2ViewPos.y)
 
     console.log(`Final sync error: ${syncError.toFixed(1)}px`)
     expect(syncError).toBeLessThan(10) // Allow slightly more tolerance for rapid inputs

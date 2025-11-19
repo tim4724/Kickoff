@@ -1,4 +1,6 @@
+
 import Phaser from 'phaser'
+import { sceneRouter } from '../utils/SceneRouter'
 
 export class MenuScene extends Phaser.Scene {
   // UI element references for responsive layout
@@ -21,8 +23,8 @@ export class MenuScene extends Phaser.Scene {
    * Called after layout changes to keep test coordinates in sync
    */
   private updateTestAPI(): void {
-    if (typeof window !== 'undefined' && import.meta.env.DEV) {
-      ;(window as any).__menuButtons = {
+    if (typeof window !== 'undefined') {
+      ; (window as any).__menuButtons = {
         singlePlayer: {
           x: this.singlePlayerButton.x,
           y: this.singlePlayerButton.y,
@@ -130,149 +132,150 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create() {
-    const width = this.scale.width
-    const height = this.scale.height
+    console.log('🚀 MenuScene.create() called')
+    try {
+      const width = this.scale.width
+      const height = this.scale.height
 
-    // Background
-    this.background = this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a1a)
+      // Background
+      this.background = this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a1a)
 
-    // Title
-    this.title = this.add.text(width / 2, height * 0.25, 'KICKOFF', {
-      fontSize: '72px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    })
-    this.title.setOrigin(0.5)
-
-    // Single Player Button
-    this.singlePlayerButton = this.add.rectangle(
-      width / 2,
-      height * 0.5,
-      400,
-      80,
-      0x0066ff
-    )
-    this.singlePlayerButton.setInteractive({ useHandCursor: true })
-
-    this.singlePlayerText = this.add.text(width / 2, height * 0.5, 'Single Player', {
-      fontSize: '32px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    })
-    this.singlePlayerText.setOrigin(0.5)
-
-    // Multiplayer Button
-    this.multiplayerButton = this.add.rectangle(
-      width / 2,
-      height * 0.65,
-      400,
-      80,
-      0xff4444
-    )
-    this.multiplayerButton.setInteractive({ useHandCursor: true })
-
-    this.multiplayerText = this.add.text(width / 2, height * 0.65, 'Multiplayer', {
-      fontSize: '32px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    })
-    this.multiplayerText.setOrigin(0.5)
-
-    // AI-Only Button (Dev Mode)
-    this.aiOnlyButton = this.add.rectangle(
-      width / 2,
-      height * 0.8,
-      400,
-      80,
-      0xffaa00
-    )
-    this.aiOnlyButton.setInteractive({ useHandCursor: true })
-
-    this.aiOnlyText = this.add.text(width / 2, height * 0.8, 'AI-Only (Dev)', {
-      fontSize: '32px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    })
-    this.aiOnlyText.setOrigin(0.5)
-
-    // Version info
-    this.versionText = this.add.text(width / 2, height * 0.9, 'v0.2.0 - Single Player Update', {
-      fontSize: '16px',
-      color: '#888888',
-    })
-    this.versionText.setOrigin(0.5)
-
-    // Button hover effects
-    this.singlePlayerButton.on('pointerover', () => {
-      this.singlePlayerButton.setFillStyle(0x0088ff)
-    })
-    this.singlePlayerButton.on('pointerout', () => {
-      this.singlePlayerButton.setFillStyle(0x0066ff)
-    })
-
-    this.multiplayerButton.on('pointerover', () => {
-      this.multiplayerButton.setFillStyle(0xff6666)
-    })
-    this.multiplayerButton.on('pointerout', () => {
-      this.multiplayerButton.setFillStyle(0xff4444)
-    })
-
-    this.aiOnlyButton.on('pointerover', () => {
-      this.aiOnlyButton.setFillStyle(0xffcc00)
-    })
-    this.aiOnlyButton.on('pointerout', () => {
-      this.aiOnlyButton.setFillStyle(0xffaa00)
-    })
-
-    // Button click handlers - Using 'pointerup' for touch device compatibility
-    // Navigate using path-based routing (single HTML file)
-    this.singlePlayerButton.on('pointerup', () => {
-      console.log('🎮 Starting Single Player mode')
-      window.history.pushState({ scene: 'SinglePlayerScene' }, '', '/singleplayer')
-      this.scene.stop()
-      this.scene.start('SinglePlayerScene')
-    })
-
-    this.multiplayerButton.on('pointerup', () => {
-      console.log('🌐 Starting Multiplayer mode')
-      window.history.pushState({ scene: 'MultiplayerScene' }, '', '/multiplayer')
-      this.scene.stop()
-      this.scene.start('MultiplayerScene')
-    })
-
-    this.aiOnlyButton.on('pointerup', () => {
-      console.log('🤖 Starting AI-Only mode')
-      window.history.pushState({ scene: 'AIOnlyScene' }, '', '/ai-only')
-      this.scene.stop()
-      this.scene.start('AIOnlyScene')
-    })
-
-    // Initial layout
-    this.layoutUI()
-
-    // Listen for resize events (screen rotation, window resize)
-    this.scale.on('resize', this.handleResize, this)
-
-    // Also listen for native orientation change events (important for fullscreen on mobile)
-    // Phaser's resize event doesn't always fire during fullscreen orientation changes
-    window.addEventListener('orientationchange', this.handleOrientationChange)
-
-    console.log('📋 Menu scene loaded with responsive layout')
-
-    // Expose test API for Playwright
-    if (typeof window !== 'undefined' && import.meta.env.DEV) {
-      ;(window as any).__menuLoaded = true
-      console.log('🧪 Test API exposed: window.__menuLoaded = true, __menuButtons')
-    }
-
-    // Auto-start multiplayer for tests
-    if (typeof window !== 'undefined' && (window as any).__testRoomId) {
-      console.log('🧪 Test mode detected - auto-starting multiplayer')
-      this.time.delayedCall(100, () => {
-        window.history.pushState({ scene: 'MultiplayerScene' }, '', '/multiplayer')
-        this.scene.stop()
-        this.scene.start('MultiplayerScene')
+      // Title
+      this.title = this.add.text(width / 2, height * 0.25, 'KICKOFF', {
+        fontSize: '72px',
+        color: '#ffffff',
+        fontStyle: 'bold',
       })
+      this.title.setOrigin(0.5)
+
+      // Single Player Button
+      this.singlePlayerButton = this.add.rectangle(
+        width / 2,
+        height * 0.5,
+        400,
+        80,
+        0x0066ff
+      )
+      this.singlePlayerButton.setInteractive({ useHandCursor: true })
+
+      this.singlePlayerText = this.add.text(width / 2, height * 0.5, 'Single Player', {
+        fontSize: '32px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      this.singlePlayerText.setOrigin(0.5)
+
+      // Multiplayer Button
+      this.multiplayerButton = this.add.rectangle(
+        width / 2,
+        height * 0.65,
+        400,
+        80,
+        0xff4444
+      )
+      this.multiplayerButton.setInteractive({ useHandCursor: true })
+
+      this.multiplayerText = this.add.text(width / 2, height * 0.65, 'Multiplayer', {
+        fontSize: '32px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      this.multiplayerText.setOrigin(0.5)
+
+      // AI-Only Button (Dev Mode)
+      this.aiOnlyButton = this.add.rectangle(
+        width / 2,
+        height * 0.8,
+        400,
+        80,
+        0xffaa00
+      )
+      this.aiOnlyButton.setInteractive({ useHandCursor: true })
+
+      this.aiOnlyText = this.add.text(width / 2, height * 0.8, 'AI-Only (Dev)', {
+        fontSize: '32px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      this.aiOnlyText.setOrigin(0.5)
+
+      // Version info
+      this.versionText = this.add.text(width / 2, height * 0.9, 'v0.2.0 - Single Player Update', {
+        fontSize: '16px',
+        color: '#888888',
+      })
+      this.versionText.setOrigin(0.5)
+
+      // Button hover effects
+      this.singlePlayerButton.on('pointerover', () => {
+        this.singlePlayerButton.setFillStyle(0x0088ff)
+      })
+      this.singlePlayerButton.on('pointerout', () => {
+        this.singlePlayerButton.setFillStyle(0x0066ff)
+      })
+
+      this.multiplayerButton.on('pointerover', () => {
+        this.multiplayerButton.setFillStyle(0xff6666)
+      })
+      this.multiplayerButton.on('pointerout', () => {
+        this.multiplayerButton.setFillStyle(0xff4444)
+      })
+
+      this.aiOnlyButton.on('pointerover', () => {
+        this.aiOnlyButton.setFillStyle(0xffcc00)
+      })
+      this.aiOnlyButton.on('pointerout', () => {
+        this.aiOnlyButton.setFillStyle(0xffaa00)
+      })
+
+      // Button click handlers - Using 'pointerup' for touch device compatibility
+      // Navigate using SceneRouter (hash-based routing)
+      this.singlePlayerButton.on('pointerup', () => {
+        console.log('🎮 Starting Single Player mode')
+        sceneRouter.navigateTo('SinglePlayerScene')
+      })
+
+      this.multiplayerButton.on('pointerup', () => {
+        console.log('🌐 Starting Multiplayer mode')
+        sceneRouter.navigateTo('MultiplayerScene')
+      })
+
+      this.aiOnlyButton.on('pointerup', () => {
+        console.log('🤖 Starting AI-Only mode')
+        sceneRouter.navigateTo('AIOnlyScene')
+      })
+
+      // Initial layout
+      this.layoutUI()
+
+      // Listen for resize events (screen rotation, window resize)
+      this.scale.on('resize', this.handleResize, this)
+
+      // Also listen for native orientation change events (important for fullscreen on mobile)
+      // Phaser's resize event doesn't always fire during fullscreen orientation changes
+      window.addEventListener('orientationchange', this.handleOrientationChange)
+
+      console.log('📋 Menu scene loaded with responsive layout')
+
+      // Expose test API for Playwright
+      if (typeof window !== 'undefined') {
+        ; (window as any).__gameControls = {
+          scene: this,
+          game: this.game,
+        }
+          ; (window as any).__menuLoaded = true
+        console.log('🧪 Test API exposed: window.__menuLoaded = true, __menuButtons, __gameControls')
+      }
+
+      // Auto-start multiplayer for tests
+      if (typeof window !== 'undefined' && (window as any).__testRoomId) {
+        console.log('🧪 Test mode detected - auto-starting multiplayer')
+        this.time.delayedCall(100, () => {
+          sceneRouter.navigateTo('MultiplayerScene')
+        })
+      }
+    } catch (err) {
+      console.error('❌ Error in MenuScene.create:', err)
     }
   }
 
@@ -347,7 +350,7 @@ export class MenuScene extends Phaser.Scene {
 
     // Clear test API flags
     if (typeof window !== 'undefined') {
-      ;(window as any).__menuLoaded = false
+      ; (window as any).__menuLoaded = false
       delete (window as any).__menuButtons
     }
   }

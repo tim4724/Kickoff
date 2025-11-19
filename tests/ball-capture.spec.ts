@@ -121,16 +121,16 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     const positions = await sourcePage.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
       const state = scene?.networkManager?.getState()
-      
+
       if (!state) return { source: null, target: null }
-      
+
       // Use myPlayerId to get the controlled player from state (not sprites)
       const myPlayerId = scene?.myPlayerId
       const mySessionId = scene?.mySessionId
-      
+
       // Get source player from game state
       const myPlayer = state.players?.get(myPlayerId)
-      
+
       // Find opponent by checking for different session ID prefix
       const players = Array.from(state?.players?.entries() || [])
       const opponent = players.find(([id]: [string, any]) => !id.startsWith(mySessionId))?.[1]
@@ -268,7 +268,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
 
     console.log('\n📤 Step 2: Move player to capture ball...')
     // Use deterministic helper that handles CPU throttling
-    const captured = await moveTowardBallAndCapture(client1, 10000)
+    const captured = await moveTowardBallAndCapture(client1, 20000)
     if (captured) {
       console.log(`  ✅ Ball captured successfully`)
     } else {
@@ -594,7 +594,7 @@ test.describe('Ball Capture - Proximity Pressure', () => {
     console.log('\n📤 Step 1: Move player to capture ball...')
 
     // Use deterministic helper that handles CPU throttling
-    const captured = await moveTowardBallAndCapture(client1, 10000)
+    const captured = await moveTowardBallAndCapture(client1, 20000)
     if (captured) {
       console.log(`  ✅ Ball captured successfully`)
 

@@ -1,3 +1,4 @@
+
 /**
  * SceneRouter - URL routing system for Socca2 game
  * Enables browser back/forward navigation and deep linking to game scenes
@@ -28,7 +29,7 @@ type SceneKey = (typeof ROUTES)[RoutePath]
 export class SceneRouter {
   private game: Phaser.Game | null = null
   private isNavigating = false
-  private currentPath: RoutePath = '/menu'
+  private currentPath: RoutePath | null = null
 
   /**
    * Initialize the router with the Phaser game instance
@@ -56,11 +57,15 @@ export class SceneRouter {
     const hash = originalHash || '/menu'
     const path = this.normalizePath(hash)
 
-    console.log(`[SceneRouter] Initial route: ${hash} -> ${path}`)
+    console.log(`[SceneRouter] Initial route check: raw="${originalHash}", hash="${hash}", normalized="${path}"`)
 
     // Update URL if there was no hash OR if normalized path differs
+    // This must happen synchronously so tests can verify the URL immediately
     if (!originalHash || hash !== path) {
-      window.location.hash = path
+      console.log(`[SceneRouter] Redirecting invalid/empty route: "${hash}" -> "${path}"`)
+      console.log(`[SceneRouter] Calling window.location.replace('#${path}')`)
+      window.location.replace('#' + path)
+      console.log(`[SceneRouter] Post-replace hash: "${window.location.hash}"`)
     }
 
     // Navigate to the initial scene
@@ -79,6 +84,14 @@ export class SceneRouter {
     const path = this.normalizePath(hash)
 
     console.log(`[SceneRouter] Hash changed: ${hash} -> ${path}`)
+
+    // If hash was invalid/normalized, correct the URL
+    if (hash !== path) {
+      console.log(`[SceneRouter] Correcting invalid hash: "${hash}" -> "${path}"`)
+      window.location.replace('#' + path)
+      return // The replace will trigger another hashchange
+    }
+
     this.navigateToPath(path)
   }
 
@@ -94,6 +107,14 @@ export class SceneRouter {
     const path = this.normalizePath(hash)
 
     console.log(`[SceneRouter] Popstate: ${hash} -> ${path}`)
+
+    // If hash was invalid/normalized, correct the URL
+    if (hash !== path) {
+      console.log(`[SceneRouter] Correcting invalid popstate: "${hash}" -> "${path}"`)
+      window.location.replace('#' + path)
+      return // The replace will trigger hashchange
+    }
+
     this.navigateToPath(path)
   }
 
@@ -148,6 +169,23 @@ export class SceneRouter {
       return
     }
 
+    // Optimization: If no scenes are active (initial load), start immediately without delay
+    if (activeScenes.length === 0) {
+      console.log(`[SceneRouter] No active scenes, starting ${sceneKey} immediately`)
+      // Check if scene was created before (unlikely for empty active list but possible if manually stopped)
+      const targetAfterStop = this.game!.scene.getScene(sceneKey)
+      const wasCreated = targetAfterStop &&
+        (targetAfterStop.scene.settings.status === Phaser.Scenes.SHUTDOWN ||
+          targetAfterStop.scene.settings.status === Phaser.Scenes.DESTROYED)
+
+      if (wasCreated) {
+        targetAfterStop.scene.restart()
+      } else {
+        this.game!.scene.start(sceneKey)
+      }
+      return
+    }
+
     // Stop ALL active scenes (including target scene to ensure clean restart)
     for (const scene of activeScenes) {
       const key = scene.scene.key
@@ -165,30 +203,35 @@ export class SceneRouter {
         // Clear menu scene test API
         if (key === 'MenuScene' && (window as any).__menuLoaded) {
           console.log('🧹 Clearing __menuLoaded flag (MenuScene stopping)')
-          ;(window as any).__menuLoaded = false
+            ; (window as any).__menuLoaded = false
           delete (window as any).__menuButtons
         }
       }
     }
 
-    // Always use restart() if target scene has been created before, otherwise use start()
-    // Check if scene exists in the scene manager (was created before)
-    const targetAfterStop = this.game.scene.getScene(sceneKey)
-    // A scene that exists but isn't active has status SHUTDOWN or DESTROYED
-    const wasCreated =
-      targetAfterStop &&
-      (targetAfterStop.scene.settings.status === Phaser.Scenes.SHUTDOWN ||
-        targetAfterStop.scene.settings.status === Phaser.Scenes.DESTROYED)
+    // Small delay to ensure scenes are fully stopped and test APIs are cleared
+    // This prevents scene overlap issues in tests
+    // Using setTimeout with 0ms still allows event loop to process scene shutdown
+    setTimeout(() => {
+      // Always use restart() if target scene has been created before, otherwise use start()
+      // Check if scene exists in the scene manager (was created before)
+      const targetAfterStop = this.game!.scene.getScene(sceneKey)
+      // A scene that exists but isn't active has status SHUTDOWN or DESTROYED
+      const wasCreated =
+        targetAfterStop &&
+        (targetAfterStop.scene.settings.status === Phaser.Scenes.SHUTDOWN ||
+          targetAfterStop.scene.settings.status === Phaser.Scenes.DESTROYED)
 
-    if (wasCreated) {
-      // Scene was created before - use restart() to force create() to run again
-      console.log(`[SceneRouter] Restarting scene: ${sceneKey}`)
-      targetAfterStop.scene.restart()
-    } else {
-      // Scene never started - use start()
-      console.log(`[SceneRouter] Starting scene for first time: ${sceneKey}`)
-      this.game.scene.start(sceneKey)
-    }
+      if (wasCreated) {
+        // Scene was created before - use restart() to force create() to run again
+        console.log(`[SceneRouter] Restarting scene: ${sceneKey}`)
+        targetAfterStop.scene.restart()
+      } else {
+        // Scene never started - use start()
+        console.log(`[SceneRouter] Starting scene for first time: ${sceneKey}`)
+        this.game!.scene.start(sceneKey)
+      }
+    }, 0)
   }
 
 
@@ -242,14 +285,14 @@ export class SceneRouter {
    * Get the current route path
    */
   public getCurrentPath(): RoutePath {
-    return this.currentPath
+    return this.currentPath || '/menu'
   }
 
   /**
    * Get the current scene key
    */
   public getCurrentScene(): SceneKey {
-    return ROUTES[this.currentPath]
+    return ROUTES[this.currentPath || '/menu']
   }
 }
 
