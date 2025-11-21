@@ -6,6 +6,7 @@ import { StateAdapter, type UnifiedGameState } from '../utils/StateAdapter'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '../ai'
 import { sceneRouter } from '../utils/SceneRouter'
+import type { Room } from 'colyseus.js'
 
 /**
  * Multiplayer Game Scene
@@ -180,9 +181,9 @@ export class MultiplayerScene extends BaseGameScene {
       
       try {
         // Leave the room synchronously - this notifies the server immediately
-        const room = this.networkManager.getRoom()
+        const room = this.networkManager.getRoom() as (Room & { id?: string }) | undefined
         if (room && this.networkManager.isConnected()) {
-          console.log('🚪 [Cleanup] Leaving room immediately:', room.id)
+          console.log('🚪 [Cleanup] Leaving room immediately:', room.id ?? 'unknown')
           // Call leave() directly on room - this triggers server onLeave and notifies other clients
           room.leave() // Synchronous - server is notified immediately
         }
@@ -403,18 +404,19 @@ export class MultiplayerScene extends BaseGameScene {
       })
 
       // Update room debug text
-      const room = this.networkManager.getRoom()
-      if (room) {
-        this.roomDebugText.setText(`Room: ${room.id}`)
+      const room = this.networkManager.getRoom() as (Room & { id?: string; roomId?: string }) | undefined
+      const roomId = room?.id ?? room?.roomId ?? 'Unknown'
+      if (room && this.roomDebugText) {
+        this.roomDebugText.setText(`Room: ${roomId}`)
       }
 
       console.log('🎮 Multiplayer mode enabled')
       console.log('📡 Session ID:', this.mySessionId)
-      console.log('🏠 Room ID:', room?.id)
+      console.log('🏠 Room ID:', roomId)
 
       // Update room debug text
       if (this.roomDebugText) {
-        this.roomDebugText.setText(`Room: ${room?.id || 'Unknown'}`)
+        this.roomDebugText.setText(`Room: ${roomId}`)
       }
 
       this.setupNetworkListeners()
