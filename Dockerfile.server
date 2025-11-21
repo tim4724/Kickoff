@@ -1,5 +1,5 @@
 # Server Dockerfile - Colyseus game server
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Build shared package first
@@ -19,7 +19,7 @@ COPY shared ./shared
 RUN npm run build --workspace=server
 
 # Production runtime
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 
 # Create non-root user for security
@@ -52,4 +52,3 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 CMD ["node", "server/dist/index.js"]
-

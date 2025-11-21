@@ -1,7 +1,7 @@
 # Client Dockerfile - Static files served by nginx
 # This is a lightweight image for serving static assets
 
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Build shared package first
@@ -53,4 +53,3 @@ EXPOSE 8080
 
 # Use entrypoint to inject server URL at runtime
 ENTRYPOINT ["/entrypoint.sh"]
-
