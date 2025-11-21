@@ -1,5 +1,6 @@
 # Server Dockerfile - Colyseus game server
 FROM node:20-alpine AS builder
+RUN apk add --no-cache git
 WORKDIR /app
 
 # Install all workspaces (shared + server) in builder
@@ -21,6 +22,7 @@ RUN npm run build --workspace=server
 
 # Production runtime
 FROM node:20-alpine
+RUN apk add --no-cache git
 WORKDIR /app
 
 # Create non-root user for security
