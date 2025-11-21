@@ -38,5 +38,15 @@ export default defineConfig({
     target: 'es2020',
     outDir: 'dist',
     assetsDir: 'assets',
+    // Keep vendor bundles (Phaser/Colyseus) out of the main chunk to avoid oversized output warnings
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          phaser: ['phaser'],
+          colyseus: ['colyseus.js'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 2000,
   },
 })
