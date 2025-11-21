@@ -352,6 +352,47 @@ test.describe('Responsive UI and Navigation', () => {
   })
 
   test.describe('Scene Overlap Prevention', () => {
+    test('re-setting the same hash does not restart the active scene', async ({ page }) => {
+      await page.goto(CLIENT_URL)
+      await waitForMenuLoaded(page)
+
+      // Navigate into a game scene, then start tracking after it's live
+      await clickMenuButton(page, 'singlePlayer')
+      await backButtonExists(page) // ensures scene created
+      await page.waitForTimeout(200)
+
+      // Attach a spy to scene start events (baseline count 0)
+      await page.evaluate(() => {
+        const game = (window as any).__gameControls?.game
+        const sceneManager = game?.scene
+        const sceneEvents = sceneManager?.events
+        if (!sceneEvents?.on) return
+
+        const spy = ((window as any).__sceneRestartSpy ||= { count: 0 })
+        if ((window as any).__sceneRestartAttached) return
+        sceneEvents.on('start', (key: any) => {
+          const sceneKey =
+            typeof key === 'string'
+              ? key
+              : key?.scene?.key || key?.key || (key?.scene ? key.scene.key : undefined)
+          if (sceneKey === 'SinglePlayerScene') {
+            spy.count += 1
+          }
+        })
+        ; (window as any).__sceneRestartAttached = true
+      })
+
+      // Trigger a redundant hash change to the same route
+      await page.evaluate(() => {
+        window.location.hash = '#/singleplayer'
+      })
+      await page.waitForTimeout(700)
+
+      const restartCount = await page.evaluate(() => (window as any).__sceneRestartSpy?.count || 0)
+      expect(restartCount).toBe(0)
+
+      console.log('✅ Same-route hashchange does not restart scene')
+    })
 
     test('only one scene active at a time - menu to game', async ({ page }) => {
       await page.goto(CLIENT_URL)

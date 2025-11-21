@@ -318,11 +318,20 @@ export abstract class BaseGameScene extends Phaser.Scene {
   create() {
     console.log(`🎮 ${this.scene.key} - Creating...`)
 
+    // Run cleanup when the scene stops/destroys (ensures multiplayer disconnects notify others)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this)
+    this.events.once(Phaser.Scenes.Events.DESTROY, this.shutdown, this)
+
     // Clear menu scene flag (if coming from menu)
     if (typeof window !== 'undefined' && (window as any).__menuLoaded) {
       ; (window as any).__menuLoaded = false
       console.log('🧹 Cleared __menuLoaded flag from previous menu scene')
     }
+
+    // Clear player sprites map on scene start/restart to ensure clean state
+    // This fixes issue where players disappear when navigating back/forward
+    this.players.clear()
+    console.log('🧹 Cleared players map for clean scene initialization')
 
     // Detect mobile
     this.isMobile =
@@ -1070,6 +1079,11 @@ export abstract class BaseGameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number) {
+    // Early exit if scene is not active (shutdown in progress)
+    if (!this.scene.isActive()) {
+      return
+    }
+
     // Update mobile controls
     if (this.actionButton) {
       this.actionButton.update()
@@ -1191,6 +1205,9 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     this.scale.off('resize', this.onResize, this)
     window.removeEventListener('orientationchange', this.handleOrientationChange)
+
+    // Clean up player sprites (Phaser will destroy them, but clear our references)
+    this.players.clear()
 
     if (this.joystick) {
       this.joystick.destroy()

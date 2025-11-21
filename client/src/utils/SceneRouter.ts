@@ -9,6 +9,7 @@
  * - Programmatic navigation with URL updates
  * - Initial page load routing
  * - Prevents redundant scene transitions
+ * - Complete fresh scene loads on navigation (Phaser's start() handles cleanup automatically)
  */
 
 import Phaser from 'phaser'
@@ -41,9 +42,6 @@ export class SceneRouter {
 
     // Listen to hash changes (back/forward buttons, manual URL edits)
     window.addEventListener('hashchange', this.handleHashChange.bind(this))
-
-    // Listen to popstate for additional browser navigation support
-    window.addEventListener('popstate', this.handlePopState.bind(this))
 
     // Handle initial page load routing
     this.handleInitialRoute()
@@ -96,29 +94,6 @@ export class SceneRouter {
   }
 
   /**
-   * Handle browser popstate events (additional navigation support)
-   */
-  private handlePopState(): void {
-    if (this.isNavigating) {
-      return
-    }
-
-    const hash = window.location.hash.slice(1) || '/menu'
-    const path = this.normalizePath(hash)
-
-    console.log(`[SceneRouter] Popstate: ${hash} -> ${path}`)
-
-    // If hash was invalid/normalized, correct the URL
-    if (hash !== path) {
-      console.log(`[SceneRouter] Correcting invalid popstate: "${hash}" -> "${path}"`)
-      window.location.replace('#' + path)
-      return // The replace will trigger hashchange
-    }
-
-    this.navigateToPath(path)
-  }
-
-  /**
    * Normalize path to valid route (default to /menu if invalid)
    */
   private normalizePath(path: string): RoutePath {
@@ -136,6 +111,11 @@ export class SceneRouter {
 
   /**
    * Navigate to a path (internal method)
+   * 
+   * Phaser's scene.start() automatically handles cleanup:
+   * - If scene is running, it calls shutdown() then create()
+   * - If scene is stopped, it calls create() fresh
+   * This means we get a completely fresh scene instance every time!
    */
   private navigateToPath(path: RoutePath): void {
     if (!this.game) {
@@ -156,7 +136,7 @@ export class SceneRouter {
     // Update current path
     this.currentPath = path
 
-    // Get ALL currently active scenes (there might be multiple due to scene overlap)
+    // Get currently active scenes
     const activeScenes = this.game.scene.getScenes(true)
 
     // Check if target scene is already running AND it's the only active scene
@@ -169,69 +149,22 @@ export class SceneRouter {
       return
     }
 
-    // Optimization: If no scenes are active (initial load), start immediately without delay
-    if (activeScenes.length === 0) {
-      console.log(`[SceneRouter] No active scenes, starting ${sceneKey} immediately`)
-      // Check if scene was created before (unlikely for empty active list but possible if manually stopped)
-      const targetAfterStop = this.game!.scene.getScene(sceneKey)
-      const wasCreated = targetAfterStop &&
-        (targetAfterStop.scene.settings.status === Phaser.Scenes.SHUTDOWN ||
-          targetAfterStop.scene.settings.status === Phaser.Scenes.DESTROYED)
-
-      if (wasCreated) {
-        targetAfterStop.scene.restart()
-      } else {
-        this.game!.scene.start(sceneKey)
-      }
-      return
-    }
-
-    // Stop ALL active scenes (including target scene to ensure clean restart)
+    // Stop all other active scenes to avoid overlap
     for (const scene of activeScenes) {
       const key = scene.scene.key
-      console.log(`[SceneRouter] Stopping scene: ${key}`)
-      this.game.scene.stop(key)
-
-      // Clear test APIs immediately when stopping scenes
-      // (shutdown() is called asynchronously on next frame, so we do this now)
-      if (typeof window !== 'undefined') {
-        // Clear game scene test API
-        if ((window as any).__gameControls?.scene === scene) {
-          console.log('🧹 Clearing __gameControls test API (scene stopping)')
-          delete (window as any).__gameControls
-        }
-        // Clear menu scene test API
-        if (key === 'MenuScene' && (window as any).__menuLoaded) {
-          console.log('🧹 Clearing __menuLoaded flag (MenuScene stopping)')
-            ; (window as any).__menuLoaded = false
-          delete (window as any).__menuButtons
-        }
+      if (key !== sceneKey) {
+        console.log(`[SceneRouter] Stopping scene: ${key}`)
+        this.game.scene.stop(key)
       }
     }
 
-    // Small delay to ensure scenes are fully stopped and test APIs are cleared
-    // This prevents scene overlap issues in tests
-    // Using setTimeout with 0ms still allows event loop to process scene shutdown
-    setTimeout(() => {
-      // Always use restart() if target scene has been created before, otherwise use start()
-      // Check if scene exists in the scene manager (was created before)
-      const targetAfterStop = this.game!.scene.getScene(sceneKey)
-      // A scene that exists but isn't active has status SHUTDOWN or DESTROYED
-      const wasCreated =
-        targetAfterStop &&
-        (targetAfterStop.scene.settings.status === Phaser.Scenes.SHUTDOWN ||
-          targetAfterStop.scene.settings.status === Phaser.Scenes.DESTROYED)
-
-      if (wasCreated) {
-        // Scene was created before - use restart() to force create() to run again
-        console.log(`[SceneRouter] Restarting scene: ${sceneKey}`)
-        targetAfterStop.scene.restart()
-      } else {
-        // Scene never started - use start()
-        console.log(`[SceneRouter] Starting scene for first time: ${sceneKey}`)
-        this.game!.scene.start(sceneKey)
-      }
-    }, 0)
+    // Start the target scene immediately (Phaser handles shutdown for us)
+    console.log(`[SceneRouter] Starting scene: ${sceneKey}`)
+    try {
+      this.game.scene.start(sceneKey)
+    } catch (e) {
+      console.error(`[SceneRouter] Failed to start scene ${sceneKey}:`, e)
+    }
   }
 
 
