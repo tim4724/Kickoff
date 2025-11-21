@@ -61,6 +61,8 @@ export class NetworkManager {
   // Connection state
   private connected: boolean = false
   private sessionId: string = ''
+  private lastRoomClosedReason: string | null = null
+  private roomClosedListeners: Array<(reason: string) => void> = []
 
   // Input buffering - collect all player inputs and send together
   private inputBuffer: Map<string, PlayerInput> = new Map()
@@ -158,7 +160,8 @@ export class NetworkManager {
         this.onConnectionError?.(`Room error: ${message}`)
       })
 
-      // Handle room leave
+      // Handle room leave (will be set up in setupMessageListeners)
+      // This is just to mark as disconnected for early connection issues
       this.room.onLeave(() => {
         this.connected = false
       })
@@ -181,11 +184,35 @@ export class NetworkManager {
    * Disconnect from the server
    */
   disconnect(): void {
+    console.log('[NetworkManager] Disconnecting...')
+    
+    // Clear all event callbacks first to prevent triggering during disconnect
+    
     if (this.room) {
-      this.room.leave()
+      try {
+        this.room.leave()
+      } catch (e) {
+        console.warn('[NetworkManager] Error during room.leave():', e)
+      }
       this.connected = false
       this.room = undefined
     }
+    
+    // Clear input buffer
+    this.inputBuffer.clear()
+    
+    // Clear all event callbacks to prevent stale references
+    this.onStateChange = undefined
+    this.onPlayerJoin = undefined
+    this.onPlayerLeave = undefined
+    this.onGoalScored = undefined
+    this.onMatchStart = undefined
+    this.onMatchEnd = undefined
+    this.onConnectionError = undefined
+    this.onPlayerReady = undefined
+    this.roomClosedListeners = []
+    
+    console.log('[NetworkManager] Disconnected and cleaned up')
   }
 
   /**
@@ -257,7 +284,8 @@ export class NetworkManager {
    * Flush input buffer to server
    */
   private flushInputBuffer(): void {
-    if (!this.room || this.inputBuffer.size === 0) {
+    // Don't send if not connected or no room
+    if (!this.connected || !this.room || this.inputBuffer.size === 0) {
       return
     }
 
@@ -407,6 +435,26 @@ export class NetworkManager {
     this.room.onMessage('goal_scored', (message) => {
       this.onGoalScored?.(message.team, message.scoreBlue, message.scoreRed)
     })
+
+    // Room closed event (when opponent leaves in 2-player game)
+    this.room.onMessage('room_closed', (message) => {
+      console.log('[NetworkManager] Room closed:', message.reason)
+      this.lastRoomClosedReason = message.reason || 'unknown'
+      this.emitRoomClosed(message.reason || 'unknown')
+    })
+
+    // Listen for room disconnect (when room is destroyed)
+    // This is the main handler that triggers navigation back to menu
+    // The onLeave in connect() just sets connected = false for early connection issues
+    this.room.onLeave((code) => {
+      console.log('[NetworkManager] Room disconnected, code:', code)
+      this.connected = false
+      // Trigger roomClosed callback to navigate back to menu
+      // This happens when room is destroyed (opponent left in 2-player game)
+      const reason = this.lastRoomClosedReason || (code === 4000 ? 'opponent_left' : 'disconnected')
+      this.emitRoomClosed(reason)
+      this.lastRoomClosedReason = null
+    })
   }
 
   /**
@@ -420,6 +468,7 @@ export class NetworkManager {
   on(event: 'matchEnd', callback: (winner: 'blue' | 'red', scoreBlue: number, scoreRed: number) => void): void
   on(event: 'connectionError', callback: (error: string) => void): void
   on(event: 'playerReady', callback: (sessionId: string, team: 'blue' | 'red') => void): void
+  on(event: 'roomClosed', callback: (reason: string) => void): void
   on(event: string, callback: any): void {
     switch (event) {
       case 'stateChange':
@@ -446,6 +495,9 @@ export class NetworkManager {
       case 'playerReady':
         this.onPlayerReady = callback
         break
+      case 'roomClosed':
+        this.roomClosedListeners.push(callback)
+        break
     }
   }
 
@@ -461,6 +513,19 @@ export class NetworkManager {
    */
   getSessionId(): string {
     return this.sessionId
+  }
+
+  private emitRoomClosed(reason: string) {
+    if (!this.roomClosedListeners.length) return
+
+    const listeners = [...this.roomClosedListeners]
+    for (const listener of listeners) {
+      try {
+        listener(reason)
+      } catch (error) {
+        console.error('[NetworkManager] Error in roomClosed listener:', error)
+      }
+    }
   }
 
   /**

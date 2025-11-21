@@ -5,6 +5,7 @@ import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { StateAdapter, type UnifiedGameState } from '../utils/StateAdapter'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '../ai'
+import { sceneRouter } from '../utils/SceneRouter'
 
 /**
  * Multiplayer Game Scene
@@ -27,6 +28,9 @@ export class MultiplayerScene extends BaseGameScene {
   private colorInitialized: boolean = false
   private positionInitialized: boolean = false
 
+  // Navigation guard
+  private returningToMenu: boolean = false
+
   // AI support
   private aiEnabled: boolean = true
 
@@ -35,11 +39,21 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   protected initializeGameState(): void {
+    console.log('🎮 [MultiplayerScene] Initializing game state')
+    
     if (GameClock.isMockMode()) {
       console.warn('🕐 MultiplayerScene detected mock GameClock mode - switching to real time')
     }
     GameClock.useRealTime()
     GameClock.resetTimeScale()
+
+    // Reset state before connecting
+    // This ensures we start fresh even if scene was restarted
+    this.isMultiplayer = false
+    this.mySessionId = undefined
+    this.colorInitialized = false
+    this.positionInitialized = false
+    this.stateUpdateCount = 0
 
     // Connect to multiplayer server
     this.connectToMultiplayer()
@@ -50,75 +64,82 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   protected updateGameState(delta: number): void {
-    const dt = delta / 1000 // Convert to seconds
-
-    // Get input from joystick or keyboard (using base class method)
-    const movement = this.collectMovementInput()
-
-    // Apply local prediction for controlled player (own player OR AI teammate)
-    const hasMovement =
-      Math.abs(movement.x) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT ||
-      Math.abs(movement.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
-
-    if (hasMovement) {
-      // Find the sprite for the controlled player (unified approach)
-      const controlledSprite = this.players.get(this.controlledPlayerId)
-
-      if (controlledSprite) {
-        // Apply local prediction
-        controlledSprite.x += movement.x * GAME_CONFIG.PLAYER_SPEED * dt
-        controlledSprite.y += movement.y * GAME_CONFIG.PLAYER_SPEED * dt
-
-        controlledSprite.x = Phaser.Math.Clamp(
-          controlledSprite.x,
-          GAME_CONFIG.PLAYER_MARGIN,
-          GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.PLAYER_MARGIN
-        )
-        controlledSprite.y = Phaser.Math.Clamp(
-          controlledSprite.y,
-          GAME_CONFIG.PLAYER_MARGIN,
-          GAME_CONFIG.FIELD_HEIGHT - GAME_CONFIG.PLAYER_MARGIN
-        )
-      }
+    // Early exit if scene is not active or multiplayer is disabled
+    if (!this.scene.isActive() || !this.isMultiplayer || !this.networkManager) {
+      return
     }
 
-    // Collect human input for controlled player
-    // Only send if there's actual movement (avoid sending zero input that stops player)
-    if (this.isMultiplayer && this.networkManager && this.controlledPlayerId) {
+    try {
+      const dt = delta / 1000 // Convert to seconds
+
+      // Get input from joystick or keyboard (using base class method)
       const movement = this.collectMovementInput()
+
+      // Apply local prediction for controlled player (own player OR AI teammate)
       const hasMovement =
         Math.abs(movement.x) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT ||
         Math.abs(movement.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
-      
-      // Only send input if there's actual movement
-      // This prevents sending (0,0) which would stop the player
+
       if (hasMovement) {
-        this.networkManager.sendInput(
-          movement,
-          false,
-          undefined,
-          this.controlledPlayerId,
-          true // Mark as human input (takes priority over AI)
-        )
+        // Find the sprite for the controlled player (unified approach)
+        const controlledSprite = this.players.get(this.controlledPlayerId)
+
+        if (controlledSprite) {
+          // Apply local prediction
+          controlledSprite.x += movement.x * GAME_CONFIG.PLAYER_SPEED * dt
+          controlledSprite.y += movement.y * GAME_CONFIG.PLAYER_SPEED * dt
+
+          controlledSprite.x = Phaser.Math.Clamp(
+            controlledSprite.x,
+            GAME_CONFIG.PLAYER_MARGIN,
+            GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.PLAYER_MARGIN
+          )
+          controlledSprite.y = Phaser.Math.Clamp(
+            controlledSprite.y,
+            GAME_CONFIG.PLAYER_MARGIN,
+            GAME_CONFIG.FIELD_HEIGHT - GAME_CONFIG.PLAYER_MARGIN
+          )
+        }
       }
-    }
 
-    // Update AI for non-human players if enabled
-    if (this.aiEnabled && this.aiManager && this.isMultiplayer) {
-      this.updateAI()
-    }
+      // Collect human input for controlled player
+      // Only send if there's actual movement (avoid sending zero input that stops player)
+      if (this.controlledPlayerId) {
+        const movement = this.collectMovementInput()
+        const hasMovement =
+          Math.abs(movement.x) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT ||
+          Math.abs(movement.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
+        
+        // Only send input if there's actual movement
+        // This prevents sending (0,0) which would stop the player
+        if (hasMovement && this.networkManager.isConnected()) {
+          this.networkManager.sendInput(
+            movement,
+            false,
+            undefined,
+            this.controlledPlayerId,
+            true // Mark as human input (takes priority over AI)
+          )
+        }
+      }
 
-    // Flush all inputs (human + AI) to server
-    if (this.isMultiplayer && this.networkManager) {
-      this.networkManager.flushInputs()
-    }
+      // Update AI for non-human players if enabled
+      if (this.aiEnabled && this.aiManager) {
+        this.updateAI()
+      }
 
-    // Update from server state (process immediately for lower latency)
-    if (this.isMultiplayer && this.networkManager) {
+      // Flush all inputs (human + AI) to server
+      if (this.networkManager.isConnected()) {
+        this.networkManager.flushInputs()
+      }
+
+      // Update from server state (process immediately for lower latency)
       const state = this.networkManager.getState()
       if (state) {
         this.syncFromServerState(state)
       }
+    } catch (error) {
+      console.error('[MultiplayerScene] Error during updateGameState:', error)
     }
   }
 
@@ -131,17 +152,68 @@ export class MultiplayerScene extends BaseGameScene {
     }
   }
 
+  /**
+   * Override shutdown to ensure NetworkManager disconnects BEFORE scene cleanup
+   * This ensures the server is notified immediately when navigating away
+   */
+  shutdown() {
+    console.log('🔄 [MultiplayerScene] shutdown() called - disconnecting immediately')
+    
+    // CRITICAL: Disconnect NetworkManager FIRST, before base class shutdown
+    // This ensures the server is notified immediately and other clients see the disconnect
+    this.cleanupGameState()
+    
+    // Call base class shutdown for remaining cleanup
+    super.shutdown()
+  }
+
   protected cleanupGameState(): void {
-    // Disconnect NetworkManager
+    console.log('🧹 [MultiplayerScene] Cleaning up game state - disconnecting immediately')
+    
+    // CRITICAL: Disconnect NetworkManager FIRST, before stopping multiplayer
+    // This ensures the server is notified immediately and other clients see the disconnect
     if (this.networkManager) {
-      console.log('🔌 [Shutdown] Disconnecting NetworkManager')
-      this.networkManager.disconnect()
+      console.log('🔌 [Cleanup] Disconnecting NetworkManager immediately')
+      
+      // Stop multiplayer flag first to prevent any more updates
+      this.isMultiplayer = false
+      
+      try {
+        // Leave the room synchronously - this notifies the server immediately
+        const room = this.networkManager.getRoom()
+        if (room && this.networkManager.isConnected()) {
+          console.log('🚪 [Cleanup] Leaving room immediately:', room.id)
+          // Call leave() directly on room - this triggers server onLeave and notifies other clients
+          room.leave() // Synchronous - server is notified immediately
+        }
+        // Then call disconnect to clean up NetworkManager state
+        this.networkManager.disconnect()
+      } catch (e) {
+        console.error('[MultiplayerScene] Error during NetworkManager disconnect:', e)
+      }
       this.networkManager = undefined
+    } else {
+      // No network manager, but still stop multiplayer flag
+      this.isMultiplayer = false
     }
+
+    // Clear all state immediately to prevent any update loops from running
+    this.mySessionId = undefined
+    this.myPlayerId = 'player1-p1' // Reset to default
+    this.controlledPlayerId = 'player1-p1' // Reset to default
 
     // Reset initialization flags
     this.colorInitialized = false
     this.positionInitialized = false
+    this.returningToMenu = false
+    
+    // Clear AI manager
+    if (this.aiManager) {
+      // AI Manager doesn't have explicit cleanup, but resetting reference ensures fresh state
+      this.aiManager = undefined
+    }
+
+    console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
   }
 
   /**
@@ -201,8 +273,14 @@ export class MultiplayerScene extends BaseGameScene {
   create() {
     super.create()
 
+    // Reset room debug text if it exists (shouldn't, but be safe)
+    if (this.roomDebugText) {
+      this.roomDebugText.destroy()
+    }
+
     // Add room debug text (multiplayer-specific UI) at top left corner
-    this.roomDebugText = this.add.text(10, 10, 'Room: Not connected', {
+    // Position below back button (back button is at 10, 10 with height 40)
+    this.roomDebugText = this.add.text(10, 60, 'Room: Connecting...', {
       fontSize: '14px',
       color: '#888888',
     })
@@ -262,6 +340,15 @@ export class MultiplayerScene extends BaseGameScene {
   // ========== MULTIPLAYER NETWORKING METHODS ==========
 
   private async connectToMultiplayer() {
+    // Ensure previous connection is fully cleaned up before connecting again
+    if (this.networkManager) {
+      console.warn('[MultiplayerScene] Previous NetworkManager exists, cleaning up first')
+      this.networkManager.disconnect()
+      this.networkManager = undefined
+      // Small delay to ensure cleanup completes
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+
     try {
       // Runtime server URL configuration (for separate pods/deployment)
       // Priority: window.__SERVER_URL__ > meta tag > build-time env > default
@@ -325,11 +412,24 @@ export class MultiplayerScene extends BaseGameScene {
       console.log('📡 Session ID:', this.mySessionId)
       console.log('🏠 Room ID:', room?.id)
 
+      // Update room debug text
+      if (this.roomDebugText) {
+        this.roomDebugText.setText(`Room: ${room?.id || 'Unknown'}`)
+      }
+
       this.setupNetworkListeners()
       this.networkManager.checkExistingPlayers()
     } catch (error) {
-      console.warn('⚠️ Multiplayer unavailable, running single-player', error)
+      console.error('❌ Multiplayer connection failed:', error)
       this.isMultiplayer = false
+      
+      // Update room debug text to show error
+      if (this.roomDebugText) {
+        this.roomDebugText.setText('Room: Connection failed')
+        this.roomDebugText.setColor('#ff4444')
+      }
+      
+      // Don't throw - allow scene to continue without multiplayer
     }
   }
 
@@ -436,10 +536,101 @@ export class MultiplayerScene extends BaseGameScene {
         }
       })
 
+      // Room closed event (when opponent leaves in 2-player game)
+      this.networkManager.on('roomClosed', (reason: string) => {
+        try {
+          // Prevent duplicate navigation
+          if (this.returningToMenu) {
+            console.log('[MultiplayerScene] Already returning to menu, ignoring duplicate roomClosed')
+            return
+          }
+
+          console.log('🚪 Room closed:', reason)
+          if (reason === 'opponent_left') {
+            // Opponent left - return to menu
+            console.log('👋 Opponent left the game, returning to menu')
+            this.returnToMenu('Opponent left the game')
+          } else {
+            // Other reason (disconnected, etc.)
+            console.log('🔌 Room disconnected, returning to menu')
+            this.returnToMenu('Connection lost')
+          }
+        } catch (error) {
+          console.error('[MultiplayerScene] Error handling roomClosed:', error)
+        }
+      })
+
       console.log('✅ Network listeners set up successfully')
     } catch (error) {
       console.error('[MultiplayerScene] Error setting up network listeners:', error)
     }
+  }
+
+  /**
+   * Return to menu when room is closed
+   */
+  private returnToMenu(message: string): void {
+    // Prevent duplicate navigation
+    if (this.returningToMenu) {
+      console.log('[MultiplayerScene] Already returning to menu, ignoring duplicate call')
+      return
+    }
+
+    this.returningToMenu = true
+    console.log(`🔙 Returning to menu: ${message}`)
+    
+    // Show a brief message to the user
+    const width = this.scale.width
+    const height = this.scale.height
+
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8)
+    overlay.setDepth(2000)
+    overlay.setScrollFactor(0)
+
+    const messageText = this.add.text(width / 2, height / 2 - 30, message, {
+      fontSize: '24px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+      align: 'center',
+    })
+    messageText.setOrigin(0.5)
+    messageText.setDepth(2001)
+    messageText.setScrollFactor(0)
+
+    const returnText = this.add.text(width / 2, height / 2 + 30, 'Returning to menu...', {
+      fontSize: '18px',
+      color: '#aaaaaa',
+      align: 'center',
+    })
+    returnText.setOrigin(0.5)
+    returnText.setDepth(2001)
+    returnText.setScrollFactor(0)
+
+    this.cameraManager.getGameCamera().ignore([overlay, messageText, returnText])
+
+    // Allow click anywhere to return immediately (in addition to timed fallback)
+    const navigateToMenu = (() => {
+      let triggered = false
+      return () => {
+        if (triggered) return
+        triggered = true
+        sceneRouter.navigateTo('MenuScene')
+      }
+    })()
+
+    overlay.setInteractive({ useHandCursor: true })
+    messageText.setInteractive({ useHandCursor: true })
+    returnText
+      .setInteractive({ useHandCursor: true })
+      .setText('Click anywhere to return to menu')
+
+    this.input.once('pointerdown', navigateToMenu)
+    overlay.once('pointerdown', navigateToMenu)
+    messageText.once('pointerdown', navigateToMenu)
+    returnText.once('pointerdown', navigateToMenu)
+
+    // Navigate to menu after a brief delay
+    this.time.delayedCall(5000, navigateToMenu)
   }
 
   private removeRemotePlayer(sessionId: string) {
@@ -705,6 +896,11 @@ export class MultiplayerScene extends BaseGameScene {
       return
     }
 
+    if (this.returningToMenu) {
+      // Prevent AI work once we're already navigating out
+      return
+    }
+
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) {
       console.warn('[MultiplayerScene] Cannot update AI: no unified state')
@@ -730,7 +926,11 @@ export class MultiplayerScene extends BaseGameScene {
     }
 
     // Update AI Manager
-    this.aiManager.update(gameStateData)
+    try {
+      this.aiManager.update(gameStateData)
+    } catch (error) {
+      console.error('[MultiplayerScene] Error during AI update:', error)
+    }
   }
   
   /**

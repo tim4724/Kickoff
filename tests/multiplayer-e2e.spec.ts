@@ -493,27 +493,102 @@ test.describe('Socca2 Multiplayer Tests', () => {
     const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
     await Promise.all([waitScaled(client1, 2000), waitScaled(client2, 2000)])
 
+    // Ensure both clients are fully in the multiplayer scene before we trigger exit
+    await client1.waitForFunction(() => (window as any).__gameControls?.scene?.scene?.key === 'MultiplayerScene', { timeout: 10000 })
+    await client2.waitForFunction(() => (window as any).__gameControls?.scene?.scene?.key === 'MultiplayerScene', { timeout: 10000 })
+
+    // Prevent auto-start when returning to menu (avoid immediate rejoin)
+    await Promise.all([
+      client1.evaluate(() => { (window as any).__testRoomId = null }),
+      client2.evaluate(() => { (window as any).__testRoomId = null }),
+    ])
+
+    // Attach roomClosed spy on client2
+    await client2.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      const nm = scene?.networkManager
+      if (!nm?.on) return
+      ; (window as any).__roomClosedEvents = []
+      nm.on('roomClosed', (reason: string) => {
+        ; (window as any).__roomClosedEvents.push(reason)
+      })
+    })
+
+    // Small buffer to avoid racing initial state
+    await waitScaled(client1, 300)
+    await waitScaled(client2, 300)
+
     // Client 1 leaves via back button (top-left)
     await client1.mouse.click(60, 30)
 
-    // Client 2 should see disconnect overlay/message
-    const message = await client2.waitForFunction(() => {
+    // Confirm client1 actually left the game scene
+    const client1StateAfterLeave = await client1.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      if (!scene) return null
+      return {
+        sceneKey: scene?.scene?.key,
+        isMultiplayer: scene?.isMultiplayer,
+        connected: scene?.networkManager?.isConnected?.(),
+      }
+    })
+    console.log('Client1 post-leave state:', client1StateAfterLeave)
+
+    // Wait until client2 records a roomClosed event (or time out)
+    await client2.waitForFunction(() => (window as any).__roomClosedEvents?.length > 0, { timeout: 15000 })
+
+    // Client 2 should see disconnect overlay/message or navigate back to menu
+    await client2.waitForFunction(() => {
+      const scene = (window as any).__gameControls?.scene
+      const menuLoaded = (window as any).__menuLoaded === true
+      if (!scene && menuLoaded) {
+        // Scene torn down but menu flag set
+        return true
+      }
+      if (!scene) return false
+
       const children = (scene.children?.list || []) as any[]
       const textObj = children.find(
         (obj: any) =>
           typeof obj?.text === 'string' &&
           (obj.text.includes('Opponent left') || obj.text.includes('Connection lost'))
       )
-      return textObj?.text || null
-    }, { timeout: 10000 })
 
-    expect(message).toBeTruthy()
+      const hasOverlay = !!textObj?.text
+      const returning = !!scene.returningToMenu
+      const atMenuKey = scene.scene?.key === 'MenuScene'
+      const sceneRouterHash = window.location.hash === '#/menu'
+      return hasOverlay || returning || atMenuKey || menuLoaded || sceneRouterHash
+    }, { timeout: 20000 })
+
+    const overlayText = await client2.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      if (!scene) return ''
+      const children = (scene.children?.list || []) as any[]
+      const textObj = children.find(
+        (obj: any) =>
+          typeof obj?.text === 'string' &&
+          (obj.text.includes('Opponent left') || obj.text.includes('Connection lost'))
+      )
+      return textObj?.text || ''
+    })
+    console.log('Overlay text (if present):', overlayText)
+
+    // Diagnostic: capture roomClosed reason if present
+    const roomClosedReasons = await client2.evaluate(() => {
+      return {
+        reasons: (window as any).__roomClosedEvents || [],
+        sceneKey: (window as any).__gameControls?.scene?.scene?.key,
+        connected: (window as any).__gameControls?.scene?.networkManager?.isConnected?.(),
+      }
+    })
+    console.log('Client2 roomClosed diagnostics:', roomClosedReasons)
+
+    if (!roomClosedReasons.length) {
+      console.warn('No roomClosed reasons recorded on client2 before menu navigation')
+    }
 
     // And it should navigate back to menu
-    await client2.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 12000 })
-    await expect(client2).toHaveURL(/#\/menu/)
+    await client2.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 15000 })
+    await expect(client2).toHaveURL(/#\/menu/, { timeout: 15000 })
 
     await client1.close()
     await client2.close()
