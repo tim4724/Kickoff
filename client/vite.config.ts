@@ -1,5 +1,11 @@
 import { defineConfig } from 'vite'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
+import { readFileSync } from 'fs'
+
+const rootPkg = JSON.parse(
+  readFileSync(resolve(dirname(__dirname), 'package.json'), 'utf-8')
+)
+const appVersion = process.env.APP_VERSION || rootPkg.version || '0.0.0'
 
 export default defineConfig({
   resolve: {
@@ -14,6 +20,7 @@ export default defineConfig({
     'import.meta.env.VITE_SERVER_PORT': JSON.stringify(
       process.env.VITE_SERVER_PORT || '3000'
     ),
+    'import.meta.env.APP_VERSION': JSON.stringify(appVersion),
   },
   server: {
     port: process.env.VITE_PORT ? parseInt(process.env.VITE_PORT) : 5173,

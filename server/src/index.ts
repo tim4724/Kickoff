@@ -5,8 +5,10 @@ import cors from 'cors'
 // import { monitor } from '@colyseus/monitor' // Disabled in production due to missing dependencies
 import { MatchRoom } from './rooms/MatchRoom.js'
 import { gameClock } from '@kickoff/shared/engine/GameClock'
+import rootPkg from '../../package.json' assert { type: 'json' }
 
 const { Server } = Colyseus
+const appVersion = process.env.APP_VERSION || (rootPkg as any).version || '0.0.0'
 
 const app = express()
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3000
@@ -45,7 +47,8 @@ app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: gameClock.now(),
-    server: 'Kickoff v0.2.0',
+    version: appVersion,
+    server: `Kickoff v${appVersion}`,
   })
 })
 

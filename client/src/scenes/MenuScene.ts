@@ -199,8 +199,9 @@ export class MenuScene extends Phaser.Scene {
       })
       this.aiOnlyText.setOrigin(0.5)
 
-      // Version info
-      this.versionText = this.add.text(width / 2, height * 0.9, 'v0.2.0 - Single Player Update', {
+      // Version info (injected at build time from package.json or APP_VERSION)
+      const versionLabel = `v${import.meta.env.APP_VERSION || '0.0.0'}`
+      this.versionText = this.add.text(width / 2, height * 0.9, versionLabel, {
         fontSize: '16px',
         color: '#888888',
       })
