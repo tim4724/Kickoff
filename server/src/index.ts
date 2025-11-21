@@ -1,4 +1,4 @@
-import Colyseus from 'colyseus'
+import { Server } from 'colyseus'
 import { createServer } from 'http'
 import express from 'express'
 import cors from 'cors'
@@ -7,7 +7,6 @@ import { MatchRoom } from './rooms/MatchRoom.js'
 import { gameClock } from '@kickoff/shared/engine/GameClock'
 import rootPkg from '../../package.json' assert { type: 'json' }
 
-const { Server } = Colyseus
 const appVersion = process.env.APP_VERSION || (rootPkg as any).version || '0.0.0'
 
 const app = express()

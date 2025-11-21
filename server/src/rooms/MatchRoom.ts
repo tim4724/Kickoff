@@ -1,9 +1,6 @@
-import Colyseus from 'colyseus'
+import { Room, Client } from 'colyseus'
 import { GameState } from '../schema/GameState.js'
 import { gameClock } from '@kickoff/shared/engine/GameClock'
-
-const { Room } = Colyseus
-type Client = Colyseus.Client
 
 const GAME_CONFIG = {
   TICK_RATE: 60, // Increased from 30 for lower latency
