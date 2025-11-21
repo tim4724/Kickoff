@@ -489,6 +489,36 @@ test.describe('Socca2 Multiplayer Tests', () => {
     await client2.close()
   })
 
+  test('8b. Opponent sees disconnect message when peer leaves via back/menu', async ({ browser }, testInfo) => {
+    const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
+    await Promise.all([waitScaled(client1, 2000), waitScaled(client2, 2000)])
+
+    // Client 1 leaves via back button (top-left)
+    await client1.mouse.click(60, 30)
+
+    // Client 2 should see disconnect overlay/message
+    const message = await client2.waitForFunction(() => {
+      const scene = (window as any).__gameControls?.scene
+      if (!scene) return null
+      const children = (scene.children?.list || []) as any[]
+      const textObj = children.find(
+        (obj: any) =>
+          typeof obj?.text === 'string' &&
+          (obj.text.includes('Opponent left') || obj.text.includes('Connection lost'))
+      )
+      return textObj?.text || null
+    }, { timeout: 10000 })
+
+    expect(message).toBeTruthy()
+
+    // And it should navigate back to menu
+    await client2.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 12000 })
+    await expect(client2).toHaveURL(/#\/menu/)
+
+    await client1.close()
+    await client2.close()
+  })
+
   test('9. Final Screenshots and Test Summary', async ({ browser }, testInfo) => {
     const { client1, client2 } = await setupTwoClients(browser, testInfo.workerIndex)
     await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
