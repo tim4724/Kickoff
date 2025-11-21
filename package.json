@@ -1,6 +1,6 @@
 {
   "name": "kickoff",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Fast-paced multiplayer arcade soccer game",
   "workspaces": [

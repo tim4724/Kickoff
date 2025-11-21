@@ -2,10 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Build shared package first
-COPY package*.json ./
+# Install all workspaces (shared + server) in builder
+COPY package.json package-lock.json ./
 COPY shared/package.json ./shared/
-RUN npm ci --workspace=shared
+COPY server/package.json ./server/
+RUN npm install --workspaces --include-workspace-root
 COPY shared ./shared
 RUN npm run build --workspace=shared
 
@@ -26,8 +27,8 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copy workspace root package.json
-COPY package*.json ./
+# Copy workspace root package.json + lockfile
+COPY package.json package-lock.json ./
 
 # Copy entire shared directory (needed for @shared path resolution)
 COPY shared ./shared
@@ -38,7 +39,7 @@ COPY server/package.json ./server/
 COPY --from=builder /app/server/dist ./server/dist
 
 # Install production dependencies (workspace linking needs the full structure)
-RUN npm ci --workspace=server --workspace=shared --production=true
+RUN npm install --workspaces --include-workspace-root --production=true
 
 # Change ownership to non-root user
 RUN chown -R nodejs:nodejs /app

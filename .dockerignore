@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 **/node_modules/
+!package-lock.json
+!package.json
+!shared/package.json
+!server/package.json
+!client/package.json
 
 # Build outputs (will be built in Docker)
 **/dist/
@@ -50,5 +55,4 @@ Dockerfile
 
 # Playwright
 .playwright/
-
 
