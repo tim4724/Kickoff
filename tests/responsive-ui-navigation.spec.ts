@@ -22,21 +22,25 @@ async function clickMenuButton(
 
   const tryClick = async () => {
     await page.mouse.click(button.x, button.y)
-    await page.waitForTimeout(40)
+    await page.waitForTimeout(60)
   }
 
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     await tryClick()
     try {
       await page.waitForFunction(
-        (hash) => window.location.hash === hash || (window as any).__menuLoaded === false,
+        (hash) => {
+          const sceneKey = (window as any).__gameControls?.scene?.scene?.key
+          const menuLoaded = (window as any).__menuLoaded
+          return window.location.hash === hash || menuLoaded === false || sceneKey !== 'MenuScene'
+        },
         expectedHash,
-        { timeout: 800 }
+        { timeout: 1800 }
       )
       return
     } catch {
-      if (i === 1) throw new Error(`Navigation did not reach ${expectedHash}`)
-      await page.waitForTimeout(80)
+      if (i === 2) throw new Error(`Navigation did not reach ${expectedHash}`)
+      await page.waitForTimeout(120)
     }
   }
 }

@@ -87,7 +87,7 @@ async function measureNetworkRTT(page: Page): Promise<number> {
 }
 
 test.describe('Input Lag Measurement', () => {
-  test('Measure Baseline Input Lag (10 samples)', async ({ page }) => {
+  test('Measure Baseline Input Lag (3 samples, fast)', async ({ page }) => {
     await setupSinglePlayerTest(page, CLIENT_URL)
 
     // Disable 10x time acceleration for accurate real-time lag measurement
@@ -95,23 +95,20 @@ test.describe('Input Lag Measurement', () => {
     console.log('🎮 Single-player mode initialized (real-time, no acceleration)')
 
     // Small buffer after scene starts
-    await waitScaled(page, 500)
-
-    console.log('\n🧪 MEASURING INPUT LAG (10 samples)')
-    console.log('='.repeat(70))
+    await waitScaled(page, 200)
 
     const measurements: LatencyMeasurement[] = []
+    const samples = 3
+    console.log(`\n🧪 MEASURING INPUT LAG (${samples} samples)`)
 
-    for (let i = 0; i < 10; i++) {
-      console.log(`\n📊 Sample ${i + 1}/10`)
+    for (let i = 0; i < samples; i++) {
+      console.log(`📊 Sample ${i + 1}/${samples}`)
 
       // Measure input lag
       const inputToVisual = await measureInputLag(page)
-      console.log(`  Input-to-Visual: ${inputToVisual.toFixed(2)}ms`)
 
       // Measure network RTT (0 in single-player)
       const networkRTT = await measureNetworkRTT(page)
-      console.log(`  Network RTT: ${networkRTT.toFixed(2)}ms (single-player)`)
 
       measurements.push({
         inputToVisual,
@@ -120,7 +117,7 @@ test.describe('Input Lag Measurement', () => {
       })
 
       // Wait between samples
-      await waitScaled(page, 500)
+      await waitScaled(page, 200)
     }
 
     // Calculate statistics

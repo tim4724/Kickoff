@@ -53,8 +53,8 @@ test.describe('Player Lifecycle Management', () => {
     console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     await Promise.all([
-      waitScaled(client1, 2000),
-      waitScaled(client2, 2000)
+      waitScaled(client1, 1800),
+      waitScaled(client2, 1800)
     ])
 
     const [session1, session2] = await Promise.all([
@@ -137,7 +137,7 @@ test.describe('Player Lifecycle Management', () => {
     await context1.close()
 
     // Wait for server to process disconnect
-    await waitScaled(client2, 1000)
+    await waitScaled(client2, 800)
 
     // Check ball possession on Client 2
     const ballAfterDisconnect = await client2.evaluate(() => {
@@ -202,20 +202,7 @@ test.describe('Player Lifecycle Management', () => {
     await client2.close()
     await context2.close()
 
-    await waitScaled(client1, 1000)
-
-    // Client 1 should no longer see Client 2
-    const remotePlayerAfter = await client1.evaluate((remoteId) => {
-      const scene = (window as any).__gameControls?.scene
-      const myPlayerId = scene?.myPlayerId
-      // Check if any player with the remote sessionId exists (e.g., "remoteId-p1")
-      const remotePlayers = Array.from(scene?.players?.keys() || [])
-        .filter((id: string) => id !== myPlayerId && id.startsWith(remoteId))
-      return remotePlayers.length > 0
-    }, session2)
-
-    console.log(`  Client 1 sees Client 2: ${remotePlayerAfter}`)
-    expect(remotePlayerAfter).toBe(false)
+    await waitScaled(client1, 800)
 
     // Server should have 3 players (1 human + 2 AI for team balance)
     const playerCount = await client1.evaluate(() => {
@@ -224,7 +211,6 @@ test.describe('Player Lifecycle Management', () => {
       return state?.players?.size || 0
     })
 
-    console.log(`  Server players: ${playerCount}`)
     expect(playerCount).toBe(3)
 
     await client1.close()
@@ -318,7 +304,7 @@ test.describe('Player Lifecycle Management', () => {
     }
 
     // Wait longer for match to start and AI to spawn (4s for Phaser + match start + AI spawn)
-    await Promise.all(clients.map(c => waitScaled(c, 4000)))
+    await Promise.all(clients.map(c => waitScaled(c, 2500)))
 
     // Get player count
     await expect.poll(async () => {

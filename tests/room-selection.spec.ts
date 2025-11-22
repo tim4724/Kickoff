@@ -1,6 +1,5 @@
 import { test, expect, Browser } from '@playwright/test'
 import { setTestRoomId } from './helpers/room-utils'
-import { waitScaled } from './helpers/time-control'
 import { TEST_ENV } from "./config/test-env"
 
 /**
@@ -22,124 +21,74 @@ test.describe('Room Selection', () => {
     console.log(`  Room A: ${roomA}`)
     console.log(`  Room B: ${roomB}`)
 
-    // Create contexts and pages for 4 clients
-    const context1 = await browser.newContext()
-    const context2 = await browser.newContext()
-    const context3 = await browser.newContext()
-    const context4 = await browser.newContext()
+    // Helper to create a client with scoped logs
+    const makeClient = async (label: string) => {
+      const context = await browser.newContext()
+      const page = await context.newPage()
+      const logs: string[] = []
+      page.on('console', msg => {
+        const text = msg.text()
+        logs.push(text)
+        console.log(`[${label}] ${text}`)
+      })
+      return { context, page, logs }
+    }
 
-    const client1 = await context1.newPage()
-    const client2 = await context2.newPage()
-    const client3 = await context3.newPage()
-    const client4 = await context4.newPage()
-
-    // Set up console logging
-    const logs: { client: string; message: string }[] = []
-
-    client1.on('console', msg => {
-      const text = msg.text()
-      logs.push({ client: 'Client1', message: text })
-      console.log(`[Client1/RoomA] ${text}`)
-    })
-    client2.on('console', msg => {
-      const text = msg.text()
-      logs.push({ client: 'Client2', message: text })
-      console.log(`[Client2/RoomB] ${text}`)
-    })
-    client3.on('console', msg => {
-      const text = msg.text()
-      logs.push({ client: 'Client3', message: text })
-      console.log(`[Client3/RoomA] ${text}`)
-    })
-    client4.on('console', msg => {
-      const text = msg.text()
-      logs.push({ client: 'Client4', message: text })
-      console.log(`[Client4/RoomB] ${text}`)
-    })
+    const client1 = await makeClient('Client1/RoomA')
+    const client2 = await makeClient('Client2/RoomB')
+    const client3 = await makeClient('Client3/RoomA')
+    const client4 = await makeClient('Client4/RoomB')
 
     // Assign clients to different rooms
     // Client 1 & 3 → Room A
-    await setTestRoomId(client1, roomA)
-    await setTestRoomId(client3, roomA)
+    await setTestRoomId(client1.page, roomA)
+    await setTestRoomId(client3.page, roomA)
 
     // Client 2 & 4 → Room B
-    await setTestRoomId(client2, roomB)
-    await setTestRoomId(client4, roomB)
+    await setTestRoomId(client2.page, roomB)
+    await setTestRoomId(client4.page, roomB)
 
     // Navigate all clients
     await Promise.all([
-      client1.goto(CLIENT_URL),
-      client2.goto(CLIENT_URL),
-      client3.goto(CLIENT_URL),
-      client4.goto(CLIENT_URL),
+      client1.page.goto(CLIENT_URL),
+      client2.page.goto(CLIENT_URL),
+      client3.page.goto(CLIENT_URL),
+      client4.page.goto(CLIENT_URL),
     ])
 
-    // Wait for all clients to connect and join rooms (longer wait for Phaser initialization)
+    // Wait for all clients to log their room selection and connection
+    const waitForJoin = (logs: string[], room: string) =>
+      expect.poll(() => logs.filter(l => l.includes('Using test room:')).length, { timeout: 4000 }).toBeGreaterThanOrEqual(1)
+        .then(() => expect(logs.some(l => l.includes(room))).toBe(true))
+        .then(() =>
+          expect.poll(() => logs.filter(l => l.includes('Connected! Session ID:')).length, { timeout: 4000 }).toBeGreaterThanOrEqual(1)
+        )
+
     await Promise.all([
-      waitScaled(client1, 5000),
-      waitScaled(client2, 5000),
-      waitScaled(client3, 5000),
-      waitScaled(client4, 5000),
+      waitForJoin(client1.logs, roomA),
+      waitForJoin(client2.logs, roomB),
+      waitForJoin(client3.logs, roomA),
+      waitForJoin(client4.logs, roomB),
     ])
 
     // Verify Room A clients joined the correct room
-    const roomALogs = logs.filter(
-      log =>
-        (log.client === 'Client1' || log.client === 'Client3') &&
-        log.message.includes('Using test room:')
-    )
-
-    expect(roomALogs.length).toBeGreaterThanOrEqual(1)
-    expect(roomALogs.some(log => log.message.includes(roomA))).toBe(true)
-    console.log(`✅ Room A clients joined: ${roomA}`)
-
-    // Verify Room B clients joined the correct room
-    const roomBLogs = logs.filter(
-      log =>
-        (log.client === 'Client2' || log.client === 'Client4') &&
-        log.message.includes('Using test room:')
-    )
-
-    expect(roomBLogs.length).toBeGreaterThanOrEqual(1)
-    expect(roomBLogs.some(log => log.message.includes(roomB))).toBe(true)
-    console.log(`✅ Room B clients joined: ${roomB}`)
-
-    // Verify both rooms had "Connected!" messages (proves rooms were joined successfully)
-    const connectedLogsRoomA = logs.filter(
-      log =>
-        (log.client === 'Client1' || log.client === 'Client3') &&
-        log.message.includes('Connected! Session ID:')
-    )
-    const connectedLogsRoomB = logs.filter(
-      log =>
-        (log.client === 'Client2' || log.client === 'Client4') &&
-        log.message.includes('Connected! Session ID:')
-    )
-
-    expect(connectedLogsRoomA.length).toBeGreaterThanOrEqual(2)
-    expect(connectedLogsRoomB.length).toBeGreaterThanOrEqual(2)
-    console.log(`✅ All clients successfully connected to their rooms`)
-
-    // Verify rooms are isolated (different room IDs in logs)
-    expect(
-      roomALogs.some(log => log.message.includes(roomA)) &&
-      !roomALogs.some(log => log.message.includes(roomB))
-    ).toBe(true)
-    expect(
-      roomBLogs.some(log => log.message.includes(roomB)) &&
-      !roomBLogs.some(log => log.message.includes(roomA))
-    ).toBe(true)
-    console.log(`✅ Verified rooms are isolated - clients joined correct rooms`)
+    // Verify rooms are isolated (room tags never cross)
+    expect(client1.logs.some(log => log.includes(roomA))).toBe(true)
+    expect(client3.logs.some(log => log.includes(roomA))).toBe(true)
+    expect(client2.logs.some(log => log.includes(roomB))).toBe(true)
+    expect(client4.logs.some(log => log.includes(roomB))).toBe(true)
+    expect(client1.logs.every(log => !log.includes(roomB))).toBe(true)
+    expect(client2.logs.every(log => !log.includes(roomA))).toBe(true)
 
     // Clean up
-    await client1.close()
-    await client2.close()
-    await client3.close()
-    await client4.close()
-    await context1.close()
-    await context2.close()
-    await context3.close()
-    await context4.close()
+    await client1.page.close()
+    await client2.page.close()
+    await client3.page.close()
+    await client4.page.close()
+    await client1.context.close()
+    await client2.context.close()
+    await client3.context.close()
+    await client4.context.close()
 
     console.log(`✅ Room selection test passed!`)
   })
@@ -164,18 +113,14 @@ test.describe('Room Selection', () => {
     await setTestRoomId(client, customRoomName)
     await client.goto(CLIENT_URL)
 
-    // Wait for connection
-    await waitScaled(client, 3000)
-
-    // Verify client joined the custom room
-    expect(roomLogs.some(log =>
+    // Verify join + connection quickly
+    await expect.poll(() => roomLogs.some(log =>
       log.includes('Using test room:') && log.includes(customRoomName)
-    )).toBe(true)
+    ), { timeout: 4000 }).toBe(true)
 
-    // Verify connection was successful
-    expect(roomLogs.some(log =>
+    await expect.poll(() => roomLogs.some(log =>
       log.includes('Connected! Session ID:')
-    )).toBe(true)
+    ), { timeout: 4000 }).toBe(true)
 
     console.log(`✅ Client successfully joined custom room: ${customRoomName}`)
 

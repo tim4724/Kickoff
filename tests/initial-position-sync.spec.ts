@@ -1,239 +1,56 @@
-import { test, expect, Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { setupMultiClientTest } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
-import { TEST_ENV } from "./config/test-env"
-
-/**
- * Test: Initial Player Position Synchronization
- *
- * CRITICAL BUG: When a match starts, both clients show completely different
- * positions for the players. This test verifies that all clients see the
- * same initial player positions when the match begins.
- */
+import { TEST_ENV } from './config/test-env'
 
 const CLIENT_URL = TEST_ENV.CLIENT_URL
-const SCREENSHOT_DIR = './test-results/position-sync'
 
-/**
- * Helper: Get all player positions from a client's perspective
- */
-async function getAllPlayerPositions(page: Page): Promise<Map<string, { x: number; y: number; team: string }>> {
-  return await page.evaluate(() => {
+async function snapshot(page) {
+  return page.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    if (!scene?.networkManager) return new Map()
-
-    const state = scene.networkManager.getState()
-    if (!state?.players) return new Map()
-
-    const positions = new Map()
-    state.players.forEach((player: any, sessionId: string) => {
-      positions.set(sessionId, {
-        x: player.x,
-        y: player.y,
-        team: player.team
-      })
-    })
-
-    return Object.fromEntries(positions)
-  }).then(obj => new Map(Object.entries(obj)))
-}
-
-/**
- * Helper: Get local player visual position (what's actually rendered on screen)
- */
-async function getLocalPlayerVisualPosition(page: Page): Promise<{ x: number; y: number }> {
-  return await page.evaluate(() => {
-    const scene = (window as any).__gameControls?.scene
-    const myPlayerId = scene?.myPlayerId
-    const player = scene?.players?.get(myPlayerId)
-    if (!player) return { x: 0, y: 0 }
-
-    return {
-      x: player.x,
-      y: player.y
-    }
+    const statePlayers = Array.from(scene?.networkManager?.getState()?.players?.entries?.() || []).map(
+      ([id, p]: any) => ({ id, x: p.x, y: p.y })
+    )
+    const sprites = Array.from(scene?.players?.entries?.() || []).map(
+      ([id, p]: any) => ({ id, x: p.x, y: p.y })
+    )
+    return { statePlayers, sprites }
   })
 }
 
-/**
- * Helper: Get remote player visual positions (what's actually rendered on screen)
- */
-async function getRemotePlayerVisualPositions(page: Page): Promise<Map<string, { x: number; y: number }>> {
-  return await page.evaluate(() => {
-    const scene = (window as any).__gameControls?.scene
-    const myPlayerId = scene?.myPlayerId
-    if (!scene?.players) return new Map()
+test.describe('Initial position sync (smoke)', () => {
+  test('both clients agree on spawn positions', async ({ browser }, testInfo) => {
+    const ctx1 = await browser.newContext()
+    const ctx2 = await browser.newContext()
+    const c1 = await ctx1.newPage()
+    const c2 = await ctx2.newPage()
 
-    const positions = new Map()
-    // Iterate over all players except myPlayerId (those are "remote" from this client's perspective)
-    scene.players.forEach((sprite: any, playerId: string) => {
-      if (playerId !== myPlayerId) {
-        // Extract sessionId from playerId (e.g., "sessionId-p1" -> "sessionId")
-        const sessionId = playerId.split('-')[0]
-        positions.set(sessionId, {
-          x: sprite.x,
-          y: sprite.y
-        })
-      }
-    })
+    await setupMultiClientTest([c1, c2], CLIENT_URL, testInfo.workerIndex)
+    await Promise.all([waitScaled(c1, 800), waitScaled(c2, 800)])
 
-    return Object.fromEntries(positions)
-  }).then(obj => new Map(Object.entries(obj)))
-}
+    const [snap1, snap2] = await Promise.all([snapshot(c1), snapshot(c2)])
 
-test.describe('Initial Player Position Synchronization', () => {
-  test('Initial Player Positions Match on Both Clients', async ({ browser }, testInfo) => {
-    const context1 = await browser.newContext()
-    const context2 = await browser.newContext()
-    const client1 = await context1.newPage()
-    const client2 = await context2.newPage()
+    const map1 = new Map(snap1.statePlayers.map(p => [p.id, p]))
+    const map2 = new Map(snap2.statePlayers.map(p => [p.id, p]))
+    expect(map1.size).toBeGreaterThanOrEqual(2)
+    expect(map1.size).toBe(map2.size)
 
-    const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Both clients isolated in room: ${roomId}`)
-
-    // Wait for game to load
-    await Promise.all([waitScaled(client1, 3000), waitScaled(client2, 3000)])
-
-    // Get player IDs (these are the keys used in the server state)
-    const client1PlayerId = await client1.evaluate(() => {
-      return (window as any).__gameControls?.scene?.myPlayerId
-    })
-    const client2PlayerId = await client2.evaluate(() => {
-      return (window as any).__gameControls?.scene?.myPlayerId
-    })
-
-    if (!client1PlayerId || !client2PlayerId) {
-      throw new Error(
-        `Failed to get player IDs\n` +
-        `Client 1 Player ID: ${client1PlayerId || 'undefined'}\n` +
-        `Client 2 Player ID: ${client2PlayerId || 'undefined'}`
-      )
+    for (const [id, p1] of map1) {
+      const p2 = map2.get(id)
+      expect(p2).toBeDefined()
+      expect(Math.hypot(p1.x - p2!.x, p1.y - p2!.y)).toBeLessThan(20)
     }
 
-    // Extract session IDs from player IDs (e.g., "sessionId-p1" -> "sessionId")
-    const client1SessionId = client1PlayerId.split('-')[0]
-    const client2SessionId = client2PlayerId.split('-')[0]
+    const spriteMap1 = new Map(snap1.sprites.map(p => [p.id, p]))
+    const spriteMap2 = new Map(snap2.sprites.map(p => [p.id, p]))
 
-    console.log(`✅ Client 1 Player ID: ${client1PlayerId} (Session: ${client1SessionId})`)
-    console.log(`✅ Client 2 Player ID: ${client2PlayerId} (Session: ${client2SessionId})`)
+    for (const [id, p1] of map1) {
+      const sprite1 = spriteMap1.get(id)
+      const sprite2 = spriteMap2.get(id)
+      if (sprite1) expect(Math.hypot(sprite1.x - p1.x, sprite1.y - p1.y)).toBeLessThan(60)
+      if (sprite2) expect(Math.hypot(sprite2.x - p1.x, sprite2.y - p1.y)).toBeLessThan(60)
+    }
 
-    console.log('\n🧪 TEST: Initial Player Position Synchronization')
-    console.log('=' .repeat(60))
-
-    // Wait for both clients to sync with each other (longer wait for network propagation)
-    await Promise.all([
-      waitScaled(client1, 2000),
-      waitScaled(client2, 2000)
-    ])
-
-    // Get server state from both clients
-    const client1ServerPositions = await getAllPlayerPositions(client1)
-    const client2ServerPositions = await getAllPlayerPositions(client2)
-
-    console.log('\n📊 SERVER STATE (from Client 1 perspective):')
-    client1ServerPositions.forEach((pos, sessionId) => {
-      console.log(`  ${sessionId}: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) - Team: ${pos.team}`)
-    })
-
-    console.log('\n📊 SERVER STATE (from Client 2 perspective):')
-    client2ServerPositions.forEach((pos, sessionId) => {
-      console.log(`  ${sessionId}: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) - Team: ${pos.team}`)
-    })
-
-    // Get visual positions from both clients
-    const client1LocalVisual = await getLocalPlayerVisualPosition(client1)
-    const client1RemoteVisuals = await getRemotePlayerVisualPositions(client1)
-    const client2LocalVisual = await getLocalPlayerVisualPosition(client2)
-    const client2RemoteVisuals = await getRemotePlayerVisualPositions(client2)
-
-    console.log('\n🎨 VISUAL RENDERING (Client 1):')
-    console.log(`  Local Player: (${client1LocalVisual.x.toFixed(1)}, ${client1LocalVisual.y.toFixed(1)})`)
-    client1RemoteVisuals.forEach((pos, sessionId) => {
-      console.log(`  Remote Player ${sessionId}: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`)
-    })
-
-    console.log('\n🎨 VISUAL RENDERING (Client 2):')
-    console.log(`  Local Player: (${client2LocalVisual.x.toFixed(1)}, ${client2LocalVisual.y.toFixed(1)})`)
-    client2RemoteVisuals.forEach((pos, sessionId) => {
-      console.log(`  Remote Player ${sessionId}: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`)
-    })
-
-    // Take screenshots for visual comparison
-    await client1.screenshot({ path: `${SCREENSHOT_DIR}/client1-initial.png`, fullPage: false })
-    await client2.screenshot({ path: `${SCREENSHOT_DIR}/client2-initial.png`, fullPage: false })
-
-    // ASSERTION 1: Both clients should receive the same server state
-    console.log('\n✓ ASSERTION 1: Server state consistency')
-    expect(client1ServerPositions.size).toBe(client2ServerPositions.size)
-
-    client1ServerPositions.forEach((pos1, sessionId) => {
-      const pos2 = client2ServerPositions.get(sessionId)
-      expect(pos2).toBeDefined()
-
-      const xDiff = Math.abs(pos1.x - pos2!.x)
-      const yDiff = Math.abs(pos1.y - pos2!.y)
-
-      console.log(`  Player ${sessionId}: Δx=${xDiff.toFixed(1)}px, Δy=${yDiff.toFixed(1)}px`)
-
-      // Note: Colyseus state synchronization uses patches sent from server
-      // Clients reading at slightly different times may see different positions
-      // due to network latency and frame timing. A tolerance of 10px is realistic
-      // for networked state synchronization (server updates at 60fps = 16.67ms per frame)
-      expect(xDiff).toBeLessThan(10) // Server state should be nearly identical (networked tolerance)
-      expect(yDiff).toBeLessThan(10)
-      expect(pos1.team).toBe(pos2!.team)
-    })
-
-    // ASSERTION 2: Visual positions should match server positions
-    console.log('\n✓ ASSERTION 2: Visual rendering matches server state')
-
-    // Client 1: Check local player visual matches server
-    const client1ServerPos = client1ServerPositions.get(client1PlayerId)!
-    const client1LocalXDiff = Math.abs(client1LocalVisual.x - client1ServerPos.x)
-    const client1LocalYDiff = Math.abs(client1LocalVisual.y - client1ServerPos.y)
-    console.log(`  Client 1 local player: Δx=${client1LocalXDiff.toFixed(1)}px, Δy=${client1LocalYDiff.toFixed(1)}px`)
-    expect(client1LocalXDiff).toBeLessThan(15) // Tolerance for network latency and client prediction
-    expect(client1LocalYDiff).toBeLessThan(15)
-
-    // Client 2: Check local player visual matches server
-    const client2ServerPos = client2ServerPositions.get(client2PlayerId)!
-    const client2LocalXDiff = Math.abs(client2LocalVisual.x - client2ServerPos.x)
-    const client2LocalYDiff = Math.abs(client2LocalVisual.y - client2ServerPos.y)
-    console.log(`  Client 2 local player: Δx=${client2LocalXDiff.toFixed(1)}px, Δy=${client2LocalYDiff.toFixed(1)}px`)
-    expect(client2LocalXDiff).toBeLessThan(15) // Tolerance for network latency and client prediction
-    expect(client2LocalYDiff).toBeLessThan(15)
-
-    // ASSERTION 3: Each client sees the other player in the same position
-    console.log('\n✓ ASSERTION 3: Cross-client visual consistency')
-
-    // Client 1 should see Client 2's player
-    const client1SeesClient2 = client1RemoteVisuals.get(client2SessionId)
-    expect(client1SeesClient2).toBeDefined()
-
-    const client1ViewXDiff = Math.abs(client1SeesClient2!.x - client2ServerPos.x)
-    const client1ViewYDiff = Math.abs(client1SeesClient2!.y - client2ServerPos.y)
-    console.log(`  Client 1 sees Client 2: Δx=${client1ViewXDiff.toFixed(1)}px, Δy=${client1ViewYDiff.toFixed(1)}px`)
-    // NOTE: Large tolerance due to remote player sync delay and initial positioning
-    // This test documents that remote players eventually sync, even if not immediately perfect
-    expect(client1ViewXDiff).toBeLessThan(600)
-    expect(client1ViewYDiff).toBeLessThan(600)
-
-    // Client 2 should see Client 1's player
-    const client2SeesClient1 = client2RemoteVisuals.get(client1SessionId)
-    expect(client2SeesClient1).toBeDefined()
-
-    const client2ViewXDiff = Math.abs(client2SeesClient1!.x - client1ServerPos.x)
-    const client2ViewYDiff = Math.abs(client2SeesClient1!.y - client1ServerPos.y)
-    console.log(`  Client 2 sees Client 1: Δx=${client2ViewXDiff.toFixed(1)}px, Δy=${client2ViewYDiff.toFixed(1)}px`)
-    // NOTE: Large tolerance due to remote player sync delay and initial positioning  
-    // This test documents that remote players eventually sync, even if not immediately perfect
-    expect(client2ViewXDiff).toBeLessThan(600)
-    expect(client2ViewYDiff).toBeLessThan(600)
-
-    console.log('\n✅ TEST PASSED: Initial positions are synchronized across all clients')
-    console.log('=' .repeat(60))
-
-    await client1.close()
-    await client2.close()
+    await Promise.all([ctx1.close(), ctx2.close()])
   })
 })

@@ -18,8 +18,6 @@ const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 test.describe('Multiplayer AI Control', () => {
   test('Blue client controls blue team, red client controls red team', async ({ browser }, testInfo) => {
-    console.log('📤 Step 1: Setting up two clients...')
-
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -28,15 +26,12 @@ test.describe('Multiplayer AI Control', () => {
 
     // Connect both clients to the same isolated room
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
-    console.log(`🔒 Both clients isolated in room: ${roomId}`)
 
     // Wait for clients to connect and initialize
     await Promise.all([
-      waitScaled(client1, 5000), // Give time for Phaser to initialize and AI to set up
-      waitScaled(client2, 5000)
+      waitScaled(client1, 2500), // Give time for Phaser to initialize and AI to set up
+      waitScaled(client2, 2500)
     ])
-
-    console.log('\n📤 Step 2: Verifying team assignments...')
 
     // Get session IDs and team assignments
     const [session1, session2, team1, team2] = await Promise.all([
@@ -56,9 +51,6 @@ test.describe('Multiplayer AI Control', () => {
       })
     ])
 
-    console.log(`  Client 1: ${session1} on ${team1} team`)
-    console.log(`  Client 2: ${session2} on ${team2} team`)
-
     // Clients should be on different teams
     expect(team1).toBeTruthy()
     expect(team2).toBeTruthy()
@@ -69,8 +61,6 @@ test.describe('Multiplayer AI Control', () => {
     const redClient = team1 === 'red' ? client1 : client2
     const blueSessionId = team1 === 'blue' ? session1 : session2
     const redSessionId = team1 === 'red' ? session1 : session2
-
-    console.log('\n📤 Step 3: Verifying AI initialization...')
 
     // Check AI manager is initialized
     const [blueAIManager, redAIManager] = await Promise.all([
@@ -98,11 +88,6 @@ test.describe('Multiplayer AI Control', () => {
       })
     ])
 
-    console.log(`  Blue client AI: exists=${blueAIManager.exists}, enabled=${blueAIManager.enabled}`)
-    console.log(`    Blue team players: ${blueAIManager.blueTeam}, Red team players: ${blueAIManager.redTeam}`)
-    console.log(`  Red client AI: exists=${redAIManager.exists}, enabled=${redAIManager.enabled}`)
-    console.log(`    Blue team players: ${redAIManager.blueTeam}, Red team players: ${redAIManager.redTeam}`)
-
     // Blue client should have blue team players (3: 1 human + 2 AI), red team should be empty
     expect(blueAIManager.exists).toBe(true)
     expect(blueAIManager.enabled).toBe(true)
@@ -114,8 +99,6 @@ test.describe('Multiplayer AI Control', () => {
     expect(redAIManager.enabled).toBe(true)
     expect(redAIManager.redTeam).toBe(3) // All red players (including human)
     expect(redAIManager.blueTeam).toBe(0) // No blue players (opponent controls them)
-
-    console.log('\n📤 Step 4: Verifying player count per team...')
 
     // Get all players from server state
     const [bluePlayers, redPlayers] = await Promise.all([
@@ -141,16 +124,11 @@ test.describe('Multiplayer AI Control', () => {
       })
     ])
 
-    console.log(`  Blue team: ${bluePlayers.length} players (${bluePlayers.filter(p => p.isHuman).length} human)`)
-    console.log(`  Red team: ${redPlayers.length} players (${redPlayers.filter(p => p.isHuman).length} human)`)
-
     // Each team should have 3 players: 1 human + 2 AI
     expect(bluePlayers.length).toBe(3)
     expect(bluePlayers.filter(p => p.isHuman).length).toBe(1)
     expect(redPlayers.length).toBe(3)
     expect(redPlayers.filter(p => p.isHuman).length).toBe(1)
-
-    console.log('\n📤 Step 5: Verifying human player control...')
 
     // Check that human players are set correctly
     const [blueHumanId, redHumanId] = await Promise.all([
@@ -166,13 +144,9 @@ test.describe('Multiplayer AI Control', () => {
     expect(blueHuman?.isHuman).toBe(true)
     expect(redHuman).toBeTruthy()
     expect(redHuman?.isHuman).toBe(true)
-
-    console.log('\n✅ All AI control checks passed!')
   })
 
   test('Human player can switch between teammates', async ({ browser }, testInfo) => {
-    console.log('📤 Testing player switching...')
-
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -182,8 +156,8 @@ test.describe('Multiplayer AI Control', () => {
     const roomId = await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
     
     await Promise.all([
-      waitScaled(client1, 5000),
-      waitScaled(client2, 5000)
+      waitScaled(client1, 2000),
+      waitScaled(client2, 2000)
     ])
 
     // Get initial controlled player
@@ -205,15 +179,12 @@ test.describe('Multiplayer AI Control', () => {
     })
 
     // Wait a bit for switch to complete
-    await waitScaled(client1, 1000)
+    await waitScaled(client1, 400)
 
     // Check if controlled player changed
     const newControlled = await client1.evaluate(() => {
       return (window as any).__gameControls?.scene?.controlledPlayerId
     })
-
-    console.log(`  Initial controlled: ${initialControlled}`)
-    console.log(`  New controlled: ${newControlled}`)
 
     // Controlled player should be different (switched to teammate)
     // Note: This might be the same if we're already on the last teammate
@@ -221,8 +192,6 @@ test.describe('Multiplayer AI Control', () => {
   })
 
   test('AI teammate gaining possession hands control to human before acting', async ({ browser }, testInfo) => {
-    console.log('📤 Testing automatic control handoff on possession...')
-
     const context1 = await browser.newContext()
     const context2 = await browser.newContext()
 
@@ -232,8 +201,8 @@ test.describe('Multiplayer AI Control', () => {
     await setupMultiClientTest([client1, client2], CLIENT_URL, testInfo.workerIndex)
 
     await Promise.all([
-      waitScaled(client1, 4000),
-      waitScaled(client2, 4000)
+      waitScaled(client1, 2500),
+      waitScaled(client2, 2500)
     ])
 
     const result = await client1.evaluate(() => {
@@ -304,7 +273,5 @@ test.describe('Multiplayer AI Control', () => {
     expect(result.controlledAfter).toBe(result.aiTeammate)
     expect(result.aiInputSent).toBe(false)
 
-    console.log('✅ Control handoff verified: AI possession triggers human control before any AI input')
   })
 })
-
