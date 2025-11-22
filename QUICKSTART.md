@@ -1,10 +1,8 @@
-# 🚀 Kickoff Quick Start
+# 🚀 Socca2 Quick Start
 
-Fast-paced multiplayer arcade soccer game with real-time physics and pressure-based possession mechanics.
+Fast-paced 3v3 arcade soccer (1 human + 2 AI bots per team) with unified 1920×1080 coordinates and authoritative Colyseus server.
 
-## Getting Started
-
-### Run the Game
+## Run the Game
 
 ```bash
 npm run dev
@@ -14,117 +12,67 @@ This starts:
 - **Client** → http://localhost:5173
 - **Server** → http://localhost:3000
 
-### Play
+## Play
 
-**Desktop:**
-- Arrow Keys → Move
-- Space → Shoot/Pass
-
-**Mobile:**
-- Left joystick → Move
-- Right button → Shoot/Pass (hold for power)
+- **Desktop:** Keyboard movement + space/action (or use the on-screen controls)
+- **Mobile:** Virtual joystick (left) + action button (right, hold for power)
 
 ## Features
 
-✅ **Multiplayer** - Real-time 2v2 matches via Colyseus
-✅ **Ball Physics** - Realistic friction, bouncing, momentum
-✅ **Smart Possession** - Proximity-based with pressure dynamics
-✅ **Shooting** - Variable power, direction control
-✅ **Mobile Controls** - Touch joystick + action button
-✅ **Goal Scoring** - Match timer, celebrations, reset
+- Real-time multiplayer with client prediction + server reconciliation
+- Ball capture system with pressure/lockouts and variable-power shooting
+- Dual-camera rendering (game + UI) with letterboxing for non-16:9 screens
+- 3v3 teams with hierarchical AI and auto cursor switching to nearest player
 
 ## Architecture
 
 ```
-kickoff/
-├── client/          # Phaser 3.80 + TypeScript + Vite
-│   ├── src/scenes/GameScene.ts     # Main game logic
-│   └── src/controls/               # Virtual joystick & button
-├── server/          # Colyseus 0.16 multiplayer server
-│   ├── src/rooms/MatchRoom.ts      # Game room logic
-│   └── src/schema/GameState.ts     # Authoritative state
-├── shared/          # Shared types & constants
-└── tests/           # Playwright E2E tests
+socca2/
+├── client/          # Phaser 3 + TypeScript + Vite
+│   ├── src/scenes/  # GameScene, BaseGameScene, etc.
+│   └── src/controls/# Virtual joystick & action button
+├── server/          # Colyseus multiplayer server
+│   ├── src/rooms/MatchRoom.ts
+│   └── src/schema/GameState.ts
+├── shared/          # Shared types + GAME_CONFIG constants
+└── tests/           # Playwright E2E tests (auto-start servers)
 ```
 
 ## Testing
 
 ```bash
-npm run test:e2e           # Run all E2E tests
-npm run test:e2e:ui        # Run with Playwright UI
+npm run test:e2e           # All E2E (spins up test servers on 3001/5174)
+npm run test:e2e:ui        # Playwright UI
 npm run clean:test         # Clean test artifacts
 ```
 
-**Test Coverage:**
+**Coverage highlights:**
 - Core gameplay regression (movement, shooting, scoring)
-- Multiplayer synchronization (position, ball state)
-- Ball possession mechanics (capture, pressure, release)
-- Client-server speed matching
-- Shooting mechanics (direction, power, multiplayer sync)
+- Multiplayer sync and ball possession mechanics
+- AI gameplay flow and physics-only suites
 
 ## Development Tools
 
-### Server Monitor
-http://localhost:3000/colyseus
-- Active rooms, connected clients, server stats
+- **Server Monitor:** http://localhost:3000/colyseus
+- **Health Check:** http://localhost:3000/health
 
-### Health Check
-http://localhost:3000/health
-- Server status JSON
+## Key Game Constants (`shared/src/types.ts`)
 
-## Configuration
-
-### Game Constants
-`shared/src/types.ts` - Physics, field dimensions, gameplay tuning
-
-**Key Parameters:**
-- `PLAYER_SPEED: 250` - Movement speed (px/s)
-- `SHOOT_SPEED: 400` - Ball shot velocity (px/s)
-- `POSSESSION_RADIUS: 50` - Capture distance (px)
-- `PRESSURE_RADIUS: 120` - Contesting range (px)
-- `BALL_FRICTION: 0.98` - Ball slowdown per frame
+- `FIELD_WIDTH: 1920`, `FIELD_HEIGHT: 1080`
+- `PLAYER_SPEED: 284`
+- `SHOOT_SPEED: 1440`, `MIN_SHOOT_SPEED: 720`
+- `POSSESSION_RADIUS: 45`, `PRESSURE_RADIUS: 45`
+- `CAPTURE_LOCKOUT_MS: 300`, `LOSS_LOCKOUT_MS: 300`
+- `TICK_RATE: 30`, `MATCH_DURATION: 120`
 
 ## Troubleshooting
 
-**Port in use:**
-```bash
-npx kill-port 3000    # Server
-npx kill-port 5173    # Client
-```
+- **Port in use:** `npx kill-port 3000` (server), `npx kill-port 5173` (client)
+- **Connection issues:** Check `/health`, ensure both services running, inspect browser console
+- **TypeScript errors:** `cd shared && npm run build`
 
-**Connection issues:**
-- Check http://localhost:3000/health
-- Verify both client & server running
-- Check browser console for errors
+## Docs
 
-**TypeScript errors:**
-```bash
-cd shared && npm run build
-```
-
-## Project Documentation
-
-- `claudedocs/BALL_CAPTURE_MECHANISM.md` - Possession system details
-- `claudedocs/SHOOTING_IMPLEMENTATION_RESULTS.md` - Shooting mechanics
-- `claudedocs/INPUT_LAG_OPTIMIZATION_WORKFLOW.md` - Performance work
-- `tests/*.spec.ts` - Test specifications
-
-## Quick Commands
-
-```bash
-# Development
-npm run dev               # Run all (client + server + shared watch)
-npm run dev:client        # Client only
-npm run dev:server        # Server only
-npm run dev:shared        # Shared types watch mode
-
-# Build
-npm run build             # Build both client & server
-npm run build:client      # Client production build
-npm run build:server      # Server production build
-
-# Testing
-npm run test:e2e          # Run E2E tests
-npm run test:e2e:ui       # Playwright UI mode
-npm run clean:test        # Remove test artifacts
-```
+- `CLAUDE.md` — up-to-date working notes/commands
+- `claudedocs/*.md` — deep dives (ball capture, shooting, lag, testing)
+- `tests/*.spec.ts` — test definitions and helpers
