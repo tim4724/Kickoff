@@ -98,37 +98,38 @@ if ('ontouchstart' in window) {
       font-weight: bold;
       border-radius: 8px;
       cursor: pointer;
-      touch-action: manipulation;
+      touch-action: none;
     `
 
-    button.addEventListener('click', () => {
+    // Prevent splash background events from reaching the canvas/menu underneath
+    const stopSplashEvents = (ev: Event) => {
+      ev.stopPropagation()
+      ev.preventDefault()
+    }
+    splash.addEventListener('pointerdown', stopSplashEvents, { capture: true })
+    splash.addEventListener('pointerup', stopSplashEvents, { capture: true })
+    splash.addEventListener('click', stopSplashEvents, { capture: true })
+
+    const requestFs = (ev?: Event) => {
+      ev?.stopPropagation()
+      ev?.preventDefault()
       console.log('📱 Fullscreen button clicked')
       const container = document.getElementById('game-container')
-
-      if (container && container.requestFullscreen) {
-        container.requestFullscreen()
-          .then(() => {
-            console.log('✅ Fullscreen activated')
-            splash.remove()
-
-            // Resume the game if it was paused
-            if (game && game.scene.isPaused('SinglePlayerScene')) {
-              game.scene.resume('SinglePlayerScene')
-            } else if (game && game.scene.isPaused('MultiplayerScene')) {
-              game.scene.resume('MultiplayerScene')
-            } else if (game && game.scene.isPaused('AIOnlyScene')) {
-              game.scene.resume('AIOnlyScene')
-            }
-          })
-          .catch((err) => {
-            console.error('❌ Fullscreen failed:', err)
-            // Remove splash anyway so user can play
-            splash.remove()
-          })
-      } else if (container && (container as any).webkitRequestFullscreen) {
-        ; (container as any).webkitRequestFullscreen()
+      if (!container) {
         splash.remove()
+        return
+      }
+      const restorePointerEvents = () => {
+        container.style.pointerEvents = ''
+      }
 
+      // While splash is visible, disable pointer events on the game container so nothing underneath receives input
+      container.style.pointerEvents = 'none'
+
+      const onSuccess = () => {
+        console.log('✅ Fullscreen activated')
+        splash.remove()
+        restorePointerEvents()
         // Resume the game if it was paused
         if (game && game.scene.isPaused('SinglePlayerScene')) {
           game.scene.resume('SinglePlayerScene')
@@ -137,11 +138,29 @@ if ('ontouchstart' in window) {
         } else if (game && game.scene.isPaused('AIOnlyScene')) {
           game.scene.resume('AIOnlyScene')
         }
+      }
+
+      const onFail = (err: unknown) => {
+        console.error('❌ Fullscreen failed:', err)
+        splash.remove()
+        restorePointerEvents()
+      }
+
+      if (container.requestFullscreen) {
+        container.requestFullscreen().then(onSuccess).catch(onFail)
+      } else if ((container as any).webkitRequestFullscreen) {
+        ; (container as any).webkitRequestFullscreen()
+        onSuccess()
       } else {
         console.warn('⚠️ Fullscreen not supported')
-        splash.remove()
+        onFail('not supported')
       }
-    })
+    }
+
+    button.addEventListener('click', requestFs, { capture: true })
+    button.addEventListener('pointerup', requestFs, { capture: true })
+    button.addEventListener('touchend', requestFs, { capture: true })
+    button.addEventListener('mouseup', requestFs, { capture: true })
 
     splash.appendChild(title)
     splash.appendChild(button)
