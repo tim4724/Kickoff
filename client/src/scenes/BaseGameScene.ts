@@ -686,6 +686,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
   }
 
   protected updateBallColor(state: any) {
+    if (!state || !state.ball || !state.players || typeof state.players.get !== 'function') {
+      return
+    }
+
     const possessorId = state.ball.possessedBy
     const possessor = possessorId ? state.players.get(possessorId) : null
     const possessorTeam = possessor?.team || null
@@ -1094,7 +1098,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Update ball color based on possession
     const state = this.getGameState()
-    if (!state) {
+    if (!state || !state.ball || !state.players) {
       this.updateControlArrow()
       return // Wait for state to be available
     }

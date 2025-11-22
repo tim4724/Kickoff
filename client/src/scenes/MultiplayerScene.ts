@@ -610,28 +610,52 @@ export class MultiplayerScene extends BaseGameScene {
 
     this.cameraManager.getGameCamera().ignore([overlay, messageText, returnText])
 
-    // Allow click anywhere to return immediately (in addition to timed fallback)
+    console.log('🛡️ Disconnect overlay shown - blocking gameplay input')
+
+    // Allow tap/click anywhere to return immediately (use pointerup to avoid leaking press into next scene)
     const navigateToMenu = (() => {
       let triggered = false
       return () => {
         if (triggered) return
         triggered = true
-        sceneRouter.navigateTo('MenuScene')
+        console.log('🔙 Disconnect overlay navigating to menu')
+        if (typeof window !== 'undefined' && (window as any).__testRoomId) {
+          console.log('🧪 Clearing __testRoomId to prevent auto-rejoin on menu')
+          ;(window as any).__testRoomId = null
+        }
+        // Disable further input in this scene so the current pointer doesn't bubble into MenuScene
+        this.input.enabled = false
+        this.input.manager.enabled = false
+        // Defer navigation to the next tick so the current pointer event is fully consumed
+        this.time.delayedCall(20, () => sceneRouter.navigateTo('MenuScene'))
       }
     })()
 
-    overlay.setInteractive({ useHandCursor: true })
+    // Block underlying input while overlay is up
+    overlay.setInteractive({ useHandCursor: true, pixelPerfect: false })
     messageText.setInteractive({ useHandCursor: true })
     returnText
       .setInteractive({ useHandCursor: true })
-      .setText('Click anywhere to return to menu')
+      .setText('Tap anywhere to return to menu')
 
-    this.input.once('pointerdown', navigateToMenu)
-    overlay.once('pointerdown', navigateToMenu)
-    messageText.once('pointerdown', navigateToMenu)
-    returnText.once('pointerdown', navigateToMenu)
+    // Consume pointer events so they don't reach scenes beneath
+    const stop = (pointer: Phaser.Input.Pointer) => {
+      console.log('🖱️ Disconnect overlay click captured')
+      pointer.event?.stopImmediatePropagation()
+      pointer.event?.stopPropagation?.()
+      pointer.event?.preventDefault?.()
+    }
 
-    // Navigate to menu after a brief delay
+    overlay.once('pointerdown', stop)
+    messageText.once('pointerdown', stop)
+    returnText.once('pointerdown', stop)
+
+    // Navigate on pointerup to avoid forwarding the press to the next scene
+    overlay.once('pointerup', navigateToMenu)
+    messageText.once('pointerup', navigateToMenu)
+    returnText.once('pointerup', navigateToMenu)
+
+    // Navigate to menu after a brief delay (or immediately on user click)
     this.time.delayedCall(5000, navigateToMenu)
   }
 
@@ -645,7 +669,9 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   private syncFromServerState(state: any) {
-    if (!state) return
+    if (!state || !state.players || typeof state.players.forEach !== 'function' || !state.ball) {
+      return
+    }
 
     // DEBUG: Log state updates periodically
     if (!this.stateUpdateCount) this.stateUpdateCount = 0

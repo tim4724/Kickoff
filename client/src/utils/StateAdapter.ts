@@ -27,7 +27,7 @@
  * @module StateAdapter
  */
 
-import type { GameEngineState } from '@shared/engine/types'
+import type { EnginePlayerData, GameEngineState } from '@shared/engine/types'
 import type { GameStateData, Team } from '@shared/types'
 
 /**
@@ -81,7 +81,7 @@ export class StateAdapter {
   static fromGameEngine(state: GameEngineState): UnifiedGameState {
     // Players are already in flat format, just copy them
     const unifiedPlayers = new Map<string, UnifiedPlayerData>()
-    state.players.forEach((player, id) => {
+    state.players.forEach((player: EnginePlayerData, id: string) => {
       unifiedPlayers.set(id, {
         id: player.id,
         team: player.team,
@@ -120,7 +120,7 @@ export class StateAdapter {
    */
   static toGameStateData(state: UnifiedGameState): any {
     const playersMap = new Map()
-    state.players.forEach((player, id) => {
+    state.players.forEach((player: any, id: string) => {
       playersMap.set(id, {
         id: player.id,
         team: player.team,

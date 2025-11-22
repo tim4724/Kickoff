@@ -13,6 +13,7 @@ export class MenuScene extends Phaser.Scene {
   private aiOnlyButton!: Phaser.GameObjects.Rectangle
   private aiOnlyText!: Phaser.GameObjects.Text
   private versionText!: Phaser.GameObjects.Text
+  private clickBlockUntil: number = 0
 
   constructor() {
     super({ key: 'MenuScene' })
@@ -232,16 +233,28 @@ export class MenuScene extends Phaser.Scene {
       // Button click handlers - Using 'pointerup' for touch device compatibility
       // Navigate using SceneRouter (hash-based routing)
       this.singlePlayerButton.on('pointerup', () => {
+        if (!this.canProcessClick()) {
+          console.log('⛔ Ignoring menu click (debounce window)')
+          return
+        }
         console.log('🎮 Starting Single Player mode')
         sceneRouter.navigateTo('SinglePlayerScene')
       })
 
       this.multiplayerButton.on('pointerup', () => {
+        if (!this.canProcessClick()) {
+          console.log('⛔ Ignoring menu click (debounce window)')
+          return
+        }
         console.log('🌐 Starting Multiplayer mode')
         sceneRouter.navigateTo('MultiplayerScene')
       })
 
       this.aiOnlyButton.on('pointerup', () => {
+        if (!this.canProcessClick()) {
+          console.log('⛔ Ignoring menu click (debounce window)')
+          return
+        }
         console.log('🤖 Starting AI-Only mode')
         sceneRouter.navigateTo('AIOnlyScene')
       })
@@ -255,6 +268,13 @@ export class MenuScene extends Phaser.Scene {
       // Also listen for native orientation change events (important for fullscreen on mobile)
       // Phaser's resize event doesn't always fire during fullscreen orientation changes
       window.addEventListener('orientationchange', this.handleOrientationChange)
+
+      // Ensure input is enabled (may be disabled by previous scene during navigation)
+      console.log('🟢 MenuScene enabling input')
+      this.input.enabled = true
+      this.input.manager.enabled = true
+      // Debounce clicks briefly when entering menu to absorb stray pointerup
+      this.clickBlockUntil = performance.now() + 250
 
       console.log('📋 Menu scene loaded with responsive layout')
 
@@ -339,6 +359,10 @@ export class MenuScene extends Phaser.Scene {
       // Re-layout UI
       this.layoutUI()
     }, 100)
+  }
+
+  private canProcessClick(): boolean {
+    return performance.now() >= this.clickBlockUntil
   }
 
   /**

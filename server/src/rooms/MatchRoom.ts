@@ -129,6 +129,16 @@ export class MatchRoom extends Room<GameState> {
     // Remove player
     this.state.removePlayer(client.sessionId)
 
+    // If only one human remains, close the room so the other client can return to menu
+    const humanPlayers = Array.from(this.state.players.values()).filter((player) => player.isHuman)
+    if (humanPlayers.length <= 1) {
+      console.log('Only one human remains, notifying clients and closing room')
+      this.broadcast('room_closed', { reason: 'opponent_left' })
+      // Small delay to allow message delivery before disconnecting
+      setTimeout(() => this.disconnect(), 50)
+      return
+    }
+
     // Return to waiting phase if only 1 player remains
     if (this.state.players.size === 1 && this.state.phase === 'playing') {
       console.log('Only 1 player remaining, returning to waiting phase')

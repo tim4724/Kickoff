@@ -8,13 +8,12 @@ import { PhysicsEngine } from './PhysicsEngine.js'
 import { gameClock } from './GameClock.js'
 import type {
   EnginePlayerData,
-  EngineBallData,
   GameEngineState,
   EnginePlayerInput,
   PhysicsConfig,
   GoalEvent,
 } from './types.js'
-import type { Team, GamePhase } from '../types.js'
+import type { Team } from '../types.js'
 import { GAME_CONFIG } from '../types.js'
 
 export interface GameEngineConfig {
@@ -24,7 +23,6 @@ export interface GameEngineConfig {
 export class GameEngine {
   private physics: PhysicsEngine
   private state: GameEngineState
-  private config: GameEngineConfig
   private goalScored: boolean = false
   private inputQueues: Map<string, EnginePlayerInput[]> = new Map()
 
@@ -45,8 +43,6 @@ export class GameEngine {
   private goalResetTimerId?: number
 
   constructor(config: GameEngineConfig) {
-    this.config = config
-
     // Initialize physics engine
     const physicsConfig: PhysicsConfig = {
       fieldWidth: GAME_CONFIG.FIELD_WIDTH,
@@ -243,9 +239,8 @@ export class GameEngine {
   /**
    * Update which player is being controlled by a human (for teammate switching)
    */
-  setPlayerControl(sessionId: string, controlledPlayerId: string): void {
-    // Get the team from either the session player or the controlled player
-    const sessionPlayer = this.state.players.get(sessionId)
+  setPlayerControl(_sessionId: string, controlledPlayerId: string): void {
+    // Get the team from the controlled player
     const controlledPlayer = this.state.players.get(controlledPlayerId)
 
     if (!controlledPlayer) {

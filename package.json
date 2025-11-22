@@ -9,6 +9,7 @@
     "shared"
   ],
   "scripts": {
+    "predev": "npm run build:shared",
     "dev:shared": "cd shared && npm run watch",
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
@@ -46,12 +47,24 @@
   },
   "dependencies": {
     "@colyseus/schema": "3.0.69",
+    "@colyseus/core": "0.16.23",
+    "@colyseus/ws-transport": "0.16.5",
+    "@colyseus/redis-presence": "0.16.4",
+    "@colyseus/redis-driver": "0.16.1",
+    "@colyseus/monitor": "0.16.7",
     "colyseus": "0.16.5",
-    "colyseus.js": "0.16.5"
+    "colyseus.js": "0.16.5",
+    "nanoid": "2.1.11"
   },
   "overrides": {
     "colyseus": "0.16.5",
     "colyseus.js": "0.16.5",
-    "@colyseus/schema": "3.0.69"
+    "@colyseus/schema": "3.0.69",
+    "@colyseus/core": "0.16.23",
+    "@colyseus/ws-transport": "0.16.5",
+    "@colyseus/redis-presence": "0.16.4",
+    "@colyseus/redis-driver": "0.16.1",
+    "@colyseus/monitor": "0.16.7",
+    "nanoid": "2.1.11"
   }
 }

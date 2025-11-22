@@ -322,17 +322,50 @@ export class NetworkManager {
   private setupStateListeners(): void {
     if (!this.room) return
 
-    // Wait for room state to be ready
-    if (!this.room.state) {
-      console.warn('[NetworkManager] Room state not ready, deferring listener setup')
-      setTimeout(() => this.setupStateListeners(), 100)
-      return
+    let playersHooksRegistered = false
+    const tryHookPlayers = (state: any) => {
+      if (playersHooksRegistered) return
+      const players = state?.players
+      if (players && typeof players.onAdd === 'function' && typeof players.onRemove === 'function') {
+        playersHooksRegistered = true
+
+        players.onAdd((player: any, key: string) => {
+          try {
+            if (key === this.sessionId) return
+            this.onPlayerJoin?.({
+              id: player.id || key,
+              team: player.team || 'blue',
+              x: player.x || 0,
+              y: player.y || 0,
+              velocityX: player.velocityX || 0,
+              velocityY: player.velocityY || 0,
+              state: player.state || 'idle',
+              direction: player.direction || 0,
+            })
+          } catch (error) {
+            console.error('[NetworkManager] Error in player join:', error)
+          }
+        })
+
+        players.onRemove((_player: any, key: string) => {
+          try {
+            this.onPlayerLeave?.(key)
+          } catch (error) {
+            console.error('[NetworkManager] Error in player leave:', error)
+          }
+        })
+      }
     }
+
+    // Attempt immediate hook with current state
+    tryHookPlayers(this.room.state)
 
     // Listen for state changes
     this.room.onStateChange((state) => {
       try {
-        if (!state || !state.ball) {
+        tryHookPlayers(state)
+
+        if (!state || !state.ball || !state.players || typeof state.players.forEach !== 'function') {
           console.warn('[NetworkManager] State or ball not ready yet')
           return
         }
@@ -375,37 +408,6 @@ export class NetworkManager {
       }
     })
 
-    // Listen for players joining
-    this.room.state.players.onAdd((player: any, key: string) => {
-      try {
-        // Ignore our own player (we're not a remote player)
-        if (key === this.sessionId) {
-          return
-        }
-
-        this.onPlayerJoin?.({
-          id: player.id || key,
-          team: player.team || 'blue',
-          x: player.x || 0,
-          y: player.y || 0,
-          velocityX: player.velocityX || 0,
-          velocityY: player.velocityY || 0,
-          state: player.state || 'idle',
-          direction: player.direction || 0,
-        })
-      } catch (error) {
-        console.error('[NetworkManager] Error in player join:', error)
-      }
-    })
-
-    // Listen for players leaving
-    this.room.state.players.onRemove((_player: any, key: string) => {
-      try {
-        this.onPlayerLeave?.(key)
-      } catch (error) {
-        console.error('[NetworkManager] Error in player leave:', error)
-      }
-    })
   }
 
   /**
