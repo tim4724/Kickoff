@@ -45,8 +45,13 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "@colyseus/schema": "^3.0.61",
-    "colyseus": "^0.16.5",
-    "colyseus.js": "^0.16.21"
+    "@colyseus/schema": "3.0.69",
+    "colyseus": "0.16.5",
+    "colyseus.js": "0.16.5"
+  },
+  "overrides": {
+    "colyseus": "0.16.5",
+    "colyseus.js": "0.16.5",
+    "@colyseus/schema": "3.0.69"
   }
 }

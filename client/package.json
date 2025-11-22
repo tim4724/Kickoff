@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@kickoff/shared": "*",
-    "colyseus.js": "^0.16.21",
+    "colyseus.js": "^0.16.5",
     "phaser": "^3.70.0"
   },
   "devDependencies": {
