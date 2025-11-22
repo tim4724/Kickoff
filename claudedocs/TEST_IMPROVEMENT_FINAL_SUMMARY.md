@@ -1,4 +1,5 @@
 # Test Improvement Final Summary
+*Archive summary. Confirm current test setup in `AGENTS.md`/`TESTING.md`.*
 
 ## Achievement: 98.7% Pass Rate (78/79 tests)
 

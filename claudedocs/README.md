@@ -1,6 +1,6 @@
-# Technical Documentation
+# Technical Documentation (archive)
 
-Current implementation documentation and specifications for Socca2.
+Deep dives and historical notes. For current commands/constants, see `AGENTS.md` and `shared/src/types.ts`.
 
 ## Core Mechanics
 

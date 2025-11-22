@@ -1,4 +1,5 @@
 # Test Summary - GameClock Integration & Time Acceleration
+*Archive snapshot; use `TESTING.md`/`AGENTS.md` for current test flow and pass rates.*
 
 **Date**: 2025-10-18
 **Feature**: GameClock-based 10x time acceleration for E2E tests

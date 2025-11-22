@@ -1,4 +1,5 @@
 # Test Server Auto-Start Implementation
+*Archive detail; current setup summarized in `TESTING.md`/`AGENTS.md`.*
 
 **Date**: 2025-10-18
 **Status**: ✅ Completed and Production-Ready

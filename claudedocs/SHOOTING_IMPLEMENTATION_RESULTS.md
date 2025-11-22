@@ -1,4 +1,5 @@
 # Shooting Feature Implementation Results
+*Archive detail; verify speeds/lockouts against `shared/src/types.ts`.*
 
 **Date**: 2025-10-01 (Updated: 2025-10-02)
 **Implementation**: Complete - Test Coverage & Bug Fixes

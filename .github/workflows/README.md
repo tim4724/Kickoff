@@ -2,7 +2,7 @@
 
 ## Docker Images (`docker-publish.yml`)
 
-Automatically builds and publishes Docker images to GitHub Container Registry (ghcr.io).
+Builds and publishes Docker images to GitHub Container Registry (ghcr.io). The GHCR-only compose file was removed; pull the images directly if you need them in your own deploy stack.
 
 ### Triggers
 
@@ -28,31 +28,12 @@ Images are automatically tagged with:
 
 ### Using Published Images
 
-Update your `docker-compose.yml` to use published images:
-
-```yaml
-services:
-  client:
-    image: ghcr.io/tim4724/kickoff-client:latest
-    # Remove 'build' section
-    
-  server:
-    image: ghcr.io/tim4724/kickoff-server:latest
-    # Remove 'build' section
-```
-
-Pull images:
+Pull directly (or reference in your own compose/k8s manifests):
 
 ```bash
-# Login to GitHub Container Registry
 echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
-
-# Pull images
 docker pull ghcr.io/tim4724/kickoff-client:latest
 docker pull ghcr.io/tim4724/kickoff-server:latest
-
-# Or use docker-compose
-docker-compose pull
 ```
 
 ### Multi-Platform Support
@@ -93,4 +74,3 @@ git push origin v1.0.0
 # - v1
 # - latest
 ```
-

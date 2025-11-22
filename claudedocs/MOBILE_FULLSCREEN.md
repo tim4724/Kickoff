@@ -1,4 +1,5 @@
 # Mobile Fullscreen Implementation
+*Archive implementation note; verify current client code before reusing.*
 
 ## Current Status
 

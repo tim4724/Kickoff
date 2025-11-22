@@ -1,4 +1,5 @@
 # Input Lag Optimization - Final Summary
+*Archive metrics; use `AGENTS.md` for current lag targets and commands.*
 
 **Date**: 2025-10-01  
 **Project**: Socca2 Multiplayer Soccer Game  

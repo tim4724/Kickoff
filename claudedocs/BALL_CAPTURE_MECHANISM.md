@@ -1,4 +1,5 @@
 # Ball Capture Mechanism Analysis
+*Archive deep dive. Verify constants against `shared/src/types.ts` and `AGENTS.md` for current values.*
 
 **Date:** 2025-10-02
 **Files Analyzed:**

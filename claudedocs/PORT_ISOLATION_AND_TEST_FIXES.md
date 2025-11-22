@@ -1,4 +1,5 @@
 # Port Isolation and Test Fixes Summary
+*Archive notes; current ports/tests summarized in `AGENTS.md` and `TESTING.md`.*
 
 ## Overview
 

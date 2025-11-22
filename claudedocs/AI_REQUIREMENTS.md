@@ -1,4 +1,5 @@
 # AI Players - Requirements Specification
+*Archive plan. Current 3v3 AI details live in code and `AGENTS.md`; treat this as historical context.*
 
 **Feature Branch:** `feature/ai-players`
 **Status:** Requirements Complete - Ready for Implementation
