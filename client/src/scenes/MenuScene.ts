@@ -14,6 +14,7 @@ export class MenuScene extends Phaser.Scene {
   private aiOnlyText!: Phaser.GameObjects.Text
   private versionText!: Phaser.GameObjects.Text
   private clickBlockUntil: number = 0
+  private hadPointerDown: boolean = false
 
   constructor() {
     super({ key: 'MenuScene' })
@@ -230,31 +231,42 @@ export class MenuScene extends Phaser.Scene {
         this.aiOnlyButton.setFillStyle(0xffaa00)
       })
 
+      // Track pointerdown to allow immediate clicks even during the initial debounce window
+      const markPointerDown = () => {
+        this.hadPointerDown = true
+      }
+
       // Button click handlers - Using 'pointerup' for touch device compatibility
       // Navigate using SceneRouter (hash-based routing)
+      this.singlePlayerButton.on('pointerdown', markPointerDown)
       this.singlePlayerButton.on('pointerup', () => {
         if (!this.canProcessClick()) {
           console.log('⛔ Ignoring menu click (debounce window)')
           return
         }
+        this.hadPointerDown = false
         console.log('🎮 Starting Single Player mode')
         sceneRouter.navigateTo('SinglePlayerScene')
       })
 
+      this.multiplayerButton.on('pointerdown', markPointerDown)
       this.multiplayerButton.on('pointerup', () => {
         if (!this.canProcessClick()) {
           console.log('⛔ Ignoring menu click (debounce window)')
           return
         }
+        this.hadPointerDown = false
         console.log('🌐 Starting Multiplayer mode')
         sceneRouter.navigateTo('MultiplayerScene')
       })
 
+      this.aiOnlyButton.on('pointerdown', markPointerDown)
       this.aiOnlyButton.on('pointerup', () => {
         if (!this.canProcessClick()) {
           console.log('⛔ Ignoring menu click (debounce window)')
           return
         }
+        this.hadPointerDown = false
         console.log('🤖 Starting AI-Only mode')
         sceneRouter.navigateTo('AIOnlyScene')
       })
@@ -362,7 +374,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private canProcessClick(): boolean {
-    return performance.now() >= this.clickBlockUntil
+    // Allow immediate processing if we saw a pointerdown on a menu button,
+    // otherwise honor the short debounce window to swallow stray pointerup events.
+    return this.hadPointerDown || performance.now() >= this.clickBlockUntil
   }
 
   /**
