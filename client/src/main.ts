@@ -10,6 +10,11 @@ const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game-container',
   backgroundColor: '#1a1a1a',
+  render: {
+    antialias: true,
+    pixelArt: false,
+    roundPixels: false,
+  },
   scale: {
     mode: Phaser.Scale.RESIZE,
     width: window.innerWidth,
@@ -25,7 +30,7 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   input: {
     // Enable multi-touch for simultaneous joystick + action button
-    activePointers: 2, // Support 2 simultaneous touches minimum
+    activePointers: 3, // Support 3 simultaneous touches (joystick + action + spare)
   },
   // Don't auto-start any scene - we'll manually register and start the one we need
   scene: [],

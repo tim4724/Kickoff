@@ -506,6 +506,17 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const SAFE_MARGIN_X = 20
     const SAFE_MARGIN_Y = 40
 
+    // Guarantee enough touch pointers for simultaneous joystick + action input
+    const requiredTouchPointers = 3
+    const currentTouchPointers = this.input.manager.pointersTotal
+    if (currentTouchPointers < requiredTouchPointers) {
+      const added = requiredTouchPointers - currentTouchPointers
+      this.input.addPointer(added)
+      console.log(
+        `🖐️ [Input] Added ${added} extra touch pointer(s) (${this.input.manager.pointersTotal} total)`
+      )
+    }
+
     this.joystick = new VirtualJoystick(this)
     this.actionButton = new ActionButton(
       this,
