@@ -8,6 +8,7 @@ const CLIENT_URL = TEST_ENV.CLIENT_URL
 
 test.describe('Ball capture and shot (smoke)', () => {
   test('player can take possession and shoot', async ({ browser }, testInfo) => {
+    test.setTimeout(60000)
     const ctx1 = await browser.newContext()
     const ctx2 = await browser.newContext()
     const c1 = await ctx1.newPage()

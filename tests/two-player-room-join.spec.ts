@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupMultiClientTest } from './helpers/room-utils'
+import { setupMultiClientTest, generateTestRoomId, waitForPlayerReady } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
 import { TEST_ENV } from './config/test-env'
 
@@ -83,13 +83,13 @@ test.describe('Two-Player Room Joining', () => {
   })
 
   test('Single player waits; second player triggers start', async ({ browser }, testInfo) => {
-    const roomId = `test-w${testInfo.workerIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const roomId = generateTestRoomId(testInfo.workerIndex)
 
     const context1 = await browser.newContext()
     const client1 = await context1.newPage()
     await client1.addInitScript((id) => { (window as any).__testRoomId = id }, roomId)
     await client1.goto(CLIENT_URL)
-    await waitScaled(client1, 1200)
+    await waitForPlayerReady(client1)
 
     const phaseBefore = await client1.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.getState()?.phase)
     expect(phaseBefore).toBe('waiting')
@@ -98,14 +98,14 @@ test.describe('Two-Player Room Joining', () => {
     const client2 = await context2.newPage()
     await client2.addInitScript((id) => { (window as any).__testRoomId = id }, roomId)
     await client2.goto(CLIENT_URL)
+    await waitForPlayerReady(client2)
 
-    await Promise.all([waitScaled(client1, 2000), waitScaled(client2, 2000)])
+    // Wait for match to start
+    await expect.poll(async () => {
+      return await client1.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.getState()?.phase)
+    }, { timeout: 10000 }).toBe('playing')
 
-    const [phaseAfter1, phaseAfter2] = await Promise.all([
-      client1.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.getState()?.phase),
-      client2.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.getState()?.phase),
-    ])
-    expect(phaseAfter1).toBe('playing')
+    const phaseAfter2 = await client2.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.getState()?.phase)
     expect(phaseAfter2).toBe('playing')
 
     await client1.close()

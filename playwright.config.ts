@@ -28,7 +28,7 @@ export default defineConfig({
 
   // Optimal worker configuration with 10x time acceleration
   // 4 workers achieves good parallelism while avoiding severe CPU throttling
-  workers: 4, // Reduced from 8 for test stability with browser throttling
+  workers: 2, // Reduced from 8 for test stability with browser throttling
 
   // Global timeout to prevent hanging tests
   // With 10x time acceleration: 30s real-time = 5 minutes game-time
