@@ -23,8 +23,7 @@ playwright-report/
 .gitignore
 *.md
 !README.md
-claudedocs/
-Socca2-test-improvements/
+Kickoff-test-improvements/
 
 # IDE files
 .vscode/
@@ -55,4 +54,3 @@ Dockerfile
 
 # Playwright
 .playwright/
-

@@ -1,10 +1,8 @@
-# Socca2 - Arcade Soccer Game
-## Technical Specification v1.1
+# Kickoff - Arcade Soccer Game
+## Technical Specification
 
 **Project Type:** Fast-paced multiplayer arcade soccer for mobile web
-**Strategy:** Agile MVP → Iterative enhancement
-**Timeline:** 3-4 months to production-ready MVP
-**Last Updated:** 2025-10-02
+**Document status:** Includes historical scope (5v5/1v1, database layer, longer timeline). Current implementation is 3v3 (1 human + 2 AI bots per team), 30 Hz tick, unified 1920×1080 coordinates, and uses `GAME_CONFIG` in `shared/src/types.ts`. For the latest working state and commands, see `AGENTS.md`, `README.md`, and `QUICKSTART.md`.
 
 ---
 
@@ -537,7 +535,7 @@ Client Input → Server Validates → Broadcast State → Client Interpolates
 
 ## ✅ Sign-Off
 
-This specification represents the agreed-upon scope for Socca2 MVP development.
+This specification represents the agreed-upon scope for Kickoff MVP development.
 
 **Critical Success Factors:**
 1. AI teammates feel competent (not frustrating)

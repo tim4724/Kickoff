@@ -1,5 +1,5 @@
 /**
- * Shared TypeScript types for Socca2
+ * Shared TypeScript types for Kickoff
  * Used by both client and server
  */
 

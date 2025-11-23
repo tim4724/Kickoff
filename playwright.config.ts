@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Playwright configuration for Socca2 multiplayer testing
+ * Playwright configuration for Kickoff multiplayer testing
  *
  * Performance characteristics with synchronized 10x time acceleration:
  * - 10x time acceleration enabled on BOTH client and server

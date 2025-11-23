@@ -1,8 +1,7 @@
-# Socca2 - System Architecture
+# Kickoff - System Architecture
 ## Technical Design Document
 
-**Version:** 1.1
-**Last Updated:** 2025-10-02
+**Document status:** Contains historical/aspirational sections (e.g., 5v5 scope, database layer, placeholder physics values). Current shipped game is 3v3 (1 human + 2 AI bots per team), unified 1920×1080 coordinates, 30 Hz tick rate, and uses the constants in `shared/src/types.ts`. For latest commands and testing flow, see `AGENTS.md`, `README.md`, and `QUICKSTART.md`.
 
 ---
 

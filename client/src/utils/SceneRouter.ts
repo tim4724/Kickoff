@@ -1,6 +1,6 @@
 
 /**
- * SceneRouter - URL routing system for Socca2 game
+ * SceneRouter - URL routing system for Kickoff
  * Enables browser back/forward navigation and deep linking to game scenes
  *
  * Features:
