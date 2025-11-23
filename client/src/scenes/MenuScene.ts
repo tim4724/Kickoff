@@ -4,7 +4,7 @@ import { sceneRouter } from '../utils/SceneRouter'
 
 export class MenuScene extends Phaser.Scene {
   // UI element references for responsive layout
-  private background!: Phaser.GameObjects.Rectangle
+  private background!: Phaser.GameObjects.Graphics
   private title!: Phaser.GameObjects.Text
   private singlePlayerButton!: Phaser.GameObjects.Rectangle
   private singlePlayerText!: Phaser.GameObjects.Text
@@ -57,7 +57,6 @@ export class MenuScene extends Phaser.Scene {
     const width = this.scale.width
     const height = this.scale.height
     const centerX = width / 2
-    const centerY = height / 2
 
     // Determine if portrait or landscape
     const isPortrait = height > width
@@ -67,9 +66,9 @@ export class MenuScene extends Phaser.Scene {
 
     // Button dimensions - more screen-relative with better proportions
     // Max 85% of width, but cap at 500px for larger screens
-    const buttonWidth = Math.min(400, width * 0.85, 500)
+    const buttonWidth = Math.min(440, width * 0.85, 520)
     // Height proportional to width (20% of width), with sensible min/max
-    const buttonHeight = Math.max(60, Math.min(buttonWidth * 0.2, 100))
+    const buttonHeight = Math.max(72, Math.min(buttonWidth * 0.22, 120))
 
     // Font sizes scale with screen width for better readability on small screens
     // Title: 8% of width (larger minimum for small screens)
@@ -79,26 +78,20 @@ export class MenuScene extends Phaser.Scene {
     // Version text: 2.5% of width (increased minimum from 12 to 14)
     const versionFontSize = Math.max(14, Math.min(width * 0.025, 20))
 
-    // Update background
-    this.background.setSize(width, height)
-    this.background.setPosition(centerX, centerY)
+    // Update background with flat tone and minimal geometric accents
+    this.background.clear()
+    this.background.fillStyle(0x0f1013, 1)
+    this.background.fillRect(0, 0, width, height)
 
     // Update title
     this.title.setFontSize(titleFontSize)
     this.title.setPosition(centerX, height * 0.2)
 
-    // Adjust vertical spacing based on orientation
-    let buttonSpacing: number
-    if (isPortrait) {
-      // Portrait: tighter spacing
-      buttonSpacing = height * 0.15
-    } else {
-      // Landscape: more generous spacing
-      buttonSpacing = height * 0.18
-    }
+    const buttonSpacing = Math.max(height * (isPortrait ? 0.12 : 0.1), buttonHeight * 1.25)
+    const panelCenterY = height * (isPortrait ? 0.56 : 0.55)
 
     // Calculate button positions
-    const firstButtonY = isPortrait ? height * 0.4 : height * 0.45
+    const firstButtonY = panelCenterY - buttonSpacing
     const secondButtonY = firstButtonY + buttonSpacing
     const thirdButtonY = secondButtonY + buttonSpacing
 
@@ -140,95 +133,134 @@ export class MenuScene extends Phaser.Scene {
       const height = this.scale.height
 
       // Background
-      this.background = this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a1a)
+      this.background = this.add.graphics({ x: 0, y: 0 })
+      this.background.setDepth(-2)
 
       // Title
       this.title = this.add.text(width / 2, height * 0.25, 'KICKOFF', {
+        fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
         fontSize: '72px',
         color: '#ffffff',
         fontStyle: 'bold',
+        align: 'center',
       })
       this.title.setOrigin(0.5)
+      this.title.setResolution(2)
+      this.title.setDepth(2)
 
       // Single Player Button
       this.singlePlayerButton = this.add.rectangle(
         width / 2,
         height * 0.5,
-        400,
-        80,
-        0x0066ff
+        440,
+        96,
+        0x1d9bf0
       )
       this.singlePlayerButton.setInteractive({ useHandCursor: true })
+      this.singlePlayerButton.setStrokeStyle(2, 0xffffff, 0.1)
 
       this.singlePlayerText = this.add.text(width / 2, height * 0.5, 'Single Player', {
+        fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
         fontSize: '32px',
         color: '#ffffff',
         fontStyle: 'bold',
+        align: 'center',
+        letterSpacing: 0.5,
       })
       this.singlePlayerText.setOrigin(0.5)
+      this.singlePlayerText.setResolution(2)
+      this.singlePlayerText.setShadow(0, 2, 'rgba(0,0,0,0.4)', 2)
 
       // Multiplayer Button
       this.multiplayerButton = this.add.rectangle(
         width / 2,
         height * 0.65,
-        400,
-        80,
-        0xff4444
+        440,
+        96,
+        0x16a34a
       )
       this.multiplayerButton.setInteractive({ useHandCursor: true })
+      this.multiplayerButton.setStrokeStyle(2, 0xffffff, 0.1)
 
       this.multiplayerText = this.add.text(width / 2, height * 0.65, 'Multiplayer', {
+        fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
         fontSize: '32px',
         color: '#ffffff',
         fontStyle: 'bold',
+        align: 'center',
+        letterSpacing: 0.5,
       })
       this.multiplayerText.setOrigin(0.5)
+      this.multiplayerText.setResolution(2)
+      this.multiplayerText.setShadow(0, 2, 'rgba(0,0,0,0.4)', 2)
 
       // AI-Only Button (Dev Mode)
       this.aiOnlyButton = this.add.rectangle(
         width / 2,
         height * 0.8,
-        400,
-        80,
-        0xffaa00
+        440,
+        96,
+        0xf97316
       )
       this.aiOnlyButton.setInteractive({ useHandCursor: true })
+      this.aiOnlyButton.setStrokeStyle(2, 0xffffff, 0.1)
 
       this.aiOnlyText = this.add.text(width / 2, height * 0.8, 'AI-Only (Dev)', {
+        fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
         fontSize: '32px',
         color: '#ffffff',
         fontStyle: 'bold',
+        align: 'center',
+        letterSpacing: 0.5,
       })
       this.aiOnlyText.setOrigin(0.5)
+      this.aiOnlyText.setResolution(2)
+      this.aiOnlyText.setShadow(0, 2, 'rgba(0,0,0,0.4)', 2)
 
       // Version info (injected at build time from package.json or APP_VERSION)
       const versionLabel = `v${import.meta.env.APP_VERSION || '0.0.0'}`
       this.versionText = this.add.text(width / 2, height * 0.9, versionLabel, {
+        fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
         fontSize: '16px',
-        color: '#888888',
+        color: '#a7b2c7',
       })
       this.versionText.setOrigin(0.5)
+      this.versionText.setResolution(2)
+      this.versionText.setBackgroundColor('rgba(0,0,0,0.35)')
+      this.versionText.setPadding(8, 6, 8, 6)
 
       // Button hover effects
       this.singlePlayerButton.on('pointerover', () => {
-        this.singlePlayerButton.setFillStyle(0x0088ff)
+        this.singlePlayerButton.setFillStyle(0x3b82f6)
+        this.singlePlayerButton.setScale(1.03)
+        this.singlePlayerText.setScale(1.03)
       })
       this.singlePlayerButton.on('pointerout', () => {
-        this.singlePlayerButton.setFillStyle(0x0066ff)
+        this.singlePlayerButton.setFillStyle(0x1d9bf0)
+        this.singlePlayerButton.setScale(1)
+        this.singlePlayerText.setScale(1)
       })
 
       this.multiplayerButton.on('pointerover', () => {
-        this.multiplayerButton.setFillStyle(0xff6666)
+        this.multiplayerButton.setFillStyle(0x22c55e)
+        this.multiplayerButton.setScale(1.03)
+        this.multiplayerText.setScale(1.03)
       })
       this.multiplayerButton.on('pointerout', () => {
-        this.multiplayerButton.setFillStyle(0xff4444)
+        this.multiplayerButton.setFillStyle(0x16a34a)
+        this.multiplayerButton.setScale(1)
+        this.multiplayerText.setScale(1)
       })
 
       this.aiOnlyButton.on('pointerover', () => {
-        this.aiOnlyButton.setFillStyle(0xffcc00)
+        this.aiOnlyButton.setFillStyle(0xfb923c)
+        this.aiOnlyButton.setScale(1.03)
+        this.aiOnlyText.setScale(1.03)
       })
       this.aiOnlyButton.on('pointerout', () => {
-        this.aiOnlyButton.setFillStyle(0xffaa00)
+        this.aiOnlyButton.setFillStyle(0xf97316)
+        this.aiOnlyButton.setScale(1)
+        this.aiOnlyText.setScale(1)
       })
 
       // Track pointerdown to allow immediate clicks even during the initial debounce window

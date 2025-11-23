@@ -166,6 +166,7 @@ export class AIOnlyScene extends BaseGameScene {
     // Create game speed display
     const width = this.scale.width
     this.gameSpeedText = this.add.text(width - 20, 30, this.getSpeedDisplayText(), {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
       fontSize: '20px',
       color: '#ffffff',
       fontStyle: 'bold',
@@ -175,9 +176,11 @@ export class AIOnlyScene extends BaseGameScene {
     this.gameSpeedText.setOrigin(1, 0)
     this.gameSpeedText.setScrollFactor(0)
     this.gameSpeedText.setDepth(1000)
+    this.gameSpeedText.setResolution(2)
 
     // Make it visible only in UI camera (not game camera)
     this.cameraManager.getGameCamera().ignore([this.gameSpeedText])
+    this.uiObjects.push(this.gameSpeedText)
 
     // Add SPACE key for play/pause
     this.input.keyboard?.on('keydown-SPACE', () => {
@@ -238,6 +241,13 @@ export class AIOnlyScene extends BaseGameScene {
   private updateSpeedDisplay(): void {
     if (this.gameSpeedText) {
       this.gameSpeedText.setText(this.getSpeedDisplayText())
+    }
+  }
+
+  protected onResize(gameSize: Phaser.Structs.Size): void {
+    super.onResize(gameSize)
+    if (this.gameSpeedText) {
+      this.gameSpeedText.setPosition(gameSize.width - 20, 30)
     }
   }
 

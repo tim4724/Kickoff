@@ -585,28 +585,32 @@ export class MultiplayerScene extends BaseGameScene {
     const width = this.scale.width
     const height = this.scale.height
 
-    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8)
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x0a0c12, 0.85)
     overlay.setDepth(2000)
     overlay.setScrollFactor(0)
 
     const messageText = this.add.text(width / 2, height / 2 - 30, message, {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
       fontSize: '24px',
-      color: '#ffffff',
+      color: '#f4f7fb',
       fontStyle: 'bold',
       align: 'center',
     })
     messageText.setOrigin(0.5)
     messageText.setDepth(2001)
     messageText.setScrollFactor(0)
+    messageText.setResolution(2)
 
     const returnText = this.add.text(width / 2, height / 2 + 30, 'Returning to menu...', {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
       fontSize: '18px',
-      color: '#aaaaaa',
+      color: '#a6adbb',
       align: 'center',
     })
     returnText.setOrigin(0.5)
     returnText.setDepth(2001)
     returnText.setScrollFactor(0)
+    returnText.setResolution(2)
 
     this.cameraManager.getGameCamera().ignore([overlay, messageText, returnText])
 

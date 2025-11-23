@@ -428,19 +428,23 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const topMargin = 40
 
     this.scoreText = this.add.text(width / 2, topMargin, '0 - 0', {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
       fontSize: `${scoreFontSize}px`,
-      color: '#ffffff',
+      color: '#f4f7fb',
       fontStyle: 'bold',
     })
     this.scoreText.setOrigin(0.5, 0)
     this.scoreText.setScrollFactor(0)
+    this.scoreText.setResolution(2)
 
     this.timerText = this.add.text(width / 2, topMargin + scoreFontSize + 10, '2:00', {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
       fontSize: `${timerFontSize}px`,
-      color: '#ffffff',
+      color: '#cfd6e3',
     })
     this.timerText.setOrigin(0.5, 0)
     this.timerText.setScrollFactor(0)
+    this.timerText.setResolution(2)
 
     const controlsText = this.isMobile
       ? 'Touch Joystick to Move • Tap Button to Shoot/Switch'
@@ -450,11 +454,13 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const bottomMargin = 40
 
     this.controlsHint = this.add.text(width / 2, height - bottomMargin, controlsText, {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
       fontSize: `${hintFontSize}px`,
-      color: '#aaaaaa',
+      color: '#9aa2b3',
     })
     this.controlsHint.setOrigin(0.5, 1) // Bottom center anchor
     this.controlsHint.setScrollFactor(0)
+    this.controlsHint.setResolution(2)
 
     this.uiObjects.push(this.scoreText, this.timerText, this.controlsHint)
     this.cameraManager.getGameCamera().ignore(this.uiObjects)
@@ -535,21 +541,23 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     this.backButton = this.add.container(buttonX, buttonY)
 
-    const background = this.add.rectangle(0, 0, 100, 40, 0x000000, 0.5)
+    const background = this.add.rectangle(0, 0, 128, 46, 0x1b1d24, 0.9)
     background.setOrigin(0, 0)
 
-    const text = this.add.text(10, 10, '← Menu', {
+    const text = this.add.text(14, 10, '← Menu', {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
       fontSize: '18px',
-      color: '#ffffff',
+      color: '#e9edf5',
       fontStyle: 'bold',
     })
     text.setOrigin(0, 0)
+    text.setResolution(2)
 
     this.backButton.add([background, text])
     this.backButton.setDepth(3000)
     this.backButton.setScrollFactor(0)
     this.backButton.setInteractive(
-      new Phaser.Geom.Rectangle(0, 0, 100, 40),
+      new Phaser.Geom.Rectangle(0, 0, 128, 46),
       Phaser.Geom.Rectangle.Contains
     )
 
@@ -948,35 +956,51 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const width = this.scale.width
     const height = this.scale.height
 
-    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7)
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x0a0c12, 0.85)
     overlay.setDepth(2000)
     overlay.setScrollFactor(0)
 
+    const winnerColor =
+      winner === 'Blue' ? '#38bdf8' : winner === 'Red' ? '#f97316' : '#e6e8ee'
+
     const resultText = this.add.text(
       width / 2,
-      height / 2 - 50,
+      height / 2 - 60,
       winner === 'Draw' ? 'Match Draw!' : `${winner} Team Wins!`,
-      { fontSize: '48px', color: '#ffffff', fontStyle: 'bold' }
+      {
+        fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
+        fontSize: '48px',
+        color: winnerColor,
+        fontStyle: 'bold',
+        align: 'center',
+      }
     )
     resultText.setOrigin(0.5)
     resultText.setDepth(2001)
     resultText.setScrollFactor(0)
+    resultText.setResolution(2)
 
-    const scoreText = this.add.text(width / 2, height / 2 + 20, `${scoreBlue} - ${scoreRed}`, {
+    const scoreText = this.add.text(width / 2, height / 2 + 10, `${scoreBlue} - ${scoreRed}`, {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
       fontSize: '36px',
-      color: '#ffffff',
+      color: '#f4f7fb',
+      align: 'center',
     })
     scoreText.setOrigin(0.5)
     scoreText.setDepth(2001)
     scoreText.setScrollFactor(0)
+    scoreText.setResolution(2)
 
-    const restartText = this.add.text(width / 2, height / 2 + 80, 'Tap to return to menu', {
-      fontSize: '24px',
-      color: '#aaaaaa',
+    const restartText = this.add.text(width / 2, height / 2 + 70, 'Tap to return to menu', {
+      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
+      fontSize: '20px',
+      color: '#a6adbb',
+      align: 'center',
     })
     restartText.setOrigin(0.5)
     restartText.setDepth(2001)
     restartText.setScrollFactor(0)
+    restartText.setResolution(2)
 
     this.cameraManager.getGameCamera().ignore([overlay, resultText, scoreText, restartText])
 
