@@ -351,37 +351,40 @@ export class MultiplayerScene extends BaseGameScene {
     }
 
     try {
-      // Runtime server URL configuration (for separate pods/deployment)
-      // Priority: window.__SERVER_URL__ > meta tag > build-time env > default
-      let serverUrl: string
-      
-      // Check window variable (injected by deployment)
-      if ((window as any).__SERVER_URL__) {
-        serverUrl = (window as any).__SERVER_URL__
-      } 
-      // Check meta tag (for HTML injection)
-      else {
-        const metaTag = document.querySelector('meta[name="server-url"]')
-        if (metaTag) {
-          serverUrl = metaTag.getAttribute('content') || ''
+      // Runtime server URL configuration (single source of truth)
+      const resolveServerUrl = (): string => {
+        const pageIsHttps = window.location.protocol === 'https:'
+        const normalizeToWs = (url: string): string => {
+          if (url.startsWith('http://')) return url.replace('http://', 'ws://')
+          if (url.startsWith('https://')) return url.replace('https://', 'wss://')
+          if (!url.startsWith('ws://') && !url.startsWith('wss://')) return `ws://${url}`
+          return url
         }
-        // Fall back to build-time configuration
-        else {
+
+        // Primary: runtime-injected env (single source of truth)
+        const winUrl = (window as any).__SERVER_URL__ as string | undefined
+        if (winUrl) return normalizeToWs(winUrl)
+
+        // Secondary: build-time port hint for dev/test (Vite define)
+        const portHint = import.meta.env.VITE_SERVER_PORT as string | undefined
+        if (portHint) {
           const hostname = window.location.hostname
-          const serverPort = import.meta.env.VITE_SERVER_PORT || '3000'
-          serverUrl = `ws://${hostname}:${serverPort}`
+          return `${pageIsHttps ? 'wss' : 'ws'}://${hostname}:${portHint}`
         }
+
+        // Fallback: current host + port 3000
+        const hostname = window.location.hostname
+        return `${pageIsHttps ? 'wss' : 'ws'}://${hostname}:3000`
       }
-      
-      // Ensure WebSocket protocol
-      if (serverUrl.startsWith('http://')) {
-        serverUrl = serverUrl.replace('http://', 'ws://')
-      } else if (serverUrl.startsWith('https://')) {
-        serverUrl = serverUrl.replace('https://', 'wss://')
-      } else if (!serverUrl.startsWith('ws://') && !serverUrl.startsWith('wss://')) {
-        // If no protocol, assume ws://
-        serverUrl = `ws://${serverUrl}`
+
+      let serverUrl = resolveServerUrl()
+
+      // Final safeguard: if page is HTTPS, force wss:// to avoid mixed-content blocking
+      if (window.location.protocol === 'https:' && serverUrl.startsWith('ws://')) {
+        serverUrl = serverUrl.replace('ws://', 'wss://')
       }
+
+      console.log(`[MultiplayerScene] Using server URL: ${serverUrl}`)
 
       this.networkManager = new NetworkManager({
         serverUrl,

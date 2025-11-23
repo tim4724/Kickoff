@@ -1,42 +1,48 @@
 #!/bin/sh
 # Entrypoint script for client container
-# Injects server URL into HTML at runtime
+# Emits a small /usr/share/nginx/html/env.js to provide runtime config to the client.
+# Order of precedence for server URL:
+#   1) SERVER_URL env (normalized to ws/wss)
+#   2) Fallback: current host + port 3000, protocol matched to page (wss under https)
 
-SERVER_URL=${SERVER_URL:-}
+set -eu
 
-# If SERVER_URL is provided, normalize to websocket protocol; otherwise leave blank to use runtime fallback
-if [ -n "$SERVER_URL" ]; then
-  WS_URL=$(echo "$SERVER_URL" | sed 's|^http://|ws://|' | sed 's|^https://|wss://|')
-  if [ -z "$(echo "$WS_URL" | grep -E '^(ws|wss)://')" ]; then
-    WS_URL="ws://${WS_URL}"
+SERVER_URL="${SERVER_URL:-}"
+
+# Normalize to ws/wss if provided
+normalize_ws() {
+  local url="$1"
+  url=$(echo "$url" | sed 's|^http://|ws://|' | sed 's|^https://|wss://|')
+  if ! echo "$url" | grep -Eq '^(ws|wss)://'; then
+    url="ws://${url}"
   fi
-else
-  WS_URL=""
+  echo "$url"
+}
+
+WS_URL=""
+if [ -n "$SERVER_URL" ]; then
+  WS_URL="$(normalize_ws "$SERVER_URL")"
 fi
 
-# Inject runtime resolver into index.html before </head>
-cat >/tmp/inject_server_url.js <<EOF
-<script>
+# Write env.js used by the client at runtime
+cat >/usr/share/nginx/html/env.js <<EOF
 (function() {
   var envUrl = "${WS_URL}";
   var resolved = envUrl;
-  if (!resolved || resolved.indexOf("localhost") !== -1) {
+  if (!resolved) {
     var proto = window.location.protocol === "https:" ? "wss://" : "ws://";
-    var port = "3000";
-    resolved = proto + window.location.hostname + ":" + port;
+    resolved = proto + window.location.hostname + ":3000";
+  }
+  if (window.location.protocol === "https:" && resolved.indexOf("ws://") === 0) {
+    resolved = "wss://" + resolved.substring(5);
   }
   window.__SERVER_URL__ = resolved;
-  var meta = document.createElement("meta");
-  meta.name = "server-url";
-  meta.content = resolved;
-  document.head.appendChild(meta);
 })();
-</script>
 EOF
 
-INJECT_SINGLE_LINE=$(tr '\n' ' ' < /tmp/inject_server_url.js)
-ESCAPED_INJECT=$(echo "$INJECT_SINGLE_LINE" | sed 's/[\/&]/\\&/g')
-sed -i "s|</head>|${ESCAPED_INJECT}</head>|" /usr/share/nginx/html/index.html
+# Inject a single script tag for env.js if not already present
+if ! grep -q 'src="/env.js"' /usr/share/nginx/html/index.html; then
+  sed -i 's|</head>|<script src="/env.js"></script></head>|' /usr/share/nginx/html/index.html
+fi
 
-# Start nginx
 exec nginx -g "daemon off;"
