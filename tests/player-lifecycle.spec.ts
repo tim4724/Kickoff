@@ -1,5 +1,5 @@
 import { test, expect, Browser, Page } from '@playwright/test'
-import { setupMultiClientTest } from './helpers/room-utils'
+import { setupMultiClientTest, generateTestRoomId, waitForPlayerReady } from './helpers/room-utils'
 import { waitScaled } from './helpers/time-control'
 import { TEST_ENV } from "./config/test-env"
 import { GAME_CONFIG } from '../shared/src/types'
@@ -223,7 +223,7 @@ test.describe('Player Lifecycle Management', () => {
     console.log('📤 Testing player join/leave cycle...\n')
 
     // Generate test room ID for all clients to use
-    const testRoomId = `test-w${testInfo.workerIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const testRoomId = generateTestRoomId(testInfo.workerIndex)
     console.log(`🔒 All clients will use test room: ${testRoomId}`)
 
     // Player 1 joins (should be blue)
@@ -232,6 +232,7 @@ test.describe('Player Lifecycle Management', () => {
     const client1 = await context1.newPage()
     await client1.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client1.goto(CLIENT_URL)
+    await waitForPlayerReady(client1)
     const color1 = await waitForPlayerFillColor(client1, [BLUE_COLOR])
     const session1 = await client1.evaluate(() =>
       (window as any).__gameControls?.scene?.mySessionId
@@ -246,6 +247,7 @@ test.describe('Player Lifecycle Management', () => {
     const client2 = await context2.newPage()
     await client2.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client2.goto(CLIENT_URL)
+    await waitForPlayerReady(client2)
     const color2 = await waitForPlayerFillColor(client2, [BLUE_COLOR, RED_COLOR])
     const session2 = await client2.evaluate(() =>
       (window as any).__gameControls?.scene?.mySessionId
@@ -268,6 +270,7 @@ test.describe('Player Lifecycle Management', () => {
     const client3 = await context3.newPage()
     await client3.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await client3.goto(CLIENT_URL)
+    await waitForPlayerReady(client3)
     const color3 = await waitForPlayerFillColor(client3, [BLUE_COLOR])
     const session3 = await client3.evaluate(() =>
       (window as any).__gameControls?.scene?.mySessionId
@@ -289,7 +292,7 @@ test.describe('Player Lifecycle Management', () => {
     const clients = []
 
     // Generate test room ID for all clients
-    const testRoomId = `test-w${testInfo.workerIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const testRoomId = generateTestRoomId(testInfo.workerIndex)
     console.log(`🔒 All clients will use test room: ${testRoomId}`)
 
     // Create 2 clients
@@ -302,6 +305,9 @@ test.describe('Player Lifecycle Management', () => {
       contexts.push(context)
       clients.push(client)
     }
+
+    // Wait for connection
+    await Promise.all(clients.map(c => waitForPlayerReady(c)))
 
     // Wait longer for match to start and AI to spawn (4s for Phaser + match start + AI spawn)
     await Promise.all(clients.map(c => waitScaled(c, 2500)))
@@ -337,6 +343,7 @@ test.describe('Player Lifecycle Management', () => {
     const verifyClient = await verifyContext.newPage()
     await verifyClient.addInitScript((id) => { (window as any).__testRoomId = id }, testRoomId)
     await verifyClient.goto(CLIENT_URL)
+    await waitForPlayerReady(verifyClient)
     await waitForPlayerFillColor(verifyClient, [BLUE_COLOR, RED_COLOR])
 
     await expect.poll(async () => {
