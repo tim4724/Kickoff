@@ -21,31 +21,25 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * Update test API with current button positions
-   * Called after layout changes to keep test coordinates in sync
+   * Expose test API for Playwright
    */
-  private updateTestAPI(): void {
+  private setupTestAPI(): void {
     if (typeof window !== 'undefined') {
-      ; (window as any).__menuButtons = {
-        singlePlayer: {
-          x: this.singlePlayerButton.x,
-          y: this.singlePlayerButton.y,
-          width: this.singlePlayerButton.width,
-          height: this.singlePlayerButton.height,
-        },
-        multiplayer: {
-          x: this.multiplayerButton.x,
-          y: this.multiplayerButton.y,
-          width: this.multiplayerButton.width,
-          height: this.multiplayerButton.height,
-        },
-        aiOnly: {
-          x: this.aiOnlyButton.x,
-          y: this.aiOnlyButton.y,
-          width: this.aiOnlyButton.width,
-          height: this.aiOnlyButton.height,
-        },
+      const testAPI = {
+        scene: this,
+        game: this.game,
+        getMenuElements: () => ({
+          singlePlayerButton: this.singlePlayerButton,
+          multiplayerButton: this.multiplayerButton,
+          aiOnlyButton: this.aiOnlyButton,
+        }),
+      };
+
+      (window as any).__menuControls = {
+        test: testAPI,
       }
+
+      console.log('🧪 Menu Test API exposed: window.__menuControls')
     }
   }
 
@@ -119,9 +113,6 @@ export class MenuScene extends Phaser.Scene {
     // Update version text
     this.versionText.setFontSize(versionFontSize)
     this.versionText.setPosition(centerX, height * 0.95)
-
-    // Update test API with new button positions
-    this.updateTestAPI()
 
     console.log(`📐 Layout updated: ${width}x${height} (${isPortrait ? 'portrait' : 'landscape'})`)
   }
@@ -323,13 +314,9 @@ export class MenuScene extends Phaser.Scene {
       console.log('📋 Menu scene loaded with responsive layout')
 
       // Expose test API for Playwright
+      this.setupTestAPI()
       if (typeof window !== 'undefined') {
-        ; (window as any).__gameControls = {
-          scene: this,
-          game: this.game,
-        }
-          ; (window as any).__menuLoaded = true
-        console.log('🧪 Test API exposed: window.__menuLoaded = true, __menuButtons, __gameControls')
+        (window as any).__menuLoaded = true
       }
 
       // Auto-start multiplayer for tests

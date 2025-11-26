@@ -510,10 +510,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const requiredTouchPointers = 3
     const currentTouchPointers = this.input.manager.pointersTotal
     if (currentTouchPointers < requiredTouchPointers) {
-      const added = requiredTouchPointers - currentTouchPointers
-      this.input.addPointer(added)
+      const pointersToAdd = requiredTouchPointers - currentTouchPointers
+      this.input.addPointer(pointersToAdd)
       console.log(
-        `🖐️ [Input] Added ${added} extra touch pointer(s) (${this.input.manager.pointersTotal} total)`
+        `🖐️ [Input] Added ${pointersToAdd} extra touch pointer(s) (${this.input.manager.pointersTotal} total)`
       )
     }
 
@@ -1170,6 +1170,9 @@ export abstract class BaseGameScene extends Phaser.Scene {
       scene: this,
     }
 
+    // Expose back button for navigation tests
+    testAPI.backButton = this.backButton
+
     // Add joystick and button references if available (not in AI-only mode)
     if (this.joystick && this.actionButton) {
       testAPI.joystick = this.joystick
@@ -1247,6 +1250,12 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Clean up player sprites (Phaser will destroy them, but clear our references)
     this.players.clear()
+
+    // Reset the input plugin to prevent pointer leaks
+    if (this.input)
+    {
+        this.input.shutdown();
+    }
 
     if (this.joystick) {
       this.joystick.destroy()
