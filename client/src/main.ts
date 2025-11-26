@@ -106,35 +106,26 @@ if ('ontouchstart' in window) {
       touch-action: none;
     `
 
-    // Prevent splash background events from reaching the canvas/menu underneath
-    const stopSplashEvents = (ev: Event) => {
-      ev.stopPropagation()
-      ev.preventDefault()
-    }
-    splash.addEventListener('pointerdown', stopSplashEvents, { capture: true })
-    splash.addEventListener('pointerup', stopSplashEvents, { capture: true })
-    splash.addEventListener('click', stopSplashEvents, { capture: true })
-
     const requestFs = (ev?: Event) => {
       ev?.stopPropagation()
       ev?.preventDefault()
-      console.log('📱 Fullscreen button clicked')
+
       const container = document.getElementById('game-container')
       if (!container) {
         splash.remove()
         return
       }
-      const restorePointerEvents = () => {
-        container.style.pointerEvents = ''
-      }
 
       // While splash is visible, disable pointer events on the game container so nothing underneath receives input
-      container.style.pointerEvents = 'none'
+      if (game) {
+        game.input.manager.enabled = false
+      }
 
       const onSuccess = () => {
-        console.log('✅ Fullscreen activated')
         splash.remove()
-        restorePointerEvents()
+        if (game) {
+          game.input.manager.enabled = true
+        }
         // Resume the game if it was paused
         if (game && game.scene.isPaused('SinglePlayerScene')) {
           game.scene.resume('SinglePlayerScene')
@@ -148,7 +139,9 @@ if ('ontouchstart' in window) {
       const onFail = (err: unknown) => {
         console.error('❌ Fullscreen failed:', err)
         splash.remove()
-        restorePointerEvents()
+        if (game) {
+          game.input.manager.enabled = true
+        }
       }
 
       if (container.requestFullscreen) {

@@ -112,10 +112,31 @@ export default defineConfig({
     // All other tests
     {
       name: 'chromium',
-      testIgnore: /.*\/(ball-capture|shooting-mechanics|client-server-.*-sync|game-over|rendering|room-selection|two-player).*\.spec\.ts/,
+      testIgnore: /.*\/(ball-capture|shooting-mechanics|client-server-.*-sync|game-over|rendering|room-selection|two-player|fullscreen-click-bleed).*\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         hasTouch: false, // Disable touch emulation to prevent fullscreen splash overlay
+        launchOptions: {
+          args: [
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-gpu',
+            '--disable-background-timer-throttling', // Prevent requestAnimationFrame throttling
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+          ],
+        },
+      },
+    },
+    // Fullscreen test (requires touch emulation)
+    {
+      name: 'fullscreen-test',
+      testMatch: /.*\/fullscreen-click-bleed\.spec\.ts/,
+      use: {
+        ...devices['Pixel 5'], // Emulate a mobile device
+        hasTouch: true, // Enable touch events
         launchOptions: {
           args: [
             '--disable-dev-shm-usage',
