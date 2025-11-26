@@ -42,8 +42,8 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected debugEnabled: boolean = false
 
   // Mobile controls
-  protected joystick!: VirtualJoystick
-  protected actionButton!: ActionButton
+  protected joystick: VirtualJoystick | null = null
+  protected actionButton: ActionButton | null = null
   protected isMobile: boolean = false
 
   // Controls
@@ -354,7 +354,9 @@ export abstract class BaseGameScene extends Phaser.Scene {
     // All player sprites are created uniformly in this.players Map during scene initialization
     this.createUI()
     this.setupInput()
-    this.createMobileControls()
+    if (this.isMobile) {
+      this.createMobileControls()
+    }
     this.createBackButton()
     this.scale.on('resize', this.onResize, this)
 
@@ -525,7 +527,9 @@ export abstract class BaseGameScene extends Phaser.Scene {
     )
 
     this.joystick.setTeamColor(this.playerTeamColor)
-    this.actionButton.setTeamColor(this.playerTeamColor)
+    if (this.actionButton) {
+      this.actionButton.setTeamColor(this.playerTeamColor)
+    }
 
     this.actionButton.setOnReleaseCallback((power) => {
       const state = this.getGameState()
@@ -1045,8 +1049,6 @@ export abstract class BaseGameScene extends Phaser.Scene {
     // Safe zone margins
     const topMargin = 40
     const bottomMargin = 40
-    const SAFE_MARGIN_X = 20
-    const SAFE_MARGIN_Y = 40
 
     // Update UI text positions and sizes
     if (this.scoreText) {
@@ -1064,18 +1066,12 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Update mobile controls positions with safe zones
     if (this.joystick) {
-      this.joystick.resize(gameSize.width)
+      this.joystick.resize(gameSize.width, gameSize.height)
       console.log(`🕹️ [BaseGameScene] Joystick resized to width: ${gameSize.width}`)
     }
     if (this.actionButton) {
-      this.actionButton.resize(
-        gameSize.width - SAFE_MARGIN_X,
-        gameSize.height - SAFE_MARGIN_Y
-      )
-      console.log(
-        `🎯 [BaseGameScene] Action button resized to: ${gameSize.width - SAFE_MARGIN_X}x${gameSize.height - SAFE_MARGIN_Y
-        }`
-      )
+      this.actionButton.resize(gameSize.width, gameSize.height)
+      console.log(`🎯 [BaseGameScene] Action button resized to: ${gameSize.width}x${gameSize.height}`)
     }
   }
 
@@ -1174,32 +1170,32 @@ export abstract class BaseGameScene extends Phaser.Scene {
     testAPI.backButton = this.backButton
 
     // Add joystick and button references if available (not in AI-only mode)
-    if (this.joystick && this.actionButton) {
-      testAPI.joystick = this.joystick
-      testAPI.button = this.actionButton
+    if (this.joystick || this.actionButton) {
+      if (this.joystick) testAPI.joystick = this.joystick
+      if (this.actionButton) testAPI.button = this.actionButton
 
       // Base getState that includes joystick/button
       const baseGetState = () => ({
-        joystick: this.joystick.__test_getState(),
-        button: this.actionButton.__test_getState(),
+        joystick: this.joystick ? this.joystick.__test_getState() : null,
+        button: this.actionButton ? this.actionButton.__test_getState() : null,
       })
 
       // Common test methods for joystick and button
       const baseTestMethods = {
         touchJoystick: (x: number, y: number) => {
-          this.joystick.__test_simulateTouch(x, y)
+          this.joystick?.__test_simulateTouch(x, y)
         },
         dragJoystick: (x: number, y: number) => {
-          this.joystick.__test_simulateDrag(x, y)
+          this.joystick?.__test_simulateDrag(x, y)
         },
         releaseJoystick: () => {
-          this.joystick.__test_simulateRelease()
+          this.joystick?.__test_simulateRelease()
         },
         pressButton: () => {
-          this.actionButton.__test_simulatePress()
+          this.actionButton?.__test_simulatePress()
         },
         releaseButton: (holdMs: number = 500) => {
-          this.actionButton.__test_simulateRelease(holdMs)
+          this.actionButton?.__test_simulateRelease(holdMs)
         },
         getState: baseGetState,
       }

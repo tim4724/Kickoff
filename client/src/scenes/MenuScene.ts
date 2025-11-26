@@ -60,17 +60,19 @@ export class MenuScene extends Phaser.Scene {
 
     // Button dimensions - more screen-relative with better proportions
     // Max 85% of width, but cap at 500px for larger screens
-    const buttonWidth = Math.min(440, width * 0.85, 520)
-    // Height proportional to width (20% of width), with sensible min/max
-    const buttonHeight = Math.max(72, Math.min(buttonWidth * 0.22, 120))
+    // Use min(width,height) to stabilize sizing across orientations
+    const baseDim = Math.min(width, height)
+    const buttonWidth = Math.min(432, baseDim * 0.8)
+    // Height proportional to base dimension with cap
+    const buttonHeight = Math.min(70, buttonWidth * 0.22)
 
     // Font sizes scale with screen width for better readability on small screens
     // Title: 8% of width (larger minimum for small screens)
-    const titleFontSize = Math.max(48, Math.min(width * 0.08, 120))
+    const titleFontSize = Math.max(51, baseDim * 0.084)
     // Button text: 4% of width (increased minimum from 18 to 20)
-    const buttonFontSize = Math.max(20, Math.min(width * 0.04, 48))
+    const buttonFontSize = Math.max(32, baseDim * 0.032)
     // Version text: 2.5% of width (increased minimum from 12 to 14)
-    const versionFontSize = Math.max(14, Math.min(width * 0.025, 20))
+    const versionFontSize = Math.max(10, Math.min(baseDim * 0.0175, 14)) // orientation-stable
 
     // Update background with flat tone and minimal geometric accents
     this.background.clear()
@@ -79,7 +81,7 @@ export class MenuScene extends Phaser.Scene {
 
     // Update title
     this.title.setFontSize(titleFontSize)
-    this.title.setPosition(centerX, height * 0.2)
+    this.title.setPosition(centerX, height * 0.15)
 
     const buttonSpacing = Math.max(height * (isPortrait ? 0.12 : 0.1), buttonHeight * 1.25)
     const panelCenterY = height * (isPortrait ? 0.56 : 0.55)
@@ -143,8 +145,8 @@ export class MenuScene extends Phaser.Scene {
       this.singlePlayerButton = this.add.rectangle(
         width / 2,
         height * 0.5,
-        440,
-        96,
+        432,
+        100,
         0x1d9bf0
       )
       this.singlePlayerButton.setInteractive({ useHandCursor: true })
@@ -166,8 +168,8 @@ export class MenuScene extends Phaser.Scene {
       this.multiplayerButton = this.add.rectangle(
         width / 2,
         height * 0.65,
-        440,
-        96,
+        432,
+        100,
         0x16a34a
       )
       this.multiplayerButton.setInteractive({ useHandCursor: true })
@@ -189,8 +191,8 @@ export class MenuScene extends Phaser.Scene {
       this.aiOnlyButton = this.add.rectangle(
         width / 2,
         height * 0.8,
-        440,
-        96,
+        432,
+        100,
         0xf97316
       )
       this.aiOnlyButton.setInteractive({ useHandCursor: true })

@@ -297,8 +297,8 @@ export class MultiplayerScene extends BaseGameScene {
     // Set up test API with MultiplayerScene-specific methods
     this.setupTestAPI({
       getState: () => ({
-        joystick: this.joystick.__test_getState(),
-        button: this.actionButton.__test_getState(),
+        joystick: this.joystick ? this.joystick.__test_getState() : null,
+        button: this.actionButton ? this.actionButton.__test_getState() : null,
       }),
       // Deterministic player movement for tests (bypasses UI simulation)
       // Directly sends input to server at fixed intervals, unaffected by RAF throttling

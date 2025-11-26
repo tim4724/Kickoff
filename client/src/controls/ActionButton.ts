@@ -93,7 +93,8 @@ export class ActionButton {
         return // Left half = joystick territory
       }
 
-      // Activate on any touch in right half (entire right side is action button)
+      // Re-anchor to touch point (symmetric free placement on right side)
+      this.setPosition(pointer.x, pointer.y)
       this.pointerId = pointer.id
       this.onPress()
     })
@@ -195,11 +196,23 @@ export class ActionButton {
     // Update screen width for hit detection
     this.screenWidth = newWidth
 
-    // Recalculate button position (maintain offset from bottom-right corner)
-    this.x = newWidth - 120
-    this.y = newHeight - 120
+    // Re-anchor to a symmetric default on the right side if not pressed
+    if (!this.isPressed) {
+      this.x = Math.min(newWidth - 70, Math.max(newWidth * 0.82, newWidth / 2 + 70))
+      this.y = Math.max(100, newHeight * 0.8)
+    }
 
     // Update button and label positions
+    this.button.setPosition(this.x, this.y)
+    this.label.setPosition(this.x, this.y)
+  }
+
+  /**
+   * Manually set button position (used when user taps to move it)
+   */
+  public setPosition(newX: number, newY: number) {
+    this.x = newX
+    this.y = newY
     this.button.setPosition(this.x, this.y)
     this.label.setPosition(this.x, this.y)
   }

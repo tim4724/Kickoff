@@ -63,8 +63,8 @@ export class SinglePlayerScene extends BaseGameScene {
     // Set up test API with SinglePlayerScene-specific methods
     this.setupTestAPI({
       getState: () => ({
-        joystick: this.joystick.__test_getState(),
-        button: this.actionButton.__test_getState(),
+        joystick: this.joystick ? this.joystick.__test_getState() : null,
+        button: this.actionButton ? this.actionButton.__test_getState() : null,
         aiEnabled: this.aiEnabled,
         autoSwitchEnabled: this.autoSwitchEnabled,
       }),

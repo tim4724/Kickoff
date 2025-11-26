@@ -14,39 +14,48 @@ export class VirtualJoystick {
   private baseX: number = 0
   private baseY: number = 0
   private screenWidth: number
+  private screenHeight: number
   private maxRadius: number = 60
   private deadZone: number = 0.1
+  private teamColor: number = 0x0066ff
 
   private isActive: boolean = false
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
     this.screenWidth = scene.scale.width
+    this.screenHeight = scene.scale.height
 
     // Scale joystick based on screen size (5% of screen height)
     this.maxRadius = Math.max(50, Math.min(scene.scale.height * 0.05, 80))
+    // Default starting position (left/bottom quadrant)
+    this.baseX = Math.max(60, scene.scale.width * 0.18)
+    this.baseY = Math.max(120, scene.scale.height * 0.7)
 
     this.createJoystick()
+    this.repositionJoystick(this.baseX, this.baseY)
     this.setupInput()
   }
 
   private createJoystick() {
     // Base circle (outer ring) - initially at (0, 0), will be repositioned on touch
     // Color will be set to team color via setTeamColor()
-    this.base = this.scene.add.circle(0, 0, this.maxRadius, 0x333333, 0.5)
-    this.base.setStrokeStyle(3, 0x666666, 0.7)
+    // Base: team color at 60% opacity
+    this.base = this.scene.add.circle(0, 0, this.maxRadius, 0x0066ff, 0.6)
+    this.base.setStrokeStyle(3, 0x0066ff, 0.8)
     this.base.setDepth(1000)
     this.base.setScrollFactor(0) // Fixed to camera
 
     // Stick circle (inner control)
     // Color will be set to team color via setTeamColor()
-    this.stick = this.scene.add.circle(0, 0, this.maxRadius * 0.5, 0x0066ff, 0.8)
-    this.stick.setStrokeStyle(2, 0xffffff, 1.0)
+    // Stick: same color at 60% opacity
+    this.stick = this.scene.add.circle(0, 0, this.maxRadius * 0.5, 0x0066ff, 0.6)
+    this.stick.setStrokeStyle(2, 0x0066ff, 0.8)
     this.stick.setDepth(1001)
     this.stick.setScrollFactor(0)
 
-    // Hide by default
-    this.setVisible(false)
+    // Visible by default (always show anchor)
+    this.setVisible(true)
   }
 
   /**
@@ -54,15 +63,12 @@ export class VirtualJoystick {
    * @param color - Team color (hex)
    */
   public setTeamColor(color: number) {
-    // Update base to use team color with lower opacity
-    this.base.setFillStyle(color, 0.5)
-
-    // Calculate lighter stroke color (add 0x222222 to make it brighter)
-    const lighterColor = Math.min(color + 0x222222, 0xffffff)
-    this.base.setStrokeStyle(3, lighterColor, 0.7)
-
-    // Update stick to use team color
-    this.stick.setFillStyle(color, 0.8)
+    this.teamColor = color
+    // Team color at ~60% opacity for both base and stick
+    this.base.setFillStyle(color, 0.6)
+    this.base.setStrokeStyle(3, color, 0.8)
+    this.stick.setFillStyle(color, 0.6)
+    this.stick.setStrokeStyle(2, color, 0.8)
   }
 
   private setupInput() {
@@ -161,12 +167,13 @@ export class VirtualJoystick {
     this.isActive = false
     this.stick.x = this.baseX
     this.stick.y = this.baseY
-    this.setVisible(false)
+    this.setVisible(true)
   }
 
-  private setVisible(visible: boolean) {
-    this.base.setVisible(visible)
-    this.stick.setVisible(visible)
+  private setVisible(_visible: boolean) {
+    // Always keep base/stick visible to show anchor
+    this.base.setVisible(true)
+    this.stick.setVisible(true)
   }
 
   /**
@@ -214,16 +221,17 @@ export class VirtualJoystick {
    * Update screen width when window resizes
    * @param newWidth - New screen width
    */
-  public resize(newWidth: number) {
-    // Update screen width for left-half zone detection
+  public resize(newWidth: number, newHeight: number) {
+    // Update screen bounds for left-half zone detection
     this.screenWidth = newWidth
+    this.screenHeight = newHeight
 
-    // If joystick is currently active, reposition it to ensure it stays within bounds
+    const margin = 70
+
     if (this.isActive) {
-      const margin = 70
       // Ensure base position stays within new screen bounds
       this.baseX = Phaser.Math.Clamp(this.baseX, margin, newWidth / 2 - margin)
-      // Don't update Y here as screen height isn't passed, base will remain valid
+      this.baseY = Phaser.Math.Clamp(this.baseY, margin, this.screenHeight - margin)
 
       // Reposition visual elements
       this.base.x = this.baseX
@@ -234,7 +242,18 @@ export class VirtualJoystick {
       const currentDy = this.stick.y - this.base.y
       this.stick.x = this.baseX + currentDx
       this.stick.y = this.baseY + currentDy
+    } else {
+      // Inactive: re-anchor to a safe default within bounds
+      this.baseX = Math.max(margin, Math.min(newWidth * 0.18, newWidth / 2 - margin))
+      this.baseY = Math.max(margin, Math.min(this.screenHeight * 0.7, this.screenHeight - margin))
+      this.base.x = this.baseX
+      this.base.y = this.baseY
+      this.stick.x = this.baseX
+      this.stick.y = this.baseY
     }
+
+    // Reapply color to avoid stale state after resize/orientation change
+    this.setTeamColor(this.teamColor)
   }
 
   /**
