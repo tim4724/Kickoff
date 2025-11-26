@@ -45,7 +45,6 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected joystick!: VirtualJoystick
   protected actionButton!: ActionButton
   protected isMobile: boolean = false
-  protected addedPointers: Phaser.Input.Pointer[] = []
 
   // Controls
   protected cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -512,7 +511,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const currentTouchPointers = this.input.manager.pointersTotal
     if (currentTouchPointers < requiredTouchPointers) {
       const pointersToAdd = requiredTouchPointers - currentTouchPointers
-      this.addedPointers = this.input.addPointer(pointersToAdd)
+      this.input.addPointer(pointersToAdd)
       console.log(
         `🖐️ [Input] Added ${pointersToAdd} extra touch pointer(s) (${this.input.manager.pointersTotal} total)`
       )
@@ -1252,13 +1251,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
     // Clean up player sprites (Phaser will destroy them, but clear our references)
     this.players.clear()
 
-    // Remove any extra pointers we added for mobile controls
-    if (this.addedPointers.length > 0) {
-      console.log(`🖐️ [Input] Removing ${this.addedPointers.length} extra touch pointer(s)`)
-      this.addedPointers.forEach(pointer => {
-        this.input.manager.removePointer(pointer)
-      })
-      this.addedPointers = []
+    // Reset the input plugin to prevent pointer leaks
+    if (this.input)
+    {
+        this.input.shutdown();
     }
 
     if (this.joystick) {
