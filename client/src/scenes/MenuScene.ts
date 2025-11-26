@@ -209,7 +209,11 @@ export class MenuScene extends Phaser.Scene {
       this.aiOnlyText.setShadow(0, 2, 'rgba(0,0,0,0.4)', 2)
 
       // Version info (injected at build time from package.json or APP_VERSION)
-      const versionLabel = `v${import.meta.env.APP_VERSION || '0.0.0'}`
+      let versionLabel = `v${import.meta.env.APP_VERSION || '0.0.0'}`
+      const commitHash = import.meta.env.COMMIT_HASH
+      if (commitHash) {
+        versionLabel += `-${commitHash.substring(0, 7)}`
+      }
       this.versionText = this.add.text(width / 2, height * 0.9, versionLabel, {
         fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
         fontSize: '16px',
