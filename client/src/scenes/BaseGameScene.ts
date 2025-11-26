@@ -45,6 +45,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected joystick!: VirtualJoystick
   protected actionButton!: ActionButton
   protected isMobile: boolean = false
+  protected addedPointers: number = 0
 
   // Controls
   protected cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -510,10 +511,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const requiredTouchPointers = 3
     const currentTouchPointers = this.input.manager.pointersTotal
     if (currentTouchPointers < requiredTouchPointers) {
-      const added = requiredTouchPointers - currentTouchPointers
-      this.input.addPointer(added)
+      this.addedPointers = requiredTouchPointers - currentTouchPointers
+      this.input.addPointer(this.addedPointers)
       console.log(
-        `🖐️ [Input] Added ${added} extra touch pointer(s) (${this.input.manager.pointersTotal} total)`
+        `🖐️ [Input] Added ${this.addedPointers} extra touch pointer(s) (${this.input.manager.pointersTotal} total)`
       )
     }
 
@@ -1170,6 +1171,9 @@ export abstract class BaseGameScene extends Phaser.Scene {
       scene: this,
     }
 
+    // Expose back button for navigation tests
+    testAPI.backButton = this.backButton
+
     // Add joystick and button references if available (not in AI-only mode)
     if (this.joystick && this.actionButton) {
       testAPI.joystick = this.joystick
@@ -1247,6 +1251,16 @@ export abstract class BaseGameScene extends Phaser.Scene {
 
     // Clean up player sprites (Phaser will destroy them, but clear our references)
     this.players.clear()
+
+    // Remove any extra pointers we added for mobile controls
+    if (this.addedPointers > 0) {
+      console.log(`🖐️ [Input] Removing ${this.addedPointers} extra touch pointer(s)`)
+      for (let i = 0; i < this.addedPointers; i++) {
+        // Pointers are removed from the end of the array, so we can just call removePointer repeatedly
+        this.input.removePointer()
+      }
+      this.addedPointers = 0
+    }
 
     if (this.joystick) {
       this.joystick.destroy()
