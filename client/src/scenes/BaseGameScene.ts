@@ -45,7 +45,7 @@ export abstract class BaseGameScene extends Phaser.Scene {
   protected joystick!: VirtualJoystick
   protected actionButton!: ActionButton
   protected isMobile: boolean = false
-  protected addedPointers: number = 0
+  protected addedPointers: Phaser.Input.Pointer[] = []
 
   // Controls
   protected cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -511,10 +511,10 @@ export abstract class BaseGameScene extends Phaser.Scene {
     const requiredTouchPointers = 3
     const currentTouchPointers = this.input.manager.pointersTotal
     if (currentTouchPointers < requiredTouchPointers) {
-      this.addedPointers = requiredTouchPointers - currentTouchPointers
-      this.input.addPointer(this.addedPointers)
+      const pointersToAdd = requiredTouchPointers - currentTouchPointers
+      this.addedPointers = this.input.addPointer(pointersToAdd)
       console.log(
-        `🖐️ [Input] Added ${this.addedPointers} extra touch pointer(s) (${this.input.manager.pointersTotal} total)`
+        `🖐️ [Input] Added ${pointersToAdd} extra touch pointer(s) (${this.input.manager.pointersTotal} total)`
       )
     }
 
@@ -1253,13 +1253,12 @@ export abstract class BaseGameScene extends Phaser.Scene {
     this.players.clear()
 
     // Remove any extra pointers we added for mobile controls
-    if (this.addedPointers > 0) {
-      console.log(`🖐️ [Input] Removing ${this.addedPointers} extra touch pointer(s)`)
-      for (let i = 0; i < this.addedPointers; i++) {
-        // Pointers are removed from the end of the array, so we can just call removePointer repeatedly
-        this.input.removePointer()
-      }
-      this.addedPointers = 0
+    if (this.addedPointers.length > 0) {
+      console.log(`🖐️ [Input] Removing ${this.addedPointers.length} extra touch pointer(s)`)
+      this.addedPointers.forEach(pointer => {
+        this.input.manager.removePointer(pointer)
+      })
+      this.addedPointers = []
     }
 
     if (this.joystick) {
