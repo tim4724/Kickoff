@@ -21,6 +21,7 @@ export default defineConfig({
       process.env.VITE_SERVER_PORT || '3000'
     ),
     'import.meta.env.APP_VERSION': JSON.stringify(appVersion),
+    'import.meta.env.COMMIT_HASH': JSON.stringify(process.env.COMMIT_HASH || ''),
   },
   server: {
     port: process.env.VITE_PORT ? parseInt(process.env.VITE_PORT) : 5173,
