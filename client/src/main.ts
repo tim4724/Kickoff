@@ -118,13 +118,13 @@ if ('ontouchstart' in window) {
 
       // While splash is visible, disable pointer events on the game container so nothing underneath receives input
       if (game) {
-        game.input.manager.enabled = false
+        game.input.enabled = false
       }
 
       const onSuccess = () => {
         splash.remove()
         if (game) {
-          game.input.manager.enabled = true
+          game.input.enabled = true
         }
         // Resume the game if it was paused
         if (game && game.scene.isPaused('SinglePlayerScene')) {
@@ -140,7 +140,7 @@ if ('ontouchstart' in window) {
         console.error('❌ Fullscreen failed:', err)
         splash.remove()
         if (game) {
-          game.input.manager.enabled = true
+          game.input.enabled = true
         }
       }
 
