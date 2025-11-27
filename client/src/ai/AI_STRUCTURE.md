@@ -1,86 +1,18 @@
-# AI Architecture Structure
+# AI Architecture
 
 ## Overview
-Scoring-based AI system where each possible action is evaluated independently and the highest-scoring action is selected.
 
-## Directory Structure
+The AI operates on a simple, high-level strategy system that adapts based on ball possession. At the core, the `TeamAI` class determines whether the team should be on offense or defense and assigns roles to individual `AIPlayer` instances accordingly.
 
-```
-client/src/ai/
-├── AIPlayer.ts                   [EXISTING] Pure execution layer
-├── TeamAI.ts                     [EXISTING] High-level coordinator
-├── AIManager.ts                  [EXISTING] Multi-team manager
-├── types.ts                      [UPDATED] Type definitions + ActionContext
-│
-├── scorers/                      [NEW] Action evaluators
-│   ├── ActionScorer.ts           Base interface for all scorers
-│   │
-│   ├── possession/               [6 scorers] When I have the ball
-│   │   ├── ShootScorer.ts
-│   │   ├── DribbleToGoalScorer.ts
-│   │   ├── DribbleToSpaceScorer.ts
-│   │   ├── PassScorer.ts
-│   │   ├── ThroughBallScorer.ts
-│   │   └── ClearBallScorer.ts
-│   │
-│   ├── support/                  [5 scorers] When teammate has ball
-│   │   ├── ReceivePassScorer.ts
-│   │   ├── SupportRunScorer.ts
-│   │   ├── OfferPassingLaneScorer.ts
-│   │   ├── MaintainSpacingScorer.ts
-│   │   └── OverlapRunScorer.ts
-│   │
-│   ├── defensive/                [6 scorers] When opponent has ball
-│   │   ├── InterceptBallScorer.ts
-│   │   ├── PressCarrierScorer.ts
-│   │   ├── MarkOpponentScorer.ts
-│   │   ├── BlockPassingLaneScorer.ts
-│   │   ├── HoldPositionScorer.ts
-│   │   └── TrackBackScorer.ts
-│   │
-│   ├── transition/               [3 scorers] When ball is loose
-│   │   ├── ChaseBallScorer.ts
-│   │   ├── AnticipateInterceptScorer.ts
-│   │   └── SecondBallScorer.ts
-│   │
-│   └── special/                  [3 scorers] Special situations
-│       ├── CounterAttackScorer.ts
-│       ├── HoldPossessionScorer.ts
-│       └── RecycleScorer.ts
-│
-├── strategies/                   [NEW] Decision makers
-│   ├── PossessionDecisionMaker.ts   Evaluates possession scorers
-│   ├── SupportDecisionMaker.ts      Evaluates support scorers
-│   ├── DefensiveDecisionMaker.ts    Evaluates defensive scorers
-│   └── TransitionDecisionMaker.ts   Evaluates transition scorers
-│
-└── utils/                        [NEW] Shared utilities
-    ├── InterceptionCalculator.ts    Ball interception logic
-    └── SpatialAnalysis.ts           Geometry helpers
-```
+## Key Components
 
-## Total Files Created
-- **23 Scorers** (all game situations covered)
-- **4 Decision Makers** (context-aware selection)
-- **2 Utility Modules** (shared calculations)
-- **1 Base Interface** (ActionScorer)
-- **1 Types Update** (ActionContext, ActionScore, AI_CONSTANTS)
+-   **`AIManager.ts`**: The top-level manager that orchestrates all AI teams in the game.
+-   **`TeamAI.ts`**: Manages a single team's strategy. It switches between `OffensiveStrategy` and `DefensiveStrategy` based on which team last possessed the ball.
+-   **`AIPlayer.ts`**: Represents a single AI-controlled player, executing the specific goal assigned to it by `TeamAI` (e.g., "ATTACK," "SUPPORT," "DEFEND").
 
-## Implementation Status
-✅ **Complete Structure** - All files created with skeleton implementations
-⏳ **Ready for Implementation** - Each scorer has TODO markers for logic
+## Strategies
 
-## Next Steps (Iterative Implementation)
-1. Extract InterceptionCalculator logic from TeamAI.ts
-2. Implement SpatialAnalysis utility methods
-3. Implement scorers one by one (start with possession)
-4. Wire decision makers into TeamAI
-5. Test and tune scoring weights
+-   **`OffensiveStrategy.ts`**: Assigns attacking and supporting roles to players when the team has possession.
+-   **`DefensiveStrategy.ts`**: Assigns defensive roles to players when the opponent has possession.
 
-## Key Design Principles
-- **Separation of Concerns**: Each scorer handles one specific action
-- **Scoring System**: All actions return 0-1 score, highest wins
-- **Directional Threats**: No more "nearest opponent", use cone-based queries
-- **Context-Aware**: Different decision makers for different situations
-- **Extensible**: Easy to add new scorers without changing existing code
-- **Testable**: Each scorer can be unit tested independently
+This streamlined structure allows for clear, role-based decision-making without the complexity of a scorer-based evaluation system.
