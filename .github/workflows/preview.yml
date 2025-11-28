@@ -12,6 +12,8 @@ concurrency:
 jobs:
   build:
     uses: ./.github/workflows/docker-publish.yml
+    with:
+      platforms: linux/amd64
     secrets: inherit
     permissions:
       contents: read
@@ -22,6 +24,9 @@ jobs:
     runs-on: [self-hosted, k8s]
     needs: build
     steps:
+      - name: Checkout (for manifests/templates if needed)
+        uses: actions/checkout@v4
+
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
         with:

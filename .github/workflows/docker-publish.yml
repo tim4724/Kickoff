@@ -8,46 +8,39 @@ on:
       - 'v*'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      platforms:
+        description: "Target platforms for Docker build"
+        required: false
+        type: string
+        default: "linux/amd64,linux/arm64"
     outputs:
       client_sha_tag:
         description: "Client image tag for this commit (sha)"
-        value: ${{ jobs.build-and-push.outputs.client_sha_tag }}
+        value: ${{ jobs.build-client.outputs.sha_tag }}
       server_sha_tag:
         description: "Server image tag for this commit (sha)"
-        value: ${{ jobs.build-and-push.outputs.server_sha_tag }}
+        value: ${{ jobs.build-server.outputs.sha_tag }}
       client_branch_tag:
         description: "Client image tag for branch (short ref)"
-        value: ${{ jobs.build-and-push.outputs.client_branch_tag }}
+        value: ${{ jobs.build-client.outputs.branch_tag }}
       server_branch_tag:
         description: "Server image tag for branch (short ref)"
-        value: ${{ jobs.build-and-push.outputs.server_branch_tag }}
+        value: ${{ jobs.build-server.outputs.branch_tag }}
 
 env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-and-push:
+  build-client:
     runs-on: ubuntu-latest
     outputs:
-      client_sha_tag: ${{ steps.out-client.outputs.sha_tag }}
-      server_sha_tag: ${{ steps.out-server.outputs.sha_tag }}
-      client_branch_tag: ${{ steps.out-client.outputs.branch_tag }}
-      server_branch_tag: ${{ steps.out-server.outputs.branch_tag }}
+      sha_tag: ${{ steps.out.outputs.sha_tag }}
+      branch_tag: ${{ steps.out.outputs.branch_tag }}
     permissions:
       contents: read
       packages: write
       id-token: write
-    
-    strategy:
-      matrix:
-        include:
-          - service: client
-            dockerfile: Dockerfile.client
-            image_suffix: -client
-          - service: server
-            dockerfile: Dockerfile.server
-            image_suffix: -server
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,11 +55,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for ${{ matrix.service }}
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}${{ matrix.image_suffix }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-client
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -76,32 +69,79 @@ jobs:
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push ${{ matrix.service }} image
+      - name: Build and push client image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./${{ matrix.dockerfile }}
+          file: ./Dockerfile.client
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            ${{ matrix.service == 'client' && format('COMMIT_HASH={0}', github.sha) || '' }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-          platforms: linux/amd64,linux/arm64
+            COMMIT_HASH=${{ github.sha }}
+          cache-from: type=gha,scope=client
+          cache-to: type=gha,mode=max,scope=client
+          platforms: ${{ inputs.platforms || 'linux/amd64,linux/arm64' }}
 
-      - name: Capture tags for outputs (client)
-        if: matrix.service == 'client'
-        id: out-client
+      - name: Capture tags for outputs
+        id: out
         run: |
           SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep ":sha-" | head -n1)
           BRANCH_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep ":${GITHUB_REF_NAME}$" | head -n1)
           echo "sha_tag=$SHA_TAG" >> "$GITHUB_OUTPUT"
           echo "branch_tag=$BRANCH_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Capture tags for outputs (server)
-        if: matrix.service == 'server'
-        id: out-server
+  build-server:
+    runs-on: ubuntu-latest
+    outputs:
+      sha_tag: ${{ steps.out.outputs.sha_tag }}
+      branch_tag: ${{ steps.out.outputs.branch_tag }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-server
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.server
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+          platforms: ${{ inputs.platforms || 'linux/amd64,linux/arm64' }}
+
+      - name: Capture tags for outputs
+        id: out
         run: |
           SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep ":sha-" | head -n1)
           BRANCH_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep ":${GITHUB_REF_NAME}$" | head -n1)
