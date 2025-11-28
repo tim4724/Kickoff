@@ -225,15 +225,28 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment preview URL on PR
-        if: ${{ github.event_name == 'pull_request' }}
         env:
           BRANCH_RAW: ${{ github.ref_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g')
           HOST_CLIENT="${SAFE_BRANCH}.kickoff-game.duckdns.org"
+          PR_JSON=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                         "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/pulls?head=${GITHUB_REPOSITORY_OWNER}:${BRANCH_RAW}&state=open")
+          PR_NUMBER=$(python3 - <<'PY'
+import json, os
+data = json.loads(os.environ["PR_JSON"])
+print(data[0]["number"] if data else "")
+PY
+)
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open PR for branch ${BRANCH_RAW}; skipping comment."
+            exit 0
+          fi
           BODY="Preview available: https://${HOST_CLIENT}"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
           curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
                -H "Content-Type: application/json" \
                -X POST \
