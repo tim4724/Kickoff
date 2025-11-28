@@ -8,6 +8,7 @@ on:
 jobs:
   cleanup:
     runs-on: [self-hosted, k8s]
+    if: github.event.ref_type == 'branch'
     steps:
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
@@ -24,7 +25,7 @@ jobs:
       - name: Delete preview namespace
         run: |
           set -euo pipefail
-          BRANCH_RAW="${GITHUB_REF_NAME}"
+          BRANCH_RAW="${{ github.event.ref }}"
           SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g')
           NS="kickoff-${SAFE_BRANCH}"
           kubectl delete namespace "$NS" --ignore-not-found

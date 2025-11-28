@@ -4,24 +4,16 @@ on:
   push:
     branches:
       - '**'
-  pull_request:
-    branches:
-      - '**'
 
-permissions:
-  contents: read
-  packages: write
-  pull-requests: write
-
-env:
-  REGISTRY: ghcr.io/${{ github.repository_owner }}
-  IMAGE_CLIENT: ghcr.io/${{ github.repository_owner }}/kickoff-client
-  IMAGE_SERVER: ghcr.io/${{ github.repository_owner }}/kickoff-server
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    if: ${{ github.event_name == 'push' }}
     uses: ./.github/workflows/docker-publish.yml
+    with:
+      platforms: linux/amd64
     secrets: inherit
     permissions:
       contents: read
@@ -29,7 +21,6 @@ jobs:
       id-token: write
 
   deploy:
-    if: ${{ github.event_name == 'push' }}
     runs-on: [self-hosted, k8s]
     needs: build
     steps:
@@ -228,36 +219,3 @@ jobs:
             echo "### Preview Links"
             echo "- Client: https://${HOST_CLIENT}"
           } >> "$GITHUB_STEP_SUMMARY"
-
-  comment:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Post preview URL comment
-        env:
-          BRANCH_RAW: ${{ github.head_ref }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_API_URL: ${{ github.api_url }}
-          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-        run: |
-          set -euo pipefail
-          SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g')
-          HOST_CLIENT="https://${SAFE_BRANCH}.kickoff-game.duckdns.org"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-
-          COMMENTS=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100")
-          if echo "$COMMENTS" | python3 -c "import json,sys; data=json.load(sys.stdin); import sys; sys.exit(0) if any('${HOST_CLIENT}' in c.get('body','') for c in data) else sys.exit(1)"; then
-            echo "Comment already exists; skipping."
-            exit 0
-          fi
-
-          curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-                -H "Content-Type: application/json" \
-                -X POST \
-                -d "{\"body\":\"${HOST_CLIENT}\"}" \
-                "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments"
