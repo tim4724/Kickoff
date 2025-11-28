@@ -6,10 +6,21 @@ on:
       - main
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
+  workflow_call:
+    outputs:
+      client_sha_tag:
+        description: "Client image tag for this commit (sha)"
+        value: ${{ jobs.build-and-push.outputs.client_sha_tag }}
+      server_sha_tag:
+        description: "Server image tag for this commit (sha)"
+        value: ${{ jobs.build-and-push.outputs.server_sha_tag }}
+      client_branch_tag:
+        description: "Client image tag for branch (short ref)"
+        value: ${{ jobs.build-and-push.outputs.client_branch_tag }}
+      server_branch_tag:
+        description: "Server image tag for branch (short ref)"
+        value: ${{ jobs.build-and-push.outputs.server_branch_tag }}
 
 env:
   REGISTRY: ghcr.io
@@ -17,6 +28,11 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      client_sha_tag: ${{ steps.out-client.outputs.sha_tag }}
+      server_sha_tag: ${{ steps.out-server.outputs.sha_tag }}
+      client_branch_tag: ${{ steps.out-client.outputs.branch_tag }}
+      server_branch_tag: ${{ steps.out-server.outputs.branch_tag }}
     permissions:
       contents: read
       packages: write
@@ -74,3 +90,20 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           platforms: linux/amd64,linux/arm64
 
+      - name: Capture tags for outputs (client)
+        if: matrix.service == 'client'
+        id: out-client
+        run: |
+          SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep ":sha-" | head -n1)
+          BRANCH_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep ":${GITHUB_REF_NAME}$" | head -n1)
+          echo "sha_tag=$SHA_TAG" >> "$GITHUB_OUTPUT"
+          echo "branch_tag=$BRANCH_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Capture tags for outputs (server)
+        if: matrix.service == 'server'
+        id: out-server
+        run: |
+          SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep ":sha-" | head -n1)
+          BRANCH_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep ":${GITHUB_REF_NAME}$" | head -n1)
+          echo "sha_tag=$SHA_TAG" >> "$GITHUB_OUTPUT"
+          echo "branch_tag=$BRANCH_TAG" >> "$GITHUB_OUTPUT"
