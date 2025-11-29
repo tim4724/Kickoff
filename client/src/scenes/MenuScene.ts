@@ -88,36 +88,48 @@ export class MenuScene extends PixiScene {
     const thirdButtonY = secondButtonY + buttonSpacing
 
     // Update Single Player Button
-    this.updateButton(this.singlePlayerButton, this.singlePlayerText, centerX, firstButtonY, buttonWidth, buttonHeight, buttonFontSize)
+    this.updateButtonLayout(this.singlePlayerButton, this.singlePlayerText, centerX, firstButtonY, buttonWidth, buttonHeight, buttonFontSize)
 
     // Update Multiplayer Button
-    this.updateButton(this.multiplayerButton, this.multiplayerText, centerX, secondButtonY, buttonWidth, buttonHeight, buttonFontSize)
+    this.updateButtonLayout(this.multiplayerButton, this.multiplayerText, centerX, secondButtonY, buttonWidth, buttonHeight, buttonFontSize)
 
     // Update AI-Only Button
-    this.updateButton(this.aiOnlyButton, this.aiOnlyText, centerX, thirdButtonY, buttonWidth, buttonHeight, buttonFontSize)
+    this.updateButtonLayout(this.aiOnlyButton, this.aiOnlyText, centerX, thirdButtonY, buttonWidth, buttonHeight, buttonFontSize)
 
     // Update version text
     this.versionText.style.fontSize = versionFontSize
     this.versionText.position.set(centerX, height * 0.95)
   }
 
-  private updateButton(buttonContainer: Container, text: Text, x: number, y: number, width: number, height: number, fontSize: number) {
-    buttonContainer.position.set(x - width / 2, y - height / 2)
+  private updateButtonLayout(buttonContainer: Container, text: Text, x: number, y: number, width: number, height: number, fontSize: number) {
+    // Set position (button is centered via pivot)
+    buttonContainer.position.set(x, y)
 
+    // Update hit area (relative to pivot center)
+    // Hit area should cover from -width/2 to width/2
+    buttonContainer.hitArea = new Rectangle(-width / 2, -height / 2, width, height);
+
+    // Redraw background with new size
+    this.drawButtonBackground(buttonContainer, width, height)
+
+    // Update text
+    text.style.fontSize = fontSize
+    text.position.set(0, 0) // Centered because pivot is center
+  }
+
+  private drawButtonBackground(buttonContainer: Container, width: number, height: number) {
     const bg = buttonContainer.getChildAt(0) as Graphics
+    const color = (bg as any)._customColor || 0x000000
+
     bg.clear()
-    bg.roundRect(0, 0, width, height, 0) // Rounded corners handled via graphics context if needed, but Phaser used strict rects mostly? Wait, Phaser rects are usually sharp unless specified.
-    // The previous implementation used add.rectangle which is sharp.
-    // Let's stick to sharp or slight rounding.
-    bg.fill({ color: (bg as any)._customColor, alpha: 1 }) // _customColor is a hack I'll add or I need to store color elsewhere
+    // Draw centered rect
+    bg.roundRect(-width / 2, -height / 2, width, height, 0)
+    bg.fill(color)
     bg.stroke({ width: 2, color: 0xffffff, alpha: 0.1 })
 
-    // Center text in button
-    text.style.fontSize = fontSize
-    text.position.set(width / 2, height / 2)
-
-    // Hit area for interaction
-    buttonContainer.hitArea = new Rectangle(0, 0, width, height);
+    // Store current dimensions for redrawing on color change without full resize args
+    ;(buttonContainer as any)._currentWidth = width;
+    ;(buttonContainer as any)._currentHeight = height;
   }
 
   async create() {
@@ -180,11 +192,6 @@ export class MenuScene extends PixiScene {
       this.versionText.anchor.set(0.5)
       this.container.addChild(this.versionText)
 
-      // Initial layout
-      // We can call resize manually or rely on SceneManager to call it
-      // SceneManager calls resize() right after create()
-
-      // Debounce clicks
       this.clickBlockUntil = performance.now() + 250
 
       console.log('📋 Menu scene loaded with responsive layout')
@@ -210,12 +217,12 @@ export class MenuScene extends PixiScene {
   private createButton(label: string, color: number, hoverColor: number, callback: () => void): Container {
     const container = new Container()
 
+    // Background
     const bg = new Graphics()
-    ;(bg as any)._customColor = color // Store color for resize updates
-    bg.rect(0, 0, 100, 100) // Placeholder size
-    bg.fill(color)
+    ;(bg as any)._customColor = color
     container.addChild(bg)
 
+    // Text
     const text = new Text({
         text: label,
         style: {
@@ -241,25 +248,19 @@ export class MenuScene extends PixiScene {
     container.cursor = 'pointer'
 
     const onPointerOver = () => {
-        bg.tint = 0xdddddd // Pixi doesn't support easy color swap on graphics without redraw or tint
-        // But since we are filling with a solid color, tinting white works if base is white, but here base is colored.
-        // Actually tint multiplies.
-        // Let's just redraw or scale.
         container.scale.set(1.03)
-        // For color change, we might need to redraw or use a Sprite.
-        // Let's just stick to scale for now to keep it simple, or redraw.
-        bg.clear()
-        bg.rect(0, 0, (bg as any).width, (bg as any).height) // This is tricky because width depends on content
-        // Easier: Just use tinting if we used a white texture, but we are using graphics.
-        // Re-implementing the hover color logic from Phaser:
         ;(bg as any)._customColor = hoverColor
-        this.updateButton(container, text, container.x + container.width/2, container.y + container.height/2, (container.hitArea as any).width, (container.hitArea as any).height, (text.style as any).fontSize)
+        const w = (container as any)._currentWidth || 100
+        const h = (container as any)._currentHeight || 100
+        this.drawButtonBackground(container, w, h)
     }
 
     const onPointerOut = () => {
         container.scale.set(1)
         ;(bg as any)._customColor = color
-        this.updateButton(container, text, container.x + container.width/2, container.y + container.height/2, (container.hitArea as any).width, (container.hitArea as any).height, (text.style as any).fontSize)
+        const w = (container as any)._currentWidth || 100
+        const h = (container as any)._currentHeight || 100
+        this.drawButtonBackground(container, w, h)
     }
 
     const onPointerDown = () => {
@@ -279,7 +280,6 @@ export class MenuScene extends PixiScene {
     container.on('pointerout', onPointerOut)
     container.on('pointerdown', onPointerDown)
     container.on('pointerup', onPointerUp)
-    // Touch specific? Pixi handles pointer events which cover touch.
 
     return container
   }
