@@ -1,3 +1,4 @@
+import { Application, Text } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
@@ -5,52 +6,72 @@ import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { AIManager } from '../ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { StateAdapter } from '../utils/StateAdapter'
+import { PixiSceneManager } from '../utils/PixiSceneManager'
 
 /**
- * AI-Only Scene
+ * AI-Only Scene (PixiJS)
  * Development mode where all players are AI-controlled
- * Useful for testing AI behavior and watching AI vs AI matches
  */
 export class AIOnlyScene extends BaseGameScene {
   private paused: boolean = false
-  private gameSpeed: number = 1.0 // Initial speed: 1.0 (range: 0.01 to 1.0)
-  private gameSpeedText!: Phaser.GameObjects.Text
+  private gameSpeed: number = 1.0
+  private gameSpeedText!: Text
 
-  constructor() {
-    super({ key: 'AIOnlyScene' })
+  constructor(app: Application, key: string, manager: PixiSceneManager) {
+    super(app, key, manager)
   }
 
-  /**
-   * Override setupInput to remove player switching behavior
-   */
   protected setupInput(): void {
-    // Create cursor keys
-    this.cursors = this.input.keyboard!.createCursorKeys()
+    // Override keyboard handling for AIOnly
 
-    // Add WASD keys for movement (even though not used in AI-only, keeps consistency)
-    this.wasd = {
-      w: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      a: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      s: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      d: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+    // We reuse BaseGameScene's keyboard setup implicitly if we call super.setupInput()?
+    // But BaseGameScene binds space for shooting.
+    // We want to override it.
+    // BaseGameScene.setupInput() sets up space for shooting and L for debug.
+    // We can call super.setupInput() and then add more, but overriding behavior is tricky if we don't clear.
+    // The BaseGameScene uses a Set<string> for keys and checks in update loop or via event.
+    // It uses `window.addEventListener` for `keydown`.
+
+    // Let's implement custom input handling here without calling super.setupInput(), or carefully overriding.
+    // BaseGameScene calls `this.setupInput()` in `create()`.
+    // So we can fully override it.
+
+    const onKeyDown = (e: KeyboardEvent) => {
+        if (e.code === 'KeyL') {
+            this.debugEnabled = !this.debugEnabled
+            this.aiDebugRenderer.setEnabled(this.debugEnabled)
+            console.log('🐛 AI Debug Labels:', this.debugEnabled ? 'ON' : 'OFF')
+        }
+
+        if (e.code === 'Space') {
+            this.paused = !this.paused
+            if (this.paused) {
+                GameClock.pause()
+            } else {
+                GameClock.resume()
+            }
+            this.updateSpeedDisplay()
+            console.log('⏸️ Game:', this.paused ? 'PAUSED' : 'PLAYING')
+        }
+
+        if (e.code === 'Minus' || e.code === 'NumpadSubtract') {
+            this.adjustGameSpeed(-0.05)
+        }
+
+        if (e.code === 'Equal' || e.code === 'NumpadAdd') {
+            this.adjustGameSpeed(0.05)
+        }
     }
 
-    // Register 'L' key for AI debug toggle (from BaseGameScene)
-    this.input.keyboard!.on('keydown-L', () => {
-      this.debugEnabled = !this.debugEnabled
-      this.aiDebugRenderer.setEnabled(this.debugEnabled)
-      console.log('🐛 AI Debug Labels:', this.debugEnabled ? 'ON' : 'OFF')
-    })
+    window.addEventListener('keydown', onKeyDown)
 
-    // Spacebar will be handled in setupSpectatorControls instead (no shooting)
+    this.cleanupInput = () => {
+        window.removeEventListener('keydown', onKeyDown)
+    }
   }
 
-  /**
-   * Override createMobileControls to skip creating joystick and action button
-   */
   protected createMobileControls(): void {
-    // Do nothing - AI-only mode doesn't need controls
-    // Joystick and action button will not be created
+    // No mobile controls
   }
 
   protected initializeGameState(): void {
@@ -59,22 +80,15 @@ export class AIOnlyScene extends BaseGameScene {
     }
     GameClock.useRealTime()
 
-    // Initialize game engine
     this.gameEngine = new GameEngine({
       matchDuration: GAME_CONFIG.MATCH_DURATION,
     })
 
-    // Add AI-only teams (all players are AI-controlled)
-    // Blue team: 3 equal AI players
     this.gameEngine.addPlayer('ai-blue-team', 'blue', false)
-
-    // Red team: 3 equal AI players
     this.gameEngine.addPlayer('ai-red-team', 'red', false)
 
     console.log('🤖 AI-Only mode: 6 AI players created (3 blue, 3 red)')
 
-    // Initialize AI system
-    // Game engine creates 3 equal players per team
     this.aiManager = new AIManager()
     this.aiManager.initialize(
       ['ai-blue-team-p1', 'ai-blue-team-p2', 'ai-blue-team-p3'],
@@ -82,30 +96,20 @@ export class AIOnlyScene extends BaseGameScene {
       (playerId, decision) => this.applyAIDecision(playerId, decision)
     )
 
-    // Set up common callbacks (including shoot callback)
     this.setupGameEngineCallbacks(true)
-
-    // Start match immediately
     this.gameEngine.startMatch()
-
-    // Initialize player visuals from engine state
     this.syncPlayersFromEngine()
 
-    // Enable AI debug by default in AI-only mode
     this.debugEnabled = true
     this.aiDebugRenderer.setEnabled(true)
 
-    // Update controls hint for AI-only mode
-    this.controlsHint.setText('SPACE: Play/Pause • +/-: Speed • L: Toggle Debug')
+    this.controlsHint.text = 'SPACE: Play/Pause • +/-: Speed • L: Toggle Debug'
 
-    // Enable spectator camera controls
     this.setupSpectatorControls()
 
-    // Set initial GameClock time scale to match game speed
     GameClock.resetTimeScale()
     GameClock.setTimeScale(this.gameSpeed)
 
-    // Set up test API with AIOnlyScene-specific methods
     this.setupTestAPI({
       getState: () => ({
         paused: this.paused,
@@ -120,160 +124,93 @@ export class AIOnlyScene extends BaseGameScene {
   }
 
   protected updateGameState(delta: number): void {
-    // No human input - all players are AI-controlled
-
-    // Update AI and apply decisions when not paused
-    // GameClock.pause() ensures cooldown timers don't advance during pause
     if (!this.paused) {
       this.updateAIForGameEngine()
-
-      // Scale delta by game speed
       const scaledDelta = delta * this.gameSpeed
       this.gameEngine!.update(scaledDelta)
     }
-
-    // Sync visuals from engine state (always update visuals even when paused)
     this.syncVisualsFromEngine()
-
-    // Note: AI debug visualization is handled by BaseGameScene.update()
   }
 
   protected handleShootAction(_power: number): void {
-    // No shooting action in AI-only mode (all automated)
+    // No-op
   }
 
   protected cleanupGameState(): void {
-    // GameEngine cleanup (if needed in future)
+    // No-op
   }
 
-  /**
-   * Get unified game state (implements BaseGameScene abstract method)
-   */
   protected getUnifiedState() {
     const engineState = this.gameEngine!.getState()
     return StateAdapter.fromGameEngine(engineState)
   }
 
-  /**
-   * Set up spectator controls
-   */
   private setupSpectatorControls() {
-    console.log('📹 AI-Only Mode - Spectator View')
-    console.log('  - SPACE: Play/Pause')
-    console.log('  - +/-: Adjust game speed (current: 0.05x)')
-    console.log('  - D: Toggle AI debug visualization')
+    const width = this.app.screen.width
 
-    // Create game speed display
-    const width = this.scale.width
-    this.gameSpeedText = this.add.text(width - 20, 30, this.getSpeedDisplayText(), {
-      fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
-      fontSize: '20px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-      backgroundColor: '#000000aa',
-      padding: { x: 12, y: 8 },
-    })
-    this.gameSpeedText.setOrigin(1, 0)
-    this.gameSpeedText.setScrollFactor(0)
-    this.gameSpeedText.setDepth(1000)
-    this.gameSpeedText.setResolution(2)
-
-    // Make it visible only in UI camera (not game camera)
-    this.cameraManager.getGameCamera().ignore([this.gameSpeedText])
-    this.uiObjects.push(this.gameSpeedText)
-
-    // Add SPACE key for play/pause
-    this.input.keyboard?.on('keydown-SPACE', () => {
-      this.paused = !this.paused
-
-      // Sync GameClock pause state
-      if (this.paused) {
-        GameClock.pause()
-      } else {
-        GameClock.resume()
-      }
-
-      this.updateSpeedDisplay()
-      console.log('⏸️ Game:', this.paused ? 'PAUSED' : 'PLAYING')
+    this.gameSpeedText = new Text({
+        text: this.getSpeedDisplayText(),
+        style: {
+            fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
+            fontSize: 20,
+            fill: '#ffffff',
+            fontWeight: 'bold',
+            // backgroundColor: '#000000aa', // Not supported in Text
+        }
     })
 
-    // Add + key (PLUS and EQUALS for convenience) to increase game speed
-    this.input.keyboard?.on('keydown-PLUS', () => {
-      this.adjustGameSpeed(0.05)
-    })
-    this.input.keyboard?.on('keydown-EQUALS', () => {
-      // Handle + without shift (= key)
-      this.adjustGameSpeed(0.05)
-    })
+    // Background for text
+    // Not implemented for simplicity, or we can add a graphic behind it.
 
-    // Add - key (MINUS) to decrease game speed
-    this.input.keyboard?.on('keydown-MINUS', () => {
-      this.adjustGameSpeed(-0.05)
-    })
+    this.gameSpeedText.anchor.set(1, 0)
+    this.gameSpeedText.position.set(width - 20, 30)
+    this.gameSpeedText.zIndex = 1000
 
-    // Note: L key for debug toggle is handled in BaseGameScene.setupInput()
+    this.cameraManager.getUIContainer().addChild(this.gameSpeedText)
   }
 
-  /**
-   * Adjust game speed within range (0.01 to 1.0)
-   */
   private adjustGameSpeed(delta: number): void {
     this.gameSpeed = Math.max(0.01, Math.min(1.0, this.gameSpeed + delta))
-
-    // Sync GameClock time scale with game speed
     GameClock.setTimeScale(this.gameSpeed)
-
     this.updateSpeedDisplay()
     console.log(`⏩ Game Speed: ${this.gameSpeed.toFixed(2)}x`)
   }
 
-  /**
-   * Get formatted speed display text
-   */
   private getSpeedDisplayText(): string {
     const pausedText = this.paused ? ' [PAUSED]' : ''
     return `Speed: ${this.gameSpeed.toFixed(2)}x${pausedText}`
   }
 
-  /**
-   * Update speed display text
-   */
   private updateSpeedDisplay(): void {
     if (this.gameSpeedText) {
-      this.gameSpeedText.setText(this.getSpeedDisplayText())
+      this.gameSpeedText.text = this.getSpeedDisplayText()
     }
   }
 
-  protected onResize(gameSize: Phaser.Structs.Size): void {
-    super.onResize(gameSize)
+  public resize(width: number, height: number): void {
+    super.resize(width, height)
     if (this.gameSpeedText) {
-      this.gameSpeedText.setPosition(gameSize.width - 20, 30)
+      this.gameSpeedText.position.set(width - 20, 30)
     }
   }
 
-  // syncPlayersFromEngine and syncVisualsFromEngine are inherited from BaseGameScene
-  // The base implementation handles AI-only mode correctly (myPlayerId is set to first player)
-
-  /**
-   * Override updatePlayerBorders to prevent human control indicator in AI-only mode
-   */
   protected updatePlayerBorders(): void {
-    // In AI-only mode, ALL players should have uncontrolled borders (no human control)
+    // In AI-only mode, ALL players should have uncontrolled borders
     this.players.forEach((playerSprite) => {
-      playerSprite.setStrokeStyle(
-        VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER,
-        VISUAL_CONSTANTS.BORDER_COLOR
-      )
-      playerSprite.isFilled = true
+        // Redraw
+        // Assuming we stored fill color or can infer it.
+        // If we don't have it, we might lose color.
+        // Let's assume we implement the _fillColor hack in BaseGameScene.
+        const fillColor = (playerSprite as any)._fillColor || 0xffffff
+
+        playerSprite.clear()
+        playerSprite.circle(0, 0, 36)
+        playerSprite.fill(fillColor)
+        playerSprite.stroke({ width: 3, color: VISUAL_CONSTANTS.BORDER_COLOR, alpha: 1 })
     })
   }
 
-  /**
-   * Apply AI decision by queuing input to game engine
-   * In AI-only mode, all players are AI-controlled, so skipControlled=false
-   */
   private applyAIDecision(playerId: string, decision: any) {
-    // Use base class method with skipControlled=false (all players are AI)
     this.applyAIDecisionForGameEngine(playerId, decision, false)
   }
 }

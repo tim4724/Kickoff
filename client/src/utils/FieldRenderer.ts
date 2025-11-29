@@ -1,60 +1,80 @@
-import Phaser from 'phaser'
+import { Container, Graphics } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
 
 /**
- * Field Renderer Utility
+ * Field Renderer Utility for PixiJS
  * Shared rendering logic for field, goals, and field elements
  */
 export class FieldRenderer {
   /**
    * Create the field background and boundaries
+   * Appends elements to the game container
    */
-  static createField(
-    scene: Phaser.Scene,
-    gameObjects: Phaser.GameObjects.GameObject[],
-    uiCamera: Phaser.Cameras.Scene2D.Camera
-  ): void {
+  static createField(container: Container): void {
     const width = GAME_CONFIG.FIELD_WIDTH
     const height = GAME_CONFIG.FIELD_HEIGHT
     const margin = GAME_CONFIG.FIELD_MARGIN
 
     // Field background (green)
-    const fieldBg = scene.add.rectangle(width / 2, height / 2, width, height, 0x2d5016)
-    gameObjects.push(fieldBg)
+    const fieldBg = new Graphics()
+    fieldBg.rect(0, 0, width, height)
+    fieldBg.fill(0x2d5016)
+    container.addChild(fieldBg)
 
-    // Field border
-    const borderGraphics = scene.add.graphics()
-    borderGraphics.lineStyle(4, 0xffffff, 1)
-    borderGraphics.strokeRect(margin, margin, width - margin * 2, height - margin * 2)
+    // Field lines
+    const borderGraphics = new Graphics()
+
+    // Border
+    borderGraphics.stroke({ width: 4, color: 0xffffff, alpha: 1 })
+    borderGraphics.rect(margin, margin, width - margin * 2, height - margin * 2)
 
     // Center circle
-    borderGraphics.lineStyle(2, 0xffffff, 0.5)
-    borderGraphics.strokeCircle(width / 2, height / 2, 120)
+    borderGraphics.stroke({ width: 2, color: 0xffffff, alpha: 0.5 })
+    borderGraphics.circle(width / 2, height / 2, 120)
 
     // Center line
-    borderGraphics.lineBetween(width / 2, margin, width / 2, height - margin)
-    gameObjects.push(borderGraphics)
+    borderGraphics.moveTo(width / 2, margin)
+    borderGraphics.lineTo(width / 2, height - margin)
+
+    container.addChild(borderGraphics)
 
     // Goals
     const goalHeight = GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN
     const goalDepth = GAME_CONFIG.GOAL_DEPTH
 
-    const leftGoal = scene.add
-      .rectangle(0, height / 2, goalDepth, goalHeight, 0xffffff)
-      .setOrigin(0, 0.5)
-    const rightGoal = scene.add
-      .rectangle(width, height / 2, goalDepth, goalHeight, 0xffffff)
-      .setOrigin(1, 0.5)
-    gameObjects.push(leftGoal, rightGoal)
+    // Left Goal
+    const leftGoal = new Graphics()
+    leftGoal.rect(0, 0, goalDepth, goalHeight) // Origin 0,0 for rect
+    leftGoal.fill(0xffffff)
+    leftGoal.pivot.set(0, goalHeight / 2) // setOrigin(0, 0.5) equivalent
+    leftGoal.position.set(0, height / 2)
+    container.addChild(leftGoal)
+
+    // Right Goal
+    const rightGoal = new Graphics()
+    rightGoal.rect(0, 0, goalDepth, goalHeight)
+    rightGoal.fill(0xffffff)
+    rightGoal.pivot.set(goalDepth, goalHeight / 2) // setOrigin(1, 0.5) equivalent
+    rightGoal.position.set(width, height / 2)
+    container.addChild(rightGoal)
 
     // Goal posts
-    const post1 = scene.add.circle(margin, GAME_CONFIG.GOAL_Y_MIN, 10, 0xffffff)
-    const post2 = scene.add.circle(margin, GAME_CONFIG.GOAL_Y_MAX, 10, 0xffffff)
-    const post3 = scene.add.circle(width - margin, GAME_CONFIG.GOAL_Y_MIN, 10, 0xffffff)
-    const post4 = scene.add.circle(width - margin, GAME_CONFIG.GOAL_Y_MAX, 10, 0xffffff)
-    gameObjects.push(post1, post2, post3, post4)
+    const postColor = 0xffffff
+    const postRadius = 10
 
-    // Make all field objects invisible to UI camera
-    gameObjects.forEach((obj) => uiCamera.ignore(obj))
+    const posts = [
+        { x: margin, y: GAME_CONFIG.GOAL_Y_MIN },
+        { x: margin, y: GAME_CONFIG.GOAL_Y_MAX },
+        { x: width - margin, y: GAME_CONFIG.GOAL_Y_MIN },
+        { x: width - margin, y: GAME_CONFIG.GOAL_Y_MAX }
+    ]
+
+    posts.forEach(pos => {
+        const post = new Graphics()
+        post.circle(0, 0, postRadius)
+        post.fill(postColor)
+        post.position.set(pos.x, pos.y)
+        container.addChild(post)
+    })
   }
 }

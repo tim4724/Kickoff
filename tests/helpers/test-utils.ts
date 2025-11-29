@@ -43,7 +43,10 @@ export async function getPlayerColor(client: Page): Promise<number> {
   return client.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
     const myPlayerId = scene?.myPlayerId
-    return scene?.players?.get(myPlayerId)?.fillColor || 0
+    const player = scene?.players?.get(myPlayerId)
+    // Access internal _fillColor if available (PixiJS migration hack)
+    // or try standard PixiJS properties if possible
+    return (player as any)?._fillColor || 0
   })
 }
 
@@ -294,7 +297,10 @@ export async function restartScene(client: Page) {
   await client.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
     if (scene) {
-      scene.scene.restart()
+      const manager = (window as any).sceneManager;
+      if (manager) {
+          manager.start(scene.sceneKey);
+      }
     }
   })
 }
