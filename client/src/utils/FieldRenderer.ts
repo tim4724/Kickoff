@@ -36,6 +36,10 @@ export class FieldRenderer {
     borderGraphics.moveTo(width / 2, margin)
     borderGraphics.lineTo(width / 2, height - margin)
 
+    // Middle line (horizontal)
+    borderGraphics.moveTo(margin, height / 2)
+    borderGraphics.lineTo(width - margin, height / 2)
+
     container.addChild(borderGraphics)
 
     // Goals

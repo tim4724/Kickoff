@@ -303,7 +303,7 @@ export abstract class BaseGameScene extends PixiScene {
     // Draw player
     playerSprite.circle(0, 0, 36)
     playerSprite.fill(color)
-    playerSprite.stroke({ width: 3, color: VISUAL_CONSTANTS.BORDER_COLOR }) // Border logic is handled by updatePlayerBorders mostly
+    playerSprite.stroke({ width: 3, color: 0xffffff }) // White border
 
     playerSprite.position.set(x, y)
     playerSprite.zIndex = 10
@@ -487,11 +487,12 @@ export abstract class BaseGameScene extends PixiScene {
   protected updatePlayerBorders() {
     this.players.forEach((playerSprite, playerId) => {
       const isControlled = playerId === this.controlledPlayerId
-      // const borderColor = VISUAL_CONSTANTS.BORDER_COLOR
-      const borderWidth = 3
-      const borderAlpha = 1
 
-      const strokeColor = isControlled ? VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER : VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER
+      const borderWidth = isControlled
+        ? VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER
+        : VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER
+
+      const strokeColor = 0xffffff // White border for everyone
 
       // I need the fill color.
       // I will update `createPlayerSprite` to store `_fillColor`.
@@ -500,7 +501,7 @@ export abstract class BaseGameScene extends PixiScene {
       playerSprite.clear()
       playerSprite.circle(0, 0, 36)
       playerSprite.fill(fillColor)
-      playerSprite.stroke({ width: borderWidth, color: strokeColor, alpha: borderAlpha })
+      playerSprite.stroke({ width: borderWidth, color: strokeColor, alpha: 1 })
     })
 
     this.updateControlArrow()
