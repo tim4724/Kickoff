@@ -28,4 +28,5 @@ test.describe('Gameplay Mechanics (Single Player)', () => {
     expect(endPos.x).toBeGreaterThan(startPos.x)
     expect(endPos.y).toBeCloseTo(startPos.y, 1) // Should barely move Y
   });
+
 })

@@ -66,10 +66,10 @@ export async function getSessionId(client: Page): Promise<string> {
 export async function getServerState(client: Page) {
   return client.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    const state = scene?.networkManager?.getState()
+    const state = scene?.networkManager?.getState() || scene?.gameEngine?.getState()
     return {
       phase: state?.phase || 'unknown',
-      matchTimer: state?.matchTimer || 0,
+      matchTime: state?.matchTime || 0,
       scoreBlue: state?.scoreBlue || 0,
       scoreRed: state?.scoreRed || 0,
       playerCount: state?.players?.size || 0,
@@ -247,6 +247,18 @@ export async function shoot(client: Page, holdDurationMs: number = 200) {
   await waitScaled(client, holdDurationMs)
   await client.keyboard.up('Space')
   await waitScaled(client, 200)
+}
+
+/**
+ * Force possession (Single Player Only)
+ */
+export async function forcePossession(client: Page) {
+  await client.evaluate(() => {
+    const controls = (window as any).__gameControls
+    if (controls?.test?.forcePossession) {
+      controls.test.forcePossession()
+    }
+  })
 }
 
 /**
