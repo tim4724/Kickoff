@@ -66,10 +66,11 @@ export async function getSessionId(client: Page): Promise<string> {
 export async function getServerState(client: Page) {
   return client.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    const state = scene?.networkManager?.getState()
+    // Unified way to get state via BaseGameScene
+    const state = scene?.getGameState()
     return {
       phase: state?.phase || 'unknown',
-      matchTimer: state?.matchTimer || 0,
+      matchTimer: state?.matchTime || 0, // matchTime in state
       scoreBlue: state?.scoreBlue || 0,
       scoreRed: state?.scoreRed || 0,
       playerCount: state?.players?.size || 0,
@@ -159,7 +160,7 @@ export async function gainPossession(
     await client.waitForFunction(
       (playerId) => {
         const scene = (window as any).__gameControls?.scene
-        const state = scene?.networkManager?.getState()
+        const state = scene?.getGameState()
         return state?.ball?.possessedBy === playerId
       },
       myPlayerId,
@@ -188,7 +189,7 @@ export async function moveTowardBallAndCapture(
   while (Date.now() - startTime < timeoutMs) {
     const state = await client.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      const netState = scene?.networkManager?.getState()
+      const netState = scene?.getGameState()
       const controlledId = scene?.controlledPlayerId || scene?.mySessionId || ''
       const player = controlledId ? netState?.players?.get(controlledId) : null
       const ball = netState?.ball
@@ -199,7 +200,8 @@ export async function moveTowardBallAndCapture(
         playerY: player?.y || 0,
         ballX: ball?.x || 0,
         ballY: ball?.y || 0,
-        hasMoveHelper: !!(scene && (window as any).__gameControls?.test?.movePlayerDirect),
+        // Standardize to directMove
+        hasMoveHelper: !!(scene && (window as any).__gameControls?.test?.directMove),
       }
     })
 
@@ -219,8 +221,8 @@ export async function moveTowardBallAndCapture(
     if (state.hasMoveHelper) {
       await client.evaluate(async ({ moveX, moveY }) => {
         const controls = (window as any).__gameControls
-        if (controls?.test?.movePlayerDirect) {
-          await controls.test.movePlayerDirect(moveX, moveY, 500)
+        if (controls?.test?.directMove) {
+          await controls.test.directMove(moveX, moveY, 500)
         }
       }, { moveX: dx, moveY: dy })
     } else {

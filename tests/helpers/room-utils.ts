@@ -150,18 +150,20 @@ export async function setupSinglePlayerTest(
 ): Promise<void> {
   await page.goto(url)
 
-  // Wait for Phaser game instance to be available
-  await page.waitForFunction(() => {
-    const game = (window as any).game
-    return game && game.scene && game.scene.scenes && game.scene.scenes.length > 0
-  }, { timeout: 10000 })
+  // Wait for menu loaded
+  await page.waitForFunction(() => (window as any).__menuLoaded, { timeout: 10000 })
 
-  // Start SinglePlayerScene
+  // Click Single Player Button
   await page.evaluate(() => {
-    const game = (window as any).game
-    if (game && game.scene) {
-      game.scene.start('SinglePlayerScene')
-      game.scene.stop('MenuScene') // Stop menu scene
+    // Navigate directly using the sceneRouter which is exposed on window for testing if possible
+    // or simulate click on the button using menu controls
+    const controls = (window as any).__menuControls
+    if (controls) {
+       // Simulate click
+       controls.test.getMenuElements().singlePlayerButton.emit('pointerup')
+    } else {
+        // Fallback: modify hash to navigate
+        window.location.hash = '#/singleplayer'
     }
   })
 
@@ -169,7 +171,7 @@ export async function setupSinglePlayerTest(
   await page.waitForFunction(() => {
     const scene = (window as any).__gameControls?.scene
     // Check for unified player system - should have myPlayerId and players map
-    return scene?.scene?.key === 'SinglePlayerScene' && scene?.myPlayerId && scene?.players?.size > 0
+    return scene?.sceneKey === 'SinglePlayerScene' && scene?.myPlayerId && scene?.players?.size > 0
   }, { timeout: 10000 })
 
   // Small delay for scene initialization
@@ -195,6 +197,6 @@ export async function waitForPlayerReady(
     const scene = (window as any).__gameControls?.scene
     // Player is ready when we have myPlayerId and it exists in the players map
     // myPlayerId format: "sessionId-p1" (includes the -p1 suffix)
-    return scene?.myPlayerId && scene?.networkManager?.getState()?.players?.has(scene.myPlayerId)
+    return scene?.myPlayerId && scene?.players?.has(scene.myPlayerId) && scene?.getGameState()
   }, { timeout: timeoutMs })
 }

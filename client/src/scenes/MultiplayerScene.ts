@@ -246,7 +246,11 @@ export class MultiplayerScene extends BaseGameScene {
         joystick: this.joystick ? this.joystick.__test_getState() : null,
         button: this.actionButton ? this.actionButton.__test_getState() : null,
       }),
+      // Supports both names for compatibility
       movePlayerDirect: async (dx: number, dy: number, durationMs: number): Promise<void> => {
+        return (window as any).__gameControls.test.directMove(dx, dy, durationMs)
+      },
+      directMove: async (dx: number, dy: number, durationMs: number): Promise<void> => {
         if (!this.networkManager) {
           throw new Error('NetworkManager not available')
         }
