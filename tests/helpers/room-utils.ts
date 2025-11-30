@@ -150,26 +150,19 @@ export async function setupSinglePlayerTest(
 ): Promise<void> {
   await page.goto(url)
 
-  // Wait for Phaser game instance to be available
-  await page.waitForFunction(() => {
-    const game = (window as any).game
-    return game && game.scene && game.scene.scenes && game.scene.scenes.length > 0
-  }, { timeout: 10000 })
+  // Wait for Menu loaded (PixiJS)
+  await page.waitForFunction(() => (window as any).__menuLoaded, { timeout: 10000 })
 
-  // Start SinglePlayerScene
+  // Start SinglePlayerScene via Router
   await page.evaluate(() => {
-    const game = (window as any).game
-    if (game && game.scene) {
-      game.scene.start('SinglePlayerScene')
-      game.scene.stop('MenuScene') // Stop menu scene
-    }
+    window.location.hash = '#/singleplayer'
   })
 
   // Wait for single-player scene to be ready and expose test API
   await page.waitForFunction(() => {
     const scene = (window as any).__gameControls?.scene
     // Check for unified player system - should have myPlayerId and players map
-    return scene?.scene?.key === 'SinglePlayerScene' && scene?.myPlayerId && scene?.players?.size > 0
+    return scene?.sceneKey === 'SinglePlayerScene' && scene?.myPlayerId && scene?.players?.size > 0
   }, { timeout: 10000 })
 
   // Small delay for scene initialization

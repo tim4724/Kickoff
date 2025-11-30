@@ -14,13 +14,17 @@ async function clickMenuButton(
   page: Page,
   buttonName: 'singlePlayer' | 'multiplayer' | 'aiOnly'
 ) {
-  const button = await page.evaluate((name: string) => (window as any).__menuButtons?.[name], buttonName)
+  const button = await page.evaluate((name: string) => {
+    const btn = (window as any).__menuButtons?.[name]
+    return btn ? { x: btn.x, y: btn.y } : null
+  }, buttonName)
   if (!button) throw new Error(`Menu button "${buttonName}" not found`)
 
   const expectedHash =
     buttonName === 'singlePlayer' ? '#/singleplayer' : buttonName === 'aiOnly' ? '#/ai-only' : '#/multiplayer'
 
   const tryClick = async () => {
+    // Note: button.x/y are relative to parent, but for MenuScene they map to screen coords
     await page.mouse.click(button.x, button.y)
     await page.waitForTimeout(60)
   }
@@ -30,9 +34,10 @@ async function clickMenuButton(
     try {
       await page.waitForFunction(
         (hash) => {
-          const sceneKey = (window as any).__gameControls?.scene?.scene?.key
+          const scene = (window as any).__gameControls?.scene || (window as any).__menuControls?.test?.scene
+          const sceneKey = scene?.sceneKey
           const menuLoaded = (window as any).__menuLoaded
-          return window.location.hash === hash || menuLoaded === false || sceneKey !== 'MenuScene'
+          return window.location.hash === hash || menuLoaded === false || (sceneKey && sceneKey !== 'MenuScene')
         },
         expectedHash,
         { timeout: 1800 }
@@ -52,8 +57,8 @@ async function clickBackButton(page: Page) {
 async function backButtonExists(page: Page) {
   try {
     await page.waitForFunction(() => {
-      const scenes = (window as any).__gameControls?.game?.scene?.getScenes(true) || []
-      return scenes.some((scene: any) => scene.backButton && scene.backButton.visible)
+      const scene = (window as any).__gameControls?.scene
+      return scene?.backButton?.visible
     }, { timeout: 1500 })
     return true
   } catch {
@@ -70,7 +75,7 @@ test.describe('Responsive UI and Navigation', () => {
   test('responsive menu layouts (desktop, portrait, landscape, resize)', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
     await waitForMenuLoaded(page)
-    const titleVisible = await page.evaluate(() => (window as any).__gameControls?.scene?.title?.visible)
+    const titleVisible = await page.evaluate(() => (window as any).__menuControls?.test?.scene?.title?.visible)
     expect(titleVisible).toBe(true)
 
     await page.setViewportSize({ width: 375, height: 667 })
@@ -84,7 +89,7 @@ test.describe('Responsive UI and Navigation', () => {
 
     await page.setViewportSize({ width: 812, height: 375 })
     await waitForMenuLoaded(page)
-    const landscapeScale = await page.evaluate(() => (window as any).__gameControls?.scene?.title?.scale)
+    const landscapeScale = await page.evaluate(() => (window as any).__menuControls?.test?.scene?.title?.scale)
     expect(landscapeScale).toBeTruthy()
 
     await page.setViewportSize({ width: 1280, height: 720 })
@@ -106,9 +111,8 @@ test.describe('Responsive UI and Navigation', () => {
     const assertScene = async (key: string) => {
       await page.waitForFunction(
         (sceneKey) => {
-          const game = (window as any).__gameControls?.game
-          const scene = game?.scene?.getScene(sceneKey)
-          return scene && scene.scene.isActive()
+          const scene = (window as any).__gameControls?.scene
+          return scene?.sceneKey === sceneKey
         },
         key,
         { timeout: 1500 }

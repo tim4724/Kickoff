@@ -31,7 +31,7 @@ test.describe('Shooting Mechanics (smoke)', () => {
       // give possession to blue human
       const myId = scene.myPlayerId
       state.ball.possessedBy = myId
-      scene.ball.setPosition(state.ball.x, state.ball.y)
+      scene.ball.position.set(state.ball.x, state.ball.y)
       // fire a shot
       scene.actionButton?.__test_simulatePress()
       scene.actionButton?.__test_simulateRelease(400) // long press = shoot
