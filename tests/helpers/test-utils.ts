@@ -66,20 +66,54 @@ export async function getSessionId(client: Page): Promise<string> {
 export async function getServerState(client: Page) {
   return client.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    const state = scene?.networkManager?.getState()
-    return {
-      phase: state?.phase || 'unknown',
-      matchTimer: state?.matchTimer || 0,
-      scoreBlue: state?.scoreBlue || 0,
-      scoreRed: state?.scoreRed || 0,
-      playerCount: state?.players?.size || 0,
-      ball: {
-        x: state?.ball?.x || 0,
-        y: state?.ball?.y || 0,
-        possessedBy: state?.ball?.possessedBy || '',
-        velocityX: state?.ball?.velocityX || 0,
-        velocityY: state?.ball?.velocityY || 0
+    let phase = 'unknown'
+    let matchTimer = 0
+    let scoreBlue = 0
+    let scoreRed = 0
+    let playerCount = 0
+    let ball = { x: 0, y: 0, possessedBy: '', velocityX: 0, velocityY: 0 }
+
+    if (scene && typeof scene.getUnifiedState === 'function') {
+      const unified = scene.getUnifiedState()
+      if (unified) {
+        phase = unified.phase
+        matchTimer = unified.matchTime
+        scoreBlue = unified.scoreBlue
+        scoreRed = unified.scoreRed
+        playerCount = unified.players.size
+        ball = {
+          x: unified.ball.x,
+          y: unified.ball.y,
+          possessedBy: unified.ball.possessedBy,
+          velocityX: unified.ball.velocityX,
+          velocityY: unified.ball.velocityY
+        }
       }
+    } else if (scene?.networkManager) {
+      const state = scene.networkManager.getState()
+      if (state) {
+        phase = state.phase
+        matchTimer = state.matchTime
+        scoreBlue = state.scoreBlue
+        scoreRed = state.scoreRed
+        playerCount = state.players?.size || 0
+        ball = {
+          x: state.ball?.x || 0,
+          y: state.ball?.y || 0,
+          possessedBy: state.ball?.possessedBy || '',
+          velocityX: state.ball?.velocityX || 0,
+          velocityY: state.ball?.velocityY || 0
+        }
+      }
+    }
+
+    return {
+      phase,
+      matchTimer,
+      scoreBlue,
+      scoreRed,
+      playerCount,
+      ball
     }
   })
 }
@@ -159,6 +193,9 @@ export async function gainPossession(
     await client.waitForFunction(
       (playerId) => {
         const scene = (window as any).__gameControls?.scene
+        if (scene && typeof scene.getUnifiedState === 'function') {
+           return scene.getUnifiedState()?.ball?.possessedBy === playerId
+        }
         const state = scene?.networkManager?.getState()
         return state?.ball?.possessedBy === playerId
       },
@@ -188,17 +225,52 @@ export async function moveTowardBallAndCapture(
   while (Date.now() - startTime < timeoutMs) {
     const state = await client.evaluate(() => {
       const scene = (window as any).__gameControls?.scene
-      const netState = scene?.networkManager?.getState()
-      const controlledId = scene?.controlledPlayerId || scene?.mySessionId || ''
-      const player = controlledId ? netState?.players?.get(controlledId) : null
-      const ball = netState?.ball
+
+      let ballX = 0, ballY = 0, ballPossessor = ''
+      let playerX = 0, playerY = 0
+      let controlledId = scene?.controlledPlayerId || scene?.mySessionId || ''
+      // Fallback for SinglePlayerScene which might use myPlayerId
+      if (!controlledId && scene?.myPlayerId) controlledId = scene.myPlayerId
+
+      if (scene && typeof scene.getUnifiedState === 'function') {
+        const unified = scene.getUnifiedState()
+        if (unified) {
+          ballX = unified.ball.x
+          ballY = unified.ball.y
+          ballPossessor = unified.ball.possessedBy
+
+          if (controlledId) {
+            const player = unified.players.get(controlledId)
+            if (player) {
+              playerX = player.x
+              playerY = player.y
+            }
+          }
+        }
+      } else if (scene?.networkManager) {
+        const netState = scene.networkManager.getState()
+        if (netState) {
+          ballX = netState.ball?.x || 0
+          ballY = netState.ball?.y || 0
+          ballPossessor = netState.ball?.possessedBy || ''
+
+          if (controlledId) {
+            const player = netState.players?.get(controlledId)
+            if (player) {
+              playerX = player.x || 0
+              playerY = player.y || 0
+            }
+          }
+        }
+      }
+
       return {
         controlledId,
-        ballPossessor: ball?.possessedBy || '',
-        playerX: player?.x || 0,
-        playerY: player?.y || 0,
-        ballX: ball?.x || 0,
-        ballY: ball?.y || 0,
+        ballPossessor,
+        playerX,
+        playerY,
+        ballX,
+        ballY,
         hasMoveHelper: !!(scene && (window as any).__gameControls?.test?.movePlayerDirect),
       }
     })

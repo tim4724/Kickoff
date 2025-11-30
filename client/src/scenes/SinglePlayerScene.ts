@@ -24,8 +24,12 @@ export class SinglePlayerScene extends BaseGameScene {
     }
     GameClock.useRealTime()
 
-    GameClock.resetTimeScale()
-    GameClock.setTimeScale(1.0)
+    if (typeof window !== 'undefined' && (window as any).__testTimeScale) {
+        GameClock.setTimeScale((window as any).__testTimeScale)
+        console.log(`🕐 [SinglePlayerScene] Using test time scale: ${(window as any).__testTimeScale}x`)
+    } else {
+        GameClock.resetTimeScale()
+    }
 
     this.gameEngine = new GameEngine({
       matchDuration: GAME_CONFIG.MATCH_DURATION,
@@ -62,7 +66,7 @@ export class SinglePlayerScene extends BaseGameScene {
         this.autoSwitchEnabled = enabled
         console.log(`🔄 Auto-switch ${enabled ? 'enabled' : 'disabled'}`)
       },
-      directMove: async (dx: number, dy: number, gameTimeDurationMs: number) => {
+      movePlayerDirect: async (dx: number, dy: number, gameTimeDurationMs: number) => {
         const length = Math.sqrt(dx * dx + dy * dy)
         const normalizedX = length > 0 ? dx / length : 0
         const normalizedY = length > 0 ? dy / length : 0

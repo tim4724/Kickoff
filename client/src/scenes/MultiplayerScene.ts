@@ -36,7 +36,12 @@ export class MultiplayerScene extends BaseGameScene {
       console.warn('🕐 MultiplayerScene detected mock GameClock mode - switching to real time')
     }
     GameClock.useRealTime()
-    GameClock.resetTimeScale()
+    if (typeof window !== 'undefined' && (window as any).__testTimeScale) {
+        GameClock.setTimeScale((window as any).__testTimeScale)
+        console.log(`🕐 [MultiplayerScene] Using test time scale: ${(window as any).__testTimeScale}x`)
+    } else {
+        GameClock.resetTimeScale()
+    }
 
     this.isMultiplayer = false
     this.mySessionId = undefined

@@ -150,18 +150,16 @@ export async function setupSinglePlayerTest(
 ): Promise<void> {
   await page.goto(url)
 
-  // Wait for Phaser game instance to be available
+  // Wait for PixiSceneManager to be available
   await page.waitForFunction(() => {
-    const game = (window as any).game
-    return game && game.scene && game.scene.scenes && game.scene.scenes.length > 0
+    return !!(window as any).sceneManager
   }, { timeout: 10000 })
 
   // Start SinglePlayerScene
   await page.evaluate(() => {
-    const game = (window as any).game
-    if (game && game.scene) {
-      game.scene.start('SinglePlayerScene')
-      game.scene.stop('MenuScene') // Stop menu scene
+    const manager = (window as any).sceneManager
+    if (manager) {
+      manager.start('SinglePlayerScene')
     }
   })
 
@@ -169,7 +167,7 @@ export async function setupSinglePlayerTest(
   await page.waitForFunction(() => {
     const scene = (window as any).__gameControls?.scene
     // Check for unified player system - should have myPlayerId and players map
-    return scene?.scene?.key === 'SinglePlayerScene' && scene?.myPlayerId && scene?.players?.size > 0
+    return scene?.sceneKey === 'SinglePlayerScene' && scene?.myPlayerId && scene?.players?.size > 0
   }, { timeout: 10000 })
 
   // Small delay for scene initialization
