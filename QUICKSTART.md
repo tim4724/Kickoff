@@ -27,8 +27,8 @@ This starts:
 ## Architecture
 
 Kickoff/
-├── client/          # Phaser 3 + TypeScript + Vite
-│   ├── src/scenes/  # GameScene, BaseGameScene, etc.
+├── client/          # PixiJS v8 + TypeScript + Vite
+│   ├── src/scenes/  # MultiplayerScene, SinglePlayerScene, BaseGameScene
 │   └── src/controls/# Virtual joystick & action button
 ├── server/          # Colyseus multiplayer server
 │   ├── src/rooms/MatchRoom.ts

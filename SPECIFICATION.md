@@ -45,7 +45,7 @@
 
 ### Frontend Stack
 
--   **Rendering Engine:** **Phaser 3** is used for its robust 2D rendering capabilities, mobile-first design, and active community support.
+-   **Rendering Engine:** **PixiJS v8** is used for its high-performance 2D rendering capabilities and mobile-first design.
 -   **Framework:** The client is built with **TypeScript** and **Vite** for type safety and a fast development workflow.
 
 ### Backend Stack

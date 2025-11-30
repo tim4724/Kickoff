@@ -8,7 +8,7 @@
 
 Kickoff is a real-time multiplayer arcade soccer game built on a classic client-server model.
 
--   **Client:** A lightweight web client built with Phaser 3, responsible for rendering, input handling, and client-side prediction. It communicates with the server via WebSockets.
+-   **Client:** A lightweight web client built with PixiJS v8, responsible for rendering, input handling, and client-side prediction. It communicates with the server via WebSockets.
 -   **Server:** An authoritative game server powered by Colyseus, which manages all game logic, physics simulation, and AI control. It is the single source of truth for the game state.
 -   **Shared:** A common workspace for code shared between the client and server, primarily for game state schemas and type definitions.
 
@@ -18,9 +18,9 @@ Kickoff is a real-time multiplayer arcade soccer game built on a classic client-
 
 ### Client Layer Components
 
-1.  **Phaser 3 Renderer**
+1.  **PixiJS v8 Renderer**
     -   Manages all visual presentation, including the game field, players, ball, and UI.
-    -   Uses a dual-camera system: one for the fixed 1920x1080 game world and another for the responsive UI layer.
+    -   Uses a dual-layer system (Game World + UI) managed by `CameraManager` and PixiJS Containers.
     -   Handles letterboxing to support various screen aspect ratios.
 
 2.  **Input Handler**

@@ -45,7 +45,7 @@ npm run build:server    # Server only
 
 ```
 Kickoff/
-├── client/          # Phaser 3 game client (TypeScript + Vite)
+├── client/          # PixiJS game client (TypeScript + Vite)
 │   └── src/ai/      # AI system for bot players (3v3 gameplay)
 ├── server/          # Colyseus multiplayer server (Node.js)
 ├── shared/          # Shared engine + GAME_CONFIG constants
