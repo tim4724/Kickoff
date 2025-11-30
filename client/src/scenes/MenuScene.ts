@@ -25,7 +25,7 @@ export class MenuScene extends PixiScene {
    * Expose test API for Playwright
    */
   private setupTestAPI(): void {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && import.meta.env.DEV) {
       const testAPI = {
         scene: this,
         game: this.app,
@@ -198,12 +198,12 @@ export class MenuScene extends PixiScene {
 
       // Expose test API for Playwright
       this.setupTestAPI()
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && import.meta.env.DEV) {
         (window as any).__menuLoaded = true
       }
 
       // Auto-start multiplayer for tests
-      if (typeof window !== 'undefined' && (window as any).__testRoomId) {
+      if (typeof window !== 'undefined' && (window as any).__testRoomId && import.meta.env.DEV) {
         console.log('🧪 Test mode detected - auto-starting multiplayer')
         setTimeout(() => {
           sceneRouter.navigateTo('MultiplayerScene')

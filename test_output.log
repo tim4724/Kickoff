@@ -1,0 +1,290 @@
+
+> kickoff@0.3.1 pretest:e2e
+> npm run build:shared && npm run test:cleanup-ports
+
+
+> kickoff@0.3.1 build:shared
+> npm run build --workspace=shared
+
+
+> @kickoff/shared@0.3.1 build
+> tsc
+
+
+> kickoff@0.3.1 test:cleanup-ports
+> lsof -ti:5174 -ti:3001 2>/dev/null | xargs kill -9 2>/dev/null || true
+
+
+> kickoff@0.3.1 test:e2e
+> playwright test
+
+[2m[WebServer] [22m
+[2m[WebServer] [22m> kickoff@0.3.1 dev:server:test
+[2m[WebServer] [22m> cd server && PORT=3001 npm run dev
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m> @kickoff/server@0.3.1 dev
+[2m[WebServer] [22m> tsx watch src/index.ts
+[2m[WebServer] [22m
+[2m[WebServer] [22mDEPRECATION WARNING: 'pingInterval', 'pingMaxRetries', 'server', and 'verifyClient' Server options will be permanently moved to WebSocketTransport on v0.15
+[2m[WebServer] [22mnew Server({
+[2m[WebServer] [22m  transport: new WebSocketTransport({
+[2m[WebServer] [22m    pingInterval: ...,
+[2m[WebServer] [22m    pingMaxRetries: ...,
+[2m[WebServer] [22m    server: ...,
+[2m[WebServer] [22m    verifyClient: ...
+[2m[WebServer] [22m  })
+[2m[WebServer] [22m})
+[2m[WebServer] [22m👉 Documentation: https://docs.colyseus.io/server/transport/
+[2m[WebServer] [22m🚀 Kickoff Server listening on http://[::]:3001
+[2m[WebServer] [22m📊 Colyseus Monitor: http://[::]:3001/colyseus
+[2m[WebServer] [22m
+[2m[WebServer] [22m       ___      _
+[2m[WebServer] [22m      / __\___ | |_   _ ___  ___ _   _ ___
+[2m[WebServer] [22m     / /  / _ \| | | | / __|/ _ \ | | / __|
+[2m[WebServer] [22m    / /__| (_) | | |_| \__ \  __/ |_| \__ \
+[2m[WebServer] [22m    \____/\___/|_|\__, |___/\___|\__,_|___/
+[2m[WebServer] [22m                  |___/
+[2m[WebServer] [22m
+[2m[WebServer] [22m     · Multiplayer Framework for Node.js ·
+[2m[WebServer] [22m
+[2m[WebServer] [22m💖 Consider becoming a Sponsor on GitHub → https://github.com/sponsors/endel
+[2m[WebServer] [22m🌟 Give us a star on GitHub → https://github.com/colyseus/colyseus
+[2m[WebServer] [22m☁️  Deploy and scale your project on Colyseus Cloud → https://cloud.colyseus.io
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m> kickoff@0.3.1 dev:client:test
+[2m[WebServer] [22m> cd client && VITE_PORT=5174 VITE_SERVER_PORT=3001 npm run dev
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m> @kickoff/client@0.3.1 dev
+[2m[WebServer] [22m> vite
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m293[22m[2m[0m ms[22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5174[22m/[39m
+[2m[WebServer] [22m  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.0.2:[1m5174[22m/[39m
+🕐 Global Setup: Configuring synchronized time acceleration
+⚡ Time scale: 10x on both client and server
+🔄 Tests run in parallel with isolated rooms
+📊 Expected test duration: ~3 minutes with 8 workers
+
+Running 6 tests using 2 workers
+
+  ✘  1 [chromium] › tests/game-flow.spec.ts:5:7 › Game Flow › Menu loads and has correct buttons (9ms)
+  ✘  2 [chromium] › tests/game-flow.spec.ts:25:7 › Game Flow › Navigate to Single Player and back (8ms)
+  ✘  3 [chromium] › tests/game-flow.spec.ts:25:7 › Game Flow › Navigate to Single Player and back (retry #1) (8ms)
+  ✘  4 [chromium] › tests/game-flow.spec.ts:5:7 › Game Flow › Menu loads and has correct buttons (retry #1) (6ms)
+  ✘  5 [chromium] › tests/game-flow.spec.ts:52:7 › Game Flow › Multiplayer room connection flow (7ms)
+  ✘  6 [chromium] › tests/gameplay.spec.ts:20:7 › Gameplay Mechanics (Single Player) › Player movement (6ms)
+  ✘  7 [chromium] › tests/game-flow.spec.ts:52:7 › Game Flow › Multiplayer room connection flow (retry #1) (6ms)
+  ✘  8 [chromium] › tests/gameplay.spec.ts:20:7 › Gameplay Mechanics (Single Player) › Player movement (retry #1) (6ms)
+  ✘  9 [chromium] › tests/gameplay.spec.ts:32:7 › Gameplay Mechanics (Single Player) › Shooting mechanics (5ms)
+  ✘  10 [chromium] › tests/multiplayer-sync.spec.ts:5:7 › Multiplayer Synchronization › Two clients join same room and see each other (6ms)
+  ✘  11 [chromium] › tests/gameplay.spec.ts:32:7 › Gameplay Mechanics (Single Player) › Shooting mechanics (retry #1) (6ms)
+  ✘  12 [chromium] › tests/multiplayer-sync.spec.ts:5:7 › Multiplayer Synchronization › Two clients join same room and see each other (retry #1) (5ms)
+✅ Global teardown complete
+🧹 Cleaning up test artifacts...
+
+
+  1) [chromium] › tests/game-flow.spec.ts:5:7 › Game Flow › Menu loads and has correct buttons ─────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/game-flow-Game-Flow-Menu-loads-and-has-correct-buttons-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/game-flow-Game-Flow-Menu-loads-and-has-correct-buttons-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests/game-flow.spec.ts:25:7 › Game Flow › Navigate to Single Player and back ────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/game-flow-Game-Flow-Navigate-to-Single-Player-and-back-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/game-flow-Game-Flow-Navigate-to-Single-Player-and-back-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › tests/game-flow.spec.ts:52:7 › Game Flow › Multiplayer room connection flow ──────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/game-flow-Game-Flow-Multiplayer-room-connection-flow-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/game-flow-Game-Flow-Multiplayer-room-connection-flow-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › tests/gameplay.spec.ts:20:7 › Gameplay Mechanics (Single Player) › Player movement
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/gameplay-Gameplay-Mechanics-Single-Player-Player-movement-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/gameplay-Gameplay-Mechanics-Single-Player-Player-movement-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › tests/gameplay.spec.ts:32:7 › Gameplay Mechanics (Single Player) › Shooting mechanics
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/gameplay-Gameplay-Mechanics-Single-Player-Shooting-mechanics-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/gameplay-Gameplay-Mechanics-Single-Player-Shooting-mechanics-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › tests/multiplayer-sync.spec.ts:5:7 › Multiplayer Synchronization › Two clients join same room and see each other
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/jules/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/multiplayer-sync-Multiplay-d5cb8-ame-room-and-see-each-other-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/multiplayer-sync-Multiplay-d5cb8-ame-room-and-see-each-other-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6 failed
+    [chromium] › tests/game-flow.spec.ts:5:7 › Game Flow › Menu loads and has correct buttons ──────
+    [chromium] › tests/game-flow.spec.ts:25:7 › Game Flow › Navigate to Single Player and back ─────
+    [chromium] › tests/game-flow.spec.ts:52:7 › Game Flow › Multiplayer room connection flow ───────
+    [chromium] › tests/gameplay.spec.ts:20:7 › Gameplay Mechanics (Single Player) › Player movement
+    [chromium] › tests/gameplay.spec.ts:32:7 › Gameplay Mechanics (Single Player) › Shooting mechanics
+    [chromium] › tests/multiplayer-sync.spec.ts:5:7 › Multiplayer Synchronization › Two clients join same room and see each other

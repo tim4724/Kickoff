@@ -284,7 +284,7 @@ export abstract class BaseGameScene extends PixiScene {
 
     window.addEventListener('orientationchange', this.handleOrientationChange)
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && import.meta.env.DEV) {
       ; (window as any).__gameControls = {
         scene: this,
         game: this.app,
@@ -867,7 +867,7 @@ export abstract class BaseGameScene extends PixiScene {
   // Override update to pass deltaMS? No, I can access app.ticker.
 
   protected setupTestAPI(customTestMethods?: Record<string, any>): void {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !import.meta.env.DEV) return
 
     const existingControls = (window as any).__gameControls || {}
 
