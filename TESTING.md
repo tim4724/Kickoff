@@ -23,7 +23,7 @@ npm run test:e2e:report
 ## Servers & ports
 - Dev: client `5173`, server `3000`.
 - Tests: client `5174`, server `3001` (Playwright `webServer` handles startup/teardown).
-- `client/src/scenes/GameScene.ts` auto-selects the right server port based on page port.
+- `client/src/scenes/MultiplayerScene.ts` selects the server port (using `VITE_SERVER_PORT` or defaults).
 
 ## Time control & helpers
 - 10× time acceleration is enabled in tests; use `waitScaled()` utilities instead of raw `waitForTimeout()`.

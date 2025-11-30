@@ -39,7 +39,7 @@ npm run build:server
 ```
 
 ## Architecture Quick Notes
-- Client: Phaser 3 + Vite; dual-camera (game + UI) with letterboxing for non-16:9.
+- Client: PixiJS v8 + Vite; dual-layer (game + UI) with letterboxing for non-16:9.
 - Server: Colyseus authoritative room; fixed-timestep physics @ 30 Hz.
 - AI: Hierarchical (AIManager → TeamAI → AIPlayer); 3v3 team composition enforced.
 - Testing: Playwright uses isolated rooms and auto-start servers; ports 3001/5174 are reserved for tests, 3000/5173 for dev.
@@ -54,7 +54,7 @@ npm run build:server
 
 ## Project Structure (top-level)
 ```
-client/    # Phaser client (TypeScript + Vite)
+client/    # PixiJS client (TypeScript + Vite)
 server/    # Colyseus server
 shared/    # Shared engine + GAME_CONFIG constants
 tests/     # Playwright E2E suite
