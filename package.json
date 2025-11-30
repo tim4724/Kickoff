@@ -37,7 +37,7 @@
     "clean:all": "npm run clean:test && npm run clean --workspaces"
   },
   "devDependencies": {
-    "@playwright/test": "^1.48.2",
+    "@playwright/test": "^1.57.0",
     "concurrently": "^8.2.2",
     "tsc-alias": "^1.8.16"
   },
@@ -46,12 +46,12 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "@colyseus/schema": "3.0.69",
     "@colyseus/core": "0.16.23",
-    "@colyseus/ws-transport": "0.16.5",
-    "@colyseus/redis-presence": "0.16.4",
-    "@colyseus/redis-driver": "0.16.1",
     "@colyseus/monitor": "0.16.7",
+    "@colyseus/redis-driver": "0.16.1",
+    "@colyseus/redis-presence": "0.16.4",
+    "@colyseus/schema": "3.0.69",
+    "@colyseus/ws-transport": "0.16.5",
     "colyseus": "0.16.5",
     "colyseus.js": "0.16.5",
     "nanoid": "2.1.11"

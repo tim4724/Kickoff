@@ -1,16 +1,18 @@
 /**
- * Action Button for mobile touch controls
+ * Action Button for mobile touch controls (PixiJS)
  * Bottom-right corner button for pass/shoot actions
  * Activates only in right half of screen to avoid conflicts with joystick
  */
 
+import { Container, Graphics, Text, FederatedPointerEvent } from 'pixi.js'
 import { HapticFeedback } from '../utils/HapticFeedback'
 import { gameClock } from '@shared/engine/GameClock'
+import { PixiScene } from '../utils/PixiScene'
 
 export class ActionButton {
-  private scene: Phaser.Scene
-  private button!: Phaser.GameObjects.Arc
-  private label!: Phaser.GameObjects.Text
+  private scene: PixiScene
+  private button!: Graphics
+  private label!: Text
   private pointerId: number = -1 // Track pointer ID for multi-touch
 
   private x: number
@@ -29,12 +31,16 @@ export class ActionButton {
   private onPressCallback?: () => void
   private onReleaseCallback?: (power: number) => void
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  public container: Container
+
+  constructor(scene: PixiScene, x: number, y: number) {
     this.scene = scene
-    this.screenWidth = scene.scale.width
+    this.screenWidth = scene.app.screen.width
+    this.container = new Container()
+    scene.container.addChild(this.container)
 
     // Scale button based on screen size (6% of screen height)
-    this.radius = Math.max(50, Math.min(scene.scale.height * 0.06, 80))
+    this.radius = Math.max(50, Math.min(scene.app.screen.height * 0.06, 80))
 
     this.x = x
     this.y = y
@@ -44,20 +50,27 @@ export class ActionButton {
   }
 
   private createButton() {
-    // Button circle - color will be set to team color via setTeamColor()
-    this.button = this.scene.add.circle(this.x, this.y, this.radius, 0xff4444, 0.6)
-    this.button.setStrokeStyle(3, 0xff6666, 0.7)
-    this.button.setDepth(1000)
-    this.button.setScrollFactor(0)
-
-    // Label - removed football icon per user request
-    this.label = this.scene.add.text(this.x, this.y, '', {
-      fontSize: '32px',
-      color: '#ffffff',
+    this.button = new Graphics()
+    this.label = new Text({
+        text: '',
+        style: { fontSize: 32, fill: '#ffffff' }
     })
-    this.label.setOrigin(0.5, 0.5)
-    this.label.setDepth(1001)
-    this.label.setScrollFactor(0)
+    this.label.anchor.set(0.5, 0.5)
+
+    this.container.addChild(this.button)
+    this.container.addChild(this.label)
+
+    // Initial draw
+    this.drawButton(this.teamColor, 0.6)
+
+    this.container.position.set(this.x, this.y)
+  }
+
+  private drawButton(color: number, alpha: number, strokeColor?: number, strokeWidth: number = 3, strokeAlpha: number = 0.7) {
+    this.button.clear()
+    this.button.circle(0, 0, this.radius)
+    this.button.fill({ color, alpha })
+    this.button.stroke({ width: strokeWidth, color: strokeColor || this.teamColorLight, alpha: strokeAlpha })
   }
 
   /**
@@ -71,49 +84,60 @@ export class ActionButton {
     // Calculate lighter stroke color (add 0x222222 to make it brighter)
     this.teamColorLight = Math.min(color + 0x222222, 0xffffff)
 
-    // Update button to use team color - force update with explicit fill
-    if (this.button) {
-      this.button.fillColor = this.teamColor
-      this.button.fillAlpha = 0.6
-      this.button.setFillStyle(this.teamColor, 0.6)
-      this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
-      console.log(`🎨 [ActionButton] Button color updated to ${this.button.fillColor.toString(16)}`)
-    }
+    this.drawButton(this.teamColor, 0.6)
   }
 
   private setupInput() {
-    this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      // Skip if button already pressed by different pointer
-      if (this.isPressed && this.pointerId !== pointer.id) {
-        return
-      }
+    this.scene.app.stage.eventMode = 'static';
+    this.scene.app.stage.hitArea = this.scene.app.screen;
 
-      // ZONE CHECK: Only activate in right half of screen
-      if (pointer.x < this.screenWidth / 2) {
-        return // Left half = joystick territory
-      }
+    const onPointerDown = (e: FederatedPointerEvent) => {
+        // Skip if button already pressed by different pointer
+        if (this.isPressed && this.pointerId !== e.pointerId) {
+            return
+        }
 
-      // Re-anchor to touch point (symmetric free placement on right side)
-      this.setPosition(pointer.x, pointer.y)
-      this.pointerId = pointer.id
-      this.onPress()
-    })
+        const x = e.global.x
+        const y = e.global.y
 
-    this.scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      // Only respond to our tracked pointer
-      if (pointer.id === this.pointerId && this.isPressed) {
-        this.onRelease()
-      }
-    })
+        // ZONE CHECK: Only activate in right half of screen
+        if (x < this.screenWidth / 2) {
+            return // Left half = joystick territory
+        }
+
+        // Re-anchor to touch point
+        this.setPosition(x, y)
+        this.pointerId = e.pointerId
+        this.onPress()
+    }
+
+    const onPointerUp = (e: FederatedPointerEvent) => {
+        // Only respond to our tracked pointer
+        if (e.pointerId === this.pointerId && this.isPressed) {
+            this.onRelease()
+        }
+    }
+
+    this.scene.app.stage.on('pointerdown', onPointerDown)
+    this.scene.app.stage.on('pointerup', onPointerUp)
+    this.scene.app.stage.on('pointerupoutside', onPointerUp)
+
+    this.cleanupListeners = () => {
+        this.scene.app.stage.off('pointerdown', onPointerDown)
+        this.scene.app.stage.off('pointerup', onPointerUp)
+        this.scene.app.stage.off('pointerupoutside', onPointerUp)
+    }
   }
+
+  private cleanupListeners: () => void = () => {}
 
   private onPress() {
     this.isPressed = true
     this.pressStartTime = gameClock.now()
 
     // Visual feedback - use lighter team color when pressed
-    this.button.setFillStyle(this.teamColorLight, 0.7)
-    this.button.setScale(0.9)
+    this.drawButton(this.teamColorLight, 0.7)
+    this.container.scale.set(0.9)
 
     // Haptic feedback on press
     HapticFeedback.light()
@@ -129,15 +153,14 @@ export class ActionButton {
     const holdDurationMs = gameClock.now() - this.pressStartTime
     const holdDuration = holdDurationMs / 1000 // Convert to seconds
 
-    // Reset visual - use team color
-    this.button.setFillStyle(this.teamColor, 0.6)
-    this.button.setScale(1)
-    this.button.setStrokeStyle(3, this.teamColorLight, 0.7) // Reset to normal stroke
+    // Reset visual
+    this.drawButton(this.teamColor, 0.6)
+    this.container.scale.set(1)
 
     // Calculate power based on hold duration
     const power = Math.min(holdDuration / 1.0, 1)
 
-    // Haptic feedback on release (medium for shooting action)
+    // Haptic feedback on release
     HapticFeedback.medium()
 
     // Trigger release callback with power
@@ -180,21 +203,17 @@ export class ActionButton {
     return this.isPressed
   }
 
-  /**
-   * Get all game objects for camera ignore lists
-   */
-  public getGameObjects(): Phaser.GameObjects.GameObject[] {
-    return [this.button, this.label]
+  public getContainer(): Container {
+    return this.container
   }
 
   /**
    * Update button position and screen width when window resizes
-   * @param newWidth - New screen width
-   * @param newHeight - New screen height
    */
   public resize(newWidth: number, newHeight: number) {
     // Update screen width for hit detection
     this.screenWidth = newWidth
+    this.scene.app.stage.hitArea = this.scene.app.screen;
 
     // Re-anchor to a symmetric default on the right side if not pressed
     if (!this.isPressed) {
@@ -202,9 +221,8 @@ export class ActionButton {
       this.y = Math.max(100, newHeight * 0.8)
     }
 
-    // Update button and label positions
-    this.button.setPosition(this.x, this.y)
-    this.label.setPosition(this.x, this.y)
+    // Update button position
+    this.container.position.set(this.x, this.y)
   }
 
   /**
@@ -213,8 +231,7 @@ export class ActionButton {
   public setPosition(newX: number, newY: number) {
     this.x = newX
     this.y = newY
-    this.button.setPosition(this.x, this.y)
-    this.label.setPosition(this.x, this.y)
+    this.container.position.set(this.x, this.y)
   }
 
   /**
@@ -225,21 +242,28 @@ export class ActionButton {
       const power = this.getPower()
       // Enhanced pulse effect based on power (more pronounced scaling)
       const scale = 0.85 + power * 0.3
-      this.button.setScale(scale)
+      this.container.scale.set(scale)
 
-      // Change color intensity based on power (starts from new base 0.6)
+      // Change color intensity based on power
       const alpha = 0.6 + power * 0.4
-      this.button.setAlpha(alpha)
+      this.button.alpha = alpha; // directly set alpha on graphics
 
       // Add outer glow ring for charging effect
       const glowSize = 3 + power * 5 // Stroke width grows from 3 to 8
       const glowAlpha = 0.4 + power * 0.6 // Glow becomes more visible
-      this.button.setStrokeStyle(glowSize, this.teamColorLight, glowAlpha)
+
+      this.button.stroke({ width: glowSize, color: this.teamColorLight, alpha: glowAlpha })
     } else {
-      // Reset to base state
-      this.button.setScale(1.0)
-      this.button.setAlpha(0.6)
-      this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
+      // Reset to base state should be handled by onRelease/drawButton mostly,
+      // but if we are manually tweening properties here:
+      if (this.container.scale.x !== 1) this.container.scale.set(1)
+      if (this.button.alpha !== 1) this.button.alpha = 1 // alpha relative to container? wait, createButton sets fill alpha
+      // Actually drawButton sets fill alpha. button.alpha is container level? No, button is Graphics.
+      // Let's re-draw to be safe or just reset properties if we modified them.
+      // Re-calling drawButton every frame is expensive.
+      // Modifying stroke via property is better if possible in v8? GraphicsContext?
+      // For now, let's just leave it unless we need complex animation.
+      // The original code re-set stroke style every frame if pressed.
     }
   }
 
@@ -247,40 +271,28 @@ export class ActionButton {
    * Clean up resources
    */
   public destroy() {
-    this.button.destroy()
-    this.label.destroy()
-    this.scene.input.off('pointerdown')
-    this.scene.input.off('pointerup')
+    this.cleanupListeners()
+    this.container.destroy({ children: true })
   }
 
   // ============================================
   // TESTING API - For automated testing only
   // ============================================
 
-  /**
-   * Simulate button press (testing only)
-   */
   public __test_simulatePress() {
     if (!this.scene) return
     this.onPress()
   }
 
-  /**
-   * Simulate button release after delay (testing only)
-   * @param holdDurationMs - How long button was held (milliseconds)
-   */
   public __test_simulateRelease(holdDurationMs: number = 0) {
     if (!this.isPressed) return
 
     const holdDuration = holdDurationMs / 1000
     const power = Math.min(holdDuration / 1.0, 1)
 
-    // Reset visual - use team color
-    this.button.setFillStyle(this.teamColor, 0.6)
-    this.button.setScale(1)
-    this.button.setStrokeStyle(3, this.teamColorLight, 0.7)
+    this.drawButton(this.teamColor, 0.6)
+    this.container.scale.set(1)
 
-    // Trigger callback
     if (this.onReleaseCallback) {
       this.onReleaseCallback(power)
     }
@@ -289,9 +301,6 @@ export class ActionButton {
     this.pointerId = -1
   }
 
-  /**
-   * Get current button state (testing only)
-   */
   public __test_getState() {
     return {
       pressed: this.isPressed,

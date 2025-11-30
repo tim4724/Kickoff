@@ -1,32 +1,36 @@
-import Phaser from 'phaser'
+import { Container, Graphics } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
 
 /**
- * Ball Renderer Utility
+ * Ball Renderer Utility for PixiJS
  * Shared rendering logic for ball creation and color updates
  */
 export class BallRenderer {
   /**
    * Create the ball sprite with shadow
    */
-  static createBall(
-    scene: Phaser.Scene,
-    gameObjects: Phaser.GameObjects.GameObject[],
-    uiCamera: Phaser.Cameras.Scene2D.Camera
-  ): { ball: Phaser.GameObjects.Ellipse; shadow: Phaser.GameObjects.Ellipse } {
+  static createBall(container: Container): { ball: Graphics; shadow: Graphics } {
     const width = GAME_CONFIG.FIELD_WIDTH
     const height = GAME_CONFIG.FIELD_HEIGHT
 
     // Ball shadow
-    const ballShadow = scene.add.ellipse(width / 2 + 2, height / 2 + 3, 30, 24, 0x000000, 0.3)
-    ballShadow.setDepth(15)
+    const ballShadow = new Graphics()
+    ballShadow.ellipse(0, 0, 15, 12) // Radius is half of width/height
+    ballShadow.fill({ color: 0x000000, alpha: 0.3 })
+    ballShadow.position.set(width / 2 + 2, height / 2 + 3)
+    ballShadow.zIndex = 15 // PixiJS uses zIndex if sortableChildren is true
+    container.addChild(ballShadow)
 
     // Ball
-    const ball = scene.add.ellipse(width / 2, height / 2, 30, 30, 0xffffff)
-    ball.setDepth(15)
+    const ball = new Graphics()
+    ball.circle(0, 0, 15) // Radius 15 (width 30)
+    ball.fill(0xffffff)
+    ball.position.set(width / 2, height / 2)
+    ball.zIndex = 15
+    container.addChild(ball)
 
-    gameObjects.push(ballShadow, ball)
-    uiCamera.ignore([ballShadow, ball])
+    // Enable zIndex sorting
+    container.sortableChildren = true
 
     return { ball, shadow: ballShadow }
   }
@@ -35,7 +39,7 @@ export class BallRenderer {
    * Update ball color based on possession and pressure
    */
   static updateBallColor(
-    ball: Phaser.GameObjects.Ellipse,
+    ball: Graphics,
     possessorTeam: 'blue' | 'red' | null,
     pressureLevel: number,
     blueColor: number,
@@ -67,10 +71,12 @@ export class BallRenderer {
       targetColor = (r << 16) | (g << 8) | b
     }
 
-    // Set the fill color - setFillStyle clears isFilled flag
-    ball.setFillStyle(targetColor)
-    // Restore fill by setting it again with same color to ensure isFilled is true
-    ball.fillColor = targetColor
-    ball.isFilled = true
+    // PixiJS Graphics update requires clearing and redrawing for simple shapes
+    // Or we can use tint if we used a white texture.
+    // Since we are using Graphics primitives, we must redraw or tint.
+    // Graphics tint affects the whole graphics object.
+
+    // Simplest is to tint the graphics object since it's just a white circle.
+    ball.tint = targetColor
   }
 }

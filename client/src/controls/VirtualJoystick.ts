@@ -1,14 +1,16 @@
 /**
- * Virtual Joystick for mobile touch controls
+ * Virtual Joystick for mobile touch controls (PixiJS)
  * Spawns dynamically at touch position on left half of screen
  */
 
+import { Container, Graphics, FederatedPointerEvent } from 'pixi.js'
 import { HapticFeedback } from '../utils/HapticFeedback'
+import { PixiScene } from '../utils/PixiScene'
 
 export class VirtualJoystick {
-  private scene: Phaser.Scene
-  private base!: Phaser.GameObjects.Arc
-  private stick!: Phaser.GameObjects.Arc
+  private scene: PixiScene
+  private base!: Graphics
+  private stick!: Graphics
   private pointerId: number = -1 // Track pointer ID for multi-touch
 
   private baseX: number = 0
@@ -21,16 +23,20 @@ export class VirtualJoystick {
 
   private isActive: boolean = false
 
-  constructor(scene: Phaser.Scene) {
+  public container: Container
+
+  constructor(scene: PixiScene) {
     this.scene = scene
-    this.screenWidth = scene.scale.width
-    this.screenHeight = scene.scale.height
+    this.screenWidth = scene.app.screen.width
+    this.screenHeight = scene.app.screen.height
+    this.container = new Container()
+    scene.container.addChild(this.container)
 
     // Scale joystick based on screen size (5% of screen height)
-    this.maxRadius = Math.max(50, Math.min(scene.scale.height * 0.05, 80))
+    this.maxRadius = Math.max(50, Math.min(this.screenHeight * 0.05, 80))
     // Default starting position (left/bottom quadrant)
-    this.baseX = Math.max(60, scene.scale.width * 0.18)
-    this.baseY = Math.max(120, scene.scale.height * 0.7)
+    this.baseX = Math.max(60, this.screenWidth * 0.18)
+    this.baseY = Math.max(120, this.screenHeight * 0.7)
 
     this.createJoystick()
     this.repositionJoystick(this.baseX, this.baseY)
@@ -38,24 +44,31 @@ export class VirtualJoystick {
   }
 
   private createJoystick() {
-    // Base circle (outer ring) - initially at (0, 0), will be repositioned on touch
-    // Color will be set to team color via setTeamColor()
-    // Base: team color at 60% opacity
-    this.base = this.scene.add.circle(0, 0, this.maxRadius, 0x0066ff, 0.6)
-    this.base.setStrokeStyle(3, 0x0066ff, 0.8)
-    this.base.setDepth(1000)
-    this.base.setScrollFactor(0) // Fixed to camera
+    this.base = new Graphics()
+    this.stick = new Graphics()
 
-    // Stick circle (inner control)
-    // Color will be set to team color via setTeamColor()
-    // Stick: same color at 60% opacity
-    this.stick = this.scene.add.circle(0, 0, this.maxRadius * 0.5, 0x0066ff, 0.6)
-    this.stick.setStrokeStyle(2, 0x0066ff, 0.8)
-    this.stick.setDepth(1001)
-    this.stick.setScrollFactor(0)
+    this.container.addChild(this.base)
+    this.container.addChild(this.stick)
 
-    // Visible by default (always show anchor)
+    // Initial draw
+    this.drawJoystick()
+
+    // Ensure they are visible
     this.setVisible(true)
+  }
+
+  private drawJoystick() {
+    // Draw Base
+    this.base.clear()
+    this.base.circle(0, 0, this.maxRadius)
+    this.base.fill({ color: this.teamColor, alpha: 0.6 })
+    this.base.stroke({ width: 3, color: this.teamColor, alpha: 0.8 })
+
+    // Draw Stick
+    this.stick.clear()
+    this.stick.circle(0, 0, this.maxRadius * 0.5)
+    this.stick.fill({ color: this.teamColor, alpha: 0.6 })
+    this.stick.stroke({ width: 2, color: this.teamColor, alpha: 0.8 })
   }
 
   /**
@@ -64,86 +77,103 @@ export class VirtualJoystick {
    */
   public setTeamColor(color: number) {
     this.teamColor = color
-    // Team color at ~60% opacity for both base and stick
-    this.base.setFillStyle(color, 0.6)
-    this.base.setStrokeStyle(3, color, 0.8)
-    this.stick.setFillStyle(color, 0.6)
-    this.stick.setStrokeStyle(2, color, 0.8)
+    this.drawJoystick()
   }
 
   private setupInput() {
-    // Listen for touch/click - spawn joystick at touch position in left half
-    this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      // Skip if joystick already active with different pointer
-      if (this.isActive && this.pointerId !== pointer.id) {
-        return
-      }
+    // PixiJS handles events differently. We should attach listeners to the stage or a full-screen interactive hit area.
+    // The safest bet is the stage for global input, or a large background rectangle.
+    // Assuming scene.app.stage is interactive or we make a hit area.
 
-      // ZONE CHECK: Only activate in left half of screen
-      if (pointer.x >= this.screenWidth / 2) {
-        return // Right half = button territory
-      }
+    // We'll attach to the scene's main container but we need to ensure it has a hit area covering the screen.
+    // Ideally, the scene background does this.
+    // But for safety, let's attach to `this.scene.app.stage` event if possible, or use a global interaction manager.
+    // The issue is that `stage` events bubble.
 
-      // EXCLUSION ZONE: Don't activate in back button area (top-left corner)
-      // Back button is at (10, 10) with size 100x40, add margin for safety
-      const BACK_BUTTON_EXCLUSION_WIDTH = 120
-      const BACK_BUTTON_EXCLUSION_HEIGHT = 60
-      if (pointer.x < BACK_BUTTON_EXCLUSION_WIDTH && pointer.y < BACK_BUTTON_EXCLUSION_HEIGHT) {
-        return // Top-left corner = back button territory
-      }
+    // Let's rely on the scene passing us the pointer events or attach to the global stage for 'pointerdown'.
 
-      // Spawn joystick at touch position
-      this.baseX = pointer.x
-      this.baseY = pointer.y
+    // Using `this.scene.app.stage` requires `eventMode = 'static'` on stage.
+    this.scene.app.stage.eventMode = 'static';
+    this.scene.app.stage.hitArea = this.scene.app.screen;
 
-      // Clamp position to prevent off-screen rendering (70px margins)
-      const margin = 70
-      this.baseX = Phaser.Math.Clamp(this.baseX, margin, this.screenWidth / 2 - margin)
-      this.baseY = Phaser.Math.Clamp(this.baseY, margin, this.scene.scale.height - margin)
+    const onPointerDown = (e: FederatedPointerEvent) => {
+        // Skip if joystick already active with different pointer
+        if (this.isActive && this.pointerId !== e.pointerId) {
+            return
+        }
 
-      // Reposition visual elements to spawn point
-      this.repositionJoystick(this.baseX, this.baseY)
+        const x = e.global.x
+        const y = e.global.y
 
-      // Activate joystick and track pointer ID
-      this.pointerId = pointer.id
-      this.isActive = true
-      this.setVisible(true)
+        // ZONE CHECK: Only activate in left half of screen
+        if (x >= this.screenWidth / 2) {
+            return // Right half = button territory
+        }
 
-      // Haptic feedback on touch
-      HapticFeedback.light()
-    })
+        // EXCLUSION ZONE: Don't activate in back button area (top-left corner)
+        const BACK_BUTTON_EXCLUSION_WIDTH = 120
+        const BACK_BUTTON_EXCLUSION_HEIGHT = 60
+        if (x < BACK_BUTTON_EXCLUSION_WIDTH && y < BACK_BUTTON_EXCLUSION_HEIGHT) {
+            return // Top-left corner = back button territory
+        }
 
-    this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      // Only respond to our tracked pointer
-      if (this.isActive && pointer.id === this.pointerId) {
-        this.updateStickPosition(pointer.x, pointer.y)
-      }
-    })
+        // Spawn joystick at touch position
+        this.baseX = x
+        this.baseY = y
 
-    this.scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      // Only respond to our tracked pointer
-      if (pointer.id === this.pointerId) {
-        this.reset()
-      }
-    })
+        // Clamp position to prevent off-screen rendering (70px margins)
+        const margin = 70
+        this.baseX = Math.max(margin, Math.min(this.baseX, this.screenWidth / 2 - margin))
+        this.baseY = Math.max(margin, Math.min(this.baseY, this.screenHeight - margin))
+
+        // Reposition visual elements to spawn point
+        this.repositionJoystick(this.baseX, this.baseY)
+
+        // Activate joystick and track pointer ID
+        this.pointerId = e.pointerId
+        this.isActive = true
+        this.setVisible(true)
+
+        // Haptic feedback on touch
+        HapticFeedback.light()
+    }
+
+    const onPointerMove = (e: FederatedPointerEvent) => {
+        // Only respond to our tracked pointer
+        if (this.isActive && e.pointerId === this.pointerId) {
+            this.updateStickPosition(e.global.x, e.global.y)
+        }
+    }
+
+    const onPointerUp = (e: FederatedPointerEvent) => {
+        // Only respond to our tracked pointer
+        if (e.pointerId === this.pointerId) {
+            this.reset()
+        }
+    }
+
+    this.scene.app.stage.on('pointerdown', onPointerDown)
+    this.scene.app.stage.on('pointermove', onPointerMove)
+    this.scene.app.stage.on('pointerup', onPointerUp)
+    this.scene.app.stage.on('pointerupoutside', onPointerUp)
+
+    // Store cleanup function
+    this.cleanupListeners = () => {
+        this.scene.app.stage.off('pointerdown', onPointerDown)
+        this.scene.app.stage.off('pointermove', onPointerMove)
+        this.scene.app.stage.off('pointerup', onPointerUp)
+        this.scene.app.stage.off('pointerupoutside', onPointerUp)
+    }
   }
 
-  /**
-   * Reposition joystick base and stick to new location
-   * @param x - New base X position
-   * @param y - New base Y position
-   */
+  private cleanupListeners: () => void = () => {}
+
   private repositionJoystick(x: number, y: number) {
     this.baseX = x
     this.baseY = y
 
-    // Move base circle
-    this.base.x = x
-    this.base.y = y
-
-    // Reset stick to center of base
-    this.stick.x = x
-    this.stick.y = y
+    this.base.position.set(x, y)
+    this.stick.position.set(x, y)
   }
 
   private updateStickPosition(x: number, y: number) {
@@ -154,26 +184,24 @@ export class VirtualJoystick {
     if (distance > this.maxRadius) {
       // Clamp to max radius
       const angle = Math.atan2(dy, dx)
-      this.stick.x = this.baseX + Math.cos(angle) * this.maxRadius
-      this.stick.y = this.baseY + Math.sin(angle) * this.maxRadius
+      this.stick.position.set(
+          this.baseX + Math.cos(angle) * this.maxRadius,
+          this.baseY + Math.sin(angle) * this.maxRadius
+      )
     } else {
-      this.stick.x = x
-      this.stick.y = y
+        this.stick.position.set(x, y)
     }
   }
 
   private reset() {
     this.pointerId = -1
     this.isActive = false
-    this.stick.x = this.baseX
-    this.stick.y = this.baseY
+    this.stick.position.set(this.baseX, this.baseY)
     this.setVisible(true)
   }
 
-  private setVisible(_visible: boolean) {
-    // Always keep base/stick visible to show anchor
-    this.base.setVisible(true)
-    this.stick.setVisible(true)
+  private setVisible(visible: boolean) {
+    this.container.visible = visible
   }
 
   /**
@@ -197,9 +225,12 @@ export class VirtualJoystick {
     const normalizedX = dx / this.maxRadius
     const normalizedY = dy / this.maxRadius
 
+    // Clamp manually
+    const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max)
+
     return {
-      x: Phaser.Math.Clamp(normalizedX, -1, 1),
-      y: Phaser.Math.Clamp(normalizedY, -1, 1),
+      x: clamp(normalizedX, -1, 1),
+      y: clamp(normalizedY, -1, 1),
     }
   }
 
@@ -210,115 +241,88 @@ export class VirtualJoystick {
     return this.isActive
   }
 
-  /**
-   * Get all game objects for camera ignore lists
-   */
-  public getGameObjects(): Phaser.GameObjects.GameObject[] {
-    return [this.base, this.stick]
+  public getContainer(): Container {
+    return this.container
   }
 
   /**
    * Update screen width when window resizes
-   * @param newWidth - New screen width
    */
   public resize(newWidth: number, newHeight: number) {
-    // Update screen bounds for left-half zone detection
     this.screenWidth = newWidth
     this.screenHeight = newHeight
+
+    // Update stage hitArea
+    this.scene.app.stage.hitArea = this.scene.app.screen;
 
     const margin = 70
 
     if (this.isActive) {
       // Ensure base position stays within new screen bounds
-      this.baseX = Phaser.Math.Clamp(this.baseX, margin, newWidth / 2 - margin)
-      this.baseY = Phaser.Math.Clamp(this.baseY, margin, this.screenHeight - margin)
+      this.baseX = Math.max(margin, Math.min(this.baseX, newWidth / 2 - margin))
+      this.baseY = Math.max(margin, Math.min(this.baseY, this.screenHeight - margin))
 
       // Reposition visual elements
-      this.base.x = this.baseX
-      this.base.y = this.baseY
+      this.base.position.set(this.baseX, this.baseY)
 
       // Keep stick at current relative position
       const currentDx = this.stick.x - this.base.x
       const currentDy = this.stick.y - this.base.y
-      this.stick.x = this.baseX + currentDx
-      this.stick.y = this.baseY + currentDy
+      this.stick.position.set(this.baseX + currentDx, this.baseY + currentDy)
     } else {
       // Inactive: re-anchor to a safe default within bounds
       this.baseX = Math.max(margin, Math.min(newWidth * 0.18, newWidth / 2 - margin))
       this.baseY = Math.max(margin, Math.min(this.screenHeight * 0.7, this.screenHeight - margin))
-      this.base.x = this.baseX
-      this.base.y = this.baseY
-      this.stick.x = this.baseX
-      this.stick.y = this.baseY
+      this.base.position.set(this.baseX, this.baseY)
+      this.stick.position.set(this.baseX, this.baseY)
     }
 
-    // Reapply color to avoid stale state after resize/orientation change
-    this.setTeamColor(this.teamColor)
+    this.drawJoystick()
   }
 
   /**
    * Clean up resources
    */
   public destroy() {
-    this.base.destroy()
-    this.stick.destroy()
-    this.scene.input.off('pointerdown')
-    this.scene.input.off('pointermove')
-    this.scene.input.off('pointerup')
+    this.cleanupListeners()
+    this.container.destroy({ children: true })
   }
 
   // ============================================
   // TESTING API - For automated testing only
   // ============================================
 
-  /**
-   * Simulate touch at position (testing only)
-   * @param x - Touch X coordinate
-   * @param y - Touch Y coordinate
-   */
   public __test_simulateTouch(x: number, y: number) {
     if (!this.scene) return
 
-    // Apply same exclusion rules as setupInput()
     if (x >= this.screenWidth / 2) {
-      return // Right half = button territory
+      return
     }
 
     const BACK_BUTTON_EXCLUSION_WIDTH = 120
     const BACK_BUTTON_EXCLUSION_HEIGHT = 60
     if (x < BACK_BUTTON_EXCLUSION_WIDTH && y < BACK_BUTTON_EXCLUSION_HEIGHT) {
-      return // Top-left corner = back button territory
+      return
     }
 
-    // Simulate left-half touch
     const margin = 70
-    this.baseX = Phaser.Math.Clamp(x, margin, this.screenWidth / 2 - margin)
-    this.baseY = Phaser.Math.Clamp(y, margin, this.scene.scale.height - margin)
+    this.baseX = Math.max(margin, Math.min(x, this.screenWidth / 2 - margin))
+    this.baseY = Math.max(margin, Math.min(y, this.screenHeight - margin))
+
     this.repositionJoystick(this.baseX, this.baseY)
     this.isActive = true
     this.setVisible(true)
   }
 
-  /**
-   * Simulate drag to position (testing only)
-   * @param x - Drag X coordinate
-   * @param y - Drag Y coordinate
-   */
   public __test_simulateDrag(x: number, y: number) {
     if (!this.isActive) return
     this.updateStickPosition(x, y)
   }
 
-  /**
-   * Simulate touch release (testing only)
-   */
   public __test_simulateRelease() {
     this.reset()
   }
 
-  /**
-   * Get current joystick state (testing only)
-   */
   public __test_getState() {
     return {
       active: this.isActive,
@@ -326,7 +330,7 @@ export class VirtualJoystick {
       baseY: this.baseY,
       stickX: this.stick.x,
       stickY: this.stick.y,
-      baseColor: this.base.fillColor,
+      baseColor: (this.base.fill as any)?.color || this.teamColor, // Fill might be complex object in v8
       input: this.getInput(),
     }
   }

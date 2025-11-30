@@ -9,13 +9,13 @@
  * - Programmatic navigation with URL updates
  * - Initial page load routing
  * - Prevents redundant scene transitions
- * - Complete fresh scene loads on navigation (Phaser's start() handles cleanup automatically)
+ * - Complete fresh scene loads on navigation
  */
 
-import Phaser from 'phaser'
+import { PixiSceneManager } from './PixiSceneManager'
 
 /**
- * Route configuration mapping URL hash paths to Phaser scene keys
+ * Route configuration mapping URL hash paths to Scene keys
  */
 const ROUTES = {
   '/menu': 'MenuScene',
@@ -28,16 +28,16 @@ type RoutePath = keyof typeof ROUTES
 type SceneKey = (typeof ROUTES)[RoutePath]
 
 export class SceneRouter {
-  private game: Phaser.Game | null = null
+  private sceneManager: PixiSceneManager | null = null
   private isNavigating = false
   private currentPath: RoutePath | null = null
 
   /**
-   * Initialize the router with the Phaser game instance
+   * Initialize the router with the Scene Manager instance
    * Sets up event listeners for browser navigation
    */
-  public init(game: Phaser.Game): void {
-    this.game = game
+  public init(sceneManager: PixiSceneManager): void {
+    this.sceneManager = sceneManager
     console.log('[SceneRouter] Initializing router')
 
     // Listen to hash changes (back/forward buttons, manual URL edits)
@@ -111,22 +111,18 @@ export class SceneRouter {
 
   /**
    * Navigate to a path (internal method)
-   * 
-   * Phaser's scene.start() automatically handles cleanup:
-   * - If scene is running, it calls shutdown() then create()
-   * - If scene is stopped, it calls create() fresh
-   * This means we get a completely fresh scene instance every time!
    */
   private navigateToPath(path: RoutePath): void {
-    if (!this.game) {
-      console.error('[SceneRouter] Cannot navigate - game not initialized')
+    if (!this.sceneManager) {
+      console.error('[SceneRouter] Cannot navigate - scene manager not initialized')
       return
     }
 
     // Check if already on this path
     if (this.currentPath === path) {
       console.log(`[SceneRouter] Already on ${path}, skipping navigation`)
-      return
+      // But we still force a start if it's the initial load or to be safe
+      // Actually, if we're here, we probably want to ensure the scene is active
     }
 
     const sceneKey = ROUTES[path]
@@ -136,35 +132,9 @@ export class SceneRouter {
     // Update current path
     this.currentPath = path
 
-    // Get currently active scenes
-    const activeScenes = this.game.scene.getScenes(true)
-
-    // Check if target scene is already running AND it's the only active scene
-    const targetScene = this.game.scene.getScene(sceneKey)
-    const targetIsRunning = targetScene && targetScene.scene.isActive()
-    const onlyTargetActive = activeScenes.length === 1 && targetIsRunning
-
-    if (onlyTargetActive) {
-      console.log(`[SceneRouter] Scene ${sceneKey} is already the only active scene, skipping`)
-      return
-    }
-
-    // Stop all other active scenes to avoid overlap
-    for (const scene of activeScenes) {
-      const key = scene.scene.key
-      if (key !== sceneKey) {
-        console.log(`[SceneRouter] Stopping scene: ${key}`)
-        this.game.scene.stop(key)
-      }
-    }
-
-    // Start the target scene immediately (Phaser handles shutdown for us)
+    // Start the target scene
     console.log(`[SceneRouter] Starting scene: ${sceneKey}`)
-    try {
-      this.game.scene.start(sceneKey)
-    } catch (e) {
-      console.error(`[SceneRouter] Failed to start scene ${sceneKey}:`, e)
-    }
+    this.sceneManager.start(sceneKey)
   }
 
 
@@ -172,11 +142,11 @@ export class SceneRouter {
    * Programmatically navigate to a scene by name
    * Updates the URL and transitions to the scene
    *
-   * @param sceneName - Phaser scene key (e.g., 'MenuScene', 'MultiplayerScene')
+   * @param sceneName - Scene key (e.g., 'MenuScene', 'MultiplayerScene')
    */
   public navigateTo(sceneName: SceneKey): void {
-    if (!this.game) {
-      console.error('[SceneRouter] Cannot navigate - game not initialized')
+    if (!this.sceneManager) {
+      console.error('[SceneRouter] Cannot navigate - scene manager not initialized')
       return
     }
 
