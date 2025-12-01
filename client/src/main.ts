@@ -82,6 +82,23 @@ function setupFullscreenSplash(_app: Application) {
           padding: 20px;
         `
 
+        // Disable interaction with the game while splash is up to prevent click-through
+        const gameContainer = document.getElementById('game-container')
+        if (gameContainer) {
+            gameContainer.style.pointerEvents = 'none'
+            const canvas = gameContainer.querySelector('canvas')
+            if (canvas) canvas.style.pointerEvents = 'none'
+        }
+
+        const cleanupSplash = () => {
+            splash.remove()
+            if (gameContainer) {
+                gameContainer.style.pointerEvents = ''
+                const canvas = gameContainer.querySelector('canvas')
+                if (canvas) canvas.style.pointerEvents = ''
+            }
+        }
+
         const title = document.createElement('div')
         title.textContent = 'KICKOFF'
         title.style.cssText = `
@@ -118,26 +135,19 @@ function setupFullscreenSplash(_app: Application) {
           console.log('📱 Fullscreen button clicked')
           const container = document.getElementById('game-container')
           if (!container) {
-            splash.remove()
+            cleanupSplash()
             return
           }
-          const restorePointerEvents = () => {
-            container.style.pointerEvents = ''
-          }
-
-          container.style.pointerEvents = 'none'
 
           const onSuccess = () => {
             console.log('✅ Fullscreen activated')
-            splash.remove()
-            restorePointerEvents()
+            cleanupSplash()
             // Resume logic here if we had pausing
           }
 
           const onFail = (err: unknown) => {
             console.error('❌ Fullscreen failed:', err)
-            splash.remove()
-            restorePointerEvents()
+            cleanupSplash()
           }
 
           if (container.requestFullscreen) {
