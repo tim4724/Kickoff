@@ -1,4 +1,4 @@
-import { Application } from 'pixi.js'
+import { Application, Graphics } from 'pixi.js'
 import { MenuScene } from './scenes/MenuScene'
 import { MultiplayerScene } from './scenes/MultiplayerScene'
 import { SinglePlayerScene } from './scenes/SinglePlayerScene'
@@ -90,8 +90,17 @@ function setupFullscreenSplash(_app: Application) {
             if (canvas) canvas.style.pointerEvents = 'none'
         }
 
+        // Add a transparent blocker to PixiJS stage as a fallback
+        // This ensures events are captured even if CSS pointer-events fails
+        const blocker = new Graphics()
+        blocker.rect(-10000, -10000, 20000, 20000).fill({ color: 0x000000, alpha: 0.01 })
+        blocker.eventMode = 'static'
+        blocker.zIndex = 999999
+        _app.stage.addChild(blocker)
+
         const cleanupSplash = () => {
             splash.remove()
+            blocker.destroy()
             if (gameContainer) {
                 gameContainer.style.pointerEvents = ''
                 const canvas = gameContainer.querySelector('canvas')
