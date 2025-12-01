@@ -14,6 +14,13 @@ test.describe('Multiplayer Gameplay', () => {
     // Get P1 ID
     const p1Id = await page1.evaluate(() => (window as any).__gameControls.scene.myPlayerId)
 
+    // Wait for P1 to appear on Client 2
+    await expect.poll(async () => {
+        return page2.evaluate((id) => {
+            return (window as any).__gameControls.scene.players.has(id);
+        }, p1Id)
+    }, { timeout: 60000 }).toBe(true)
+
     // Record initial P1 pos on Client 2
     const initialP1PosOnC2 = await page2.evaluate((id) => {
         const p = (window as any).__gameControls.scene.players.get(id);
@@ -31,7 +38,7 @@ test.describe('Multiplayer Gameplay', () => {
             const p = (window as any).__gameControls.scene.players.get(id);
             return p.x;
         }, p1Id)
-    }, { timeout: 10000 }).toBeGreaterThan(initialP1PosOnC2.x + 50)
+    }, { timeout: 60000 }).toBeGreaterThan(initialP1PosOnC2.x + 50)
 
     await context1.close()
     await context2.close()

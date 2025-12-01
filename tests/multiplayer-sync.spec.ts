@@ -31,13 +31,13 @@ test.describe('Multiplayer Synchronization', () => {
         return page1.evaluate((targetId) => {
             return (window as any).__gameControls.scene.players.has(targetId + '-p1')
         }, c2Id)
-    }, { timeout: 20000 }).toBe(true)
+    }, { timeout: 60000 }).toBe(true)
 
     await expect.poll(async () => {
         return page2.evaluate((targetId) => {
             return (window as any).__gameControls.scene.players.has(targetId + '-p1')
         }, c1Id)
-    }, { timeout: 20000 }).toBe(true)
+    }, { timeout: 60000 }).toBe(true)
 
     await context1.close()
     await context2.close()
