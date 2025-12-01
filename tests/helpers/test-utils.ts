@@ -250,18 +250,6 @@ export async function shoot(client: Page, holdDurationMs: number = 200) {
 }
 
 /**
- * Force possession (Single Player Only)
- */
-export async function forcePossession(client: Page) {
-  await client.evaluate(() => {
-    const controls = (window as any).__gameControls
-    if (controls?.test?.forcePossession) {
-      controls.test.forcePossession()
-    }
-  })
-}
-
-/**
  * Calculate distance between two points
  */
 export function calculateDistance(

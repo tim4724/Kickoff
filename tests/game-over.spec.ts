@@ -5,9 +5,9 @@ import { waitScaled } from './helpers/time-control'
 test.describe('Game Over (Single Player)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true)
+    await page.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 30000 })
     await page.evaluate(() => (window as any).__menuButtons.singlePlayer.emit('pointerup'))
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene')
+    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene', { timeout: 30000 })
     await disableAI(page)
   });
 

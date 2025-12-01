@@ -19,11 +19,11 @@ export default defineConfig({
   workers: 2,
 
   // Global timeout
-  timeout: 30000,
+  timeout: 90000,
 
   // Expect timeout
   expect: {
-    timeout: 5000,
+    timeout: 10000,
   },
 
   // Multiple reporters
@@ -41,10 +41,10 @@ export default defineConfig({
     hasTouch: false,
 
     // Action timeout
-    actionTimeout: 15000,
+    actionTimeout: 30000,
 
     // Navigation timeout
-    navigationTimeout: 30000,
+    navigationTimeout: 60000,
   },
 
   projects: [

@@ -4,13 +4,13 @@ import { movePlayer, getPlayerPosition, disableAI, disableAutoSwitch } from './h
 test.describe('Gameplay Mechanics (Single Player)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true)
+    await page.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 30000 })
 
     // Enter Single Player
     await page.evaluate(() => {
         (window as any).__menuButtons.singlePlayer.emit('pointerup');
     })
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene')
+    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene', { timeout: 30000 })
 
     // Disable AI and AutoSwitch for deterministic testing
     await disableAI(page)

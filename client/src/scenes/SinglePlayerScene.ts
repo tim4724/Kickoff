@@ -96,18 +96,17 @@ export class SinglePlayerScene extends BaseGameScene {
           requestAnimationFrame(queueInput)
         })
       },
-      forcePossession: (playerId?: string) => {
+      teleportPlayer: (x: number, y: number) => {
         if (!this.gameEngine) return
         const state = this.gameEngine.getState()
-        const targetId = playerId || this.controlledPlayerId
-        state.ball.possessedBy = targetId
-
-        const player = state.players.get(targetId)
+        const player = state.players.get(this.controlledPlayerId)
         if (player) {
-            state.ball.x = player.x + 15
-            state.ball.y = player.y
+            player.x = x
+            player.y = y
+            player.velocityX = 0
+            player.velocityY = 0
+            console.log(`🔮 Teleport player to ${x}, ${y}`)
         }
-        console.log(`💪 Force possession to ${targetId}`)
       },
       teleportBall: (x: number, y: number) => {
         if (!this.gameEngine) return

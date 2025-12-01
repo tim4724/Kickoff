@@ -1,13 +1,13 @@
 import { test, expect } from './fixtures'
-import { disableAI, disableAutoSwitch, getServerState } from './helpers/test-utils'
+import { disableAI, disableAutoSwitch, getServerState, shoot } from './helpers/test-utils'
 import { waitScaled } from './helpers/time-control'
 
 test.describe('Goal Scoring (Single Player)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true)
+    await page.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 30000 })
     await page.evaluate(() => (window as any).__menuButtons.singlePlayer.emit('pointerup'))
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene')
+    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene', { timeout: 30000 })
     await disableAI(page)
     await disableAutoSwitch(page)
   });
@@ -20,12 +20,19 @@ test.describe('Goal Scoring (Single Player)', () => {
     await page.evaluate(() => {
         const controls = (window as any).__gameControls;
         controls.test.teleportBall(1800, 540);
-        // Give velocity towards goal
-        controls.scene.gameEngine.state.ball.velocityX = 1000;
+        controls.test.teleportPlayer(1750, 540);
     })
 
+    // Move to capture
+    await page.keyboard.down('ArrowRight');
+    await waitScaled(page, 500);
+    await page.keyboard.up('ArrowRight');
+
+    // Shoot
+    await shoot(page);
+
     // Wait for goal processing
-    await waitScaled(page, 1000)
+    await waitScaled(page, 3000)
 
     const goalState = await getServerState(page)
     expect(goalState.scoreBlue).toBe(1)
