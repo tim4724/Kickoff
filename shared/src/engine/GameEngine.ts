@@ -329,7 +329,7 @@ export class GameEngine {
     // Accumulate time for physics
     this.physicsAccumulator += deltaTime
 
-    const MAX_PHYSICS_STEPS = 5
+    const MAX_PHYSICS_STEPS = 10
     let physicsSteps = 0
 
     // Run physics in fixed timesteps

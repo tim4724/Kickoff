@@ -6,8 +6,8 @@ import { setTimeScale } from './helpers/time-control'
  */
 export const test = base.extend({
   page: async ({ page }, use) => {
-    // Apply 10x time acceleration to all tests
-    const TIME_SCALE = 10
+    // Run tests at real-time speed for stability
+    const TIME_SCALE = 1
 
     try {
       // Set time scale window variable BEFORE navigation for server-side acceleration

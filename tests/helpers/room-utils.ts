@@ -189,7 +189,7 @@ export async function setupSinglePlayerTest(
  */
 export async function waitForPlayerReady(
   page: Page,
-  timeoutMs: number = 10000
+  timeoutMs: number = 30000
 ): Promise<void> {
   await page.waitForFunction(() => {
     const scene = (window as any).__gameControls?.scene

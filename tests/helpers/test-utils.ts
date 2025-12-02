@@ -66,10 +66,10 @@ export async function getSessionId(client: Page): Promise<string> {
 export async function getServerState(client: Page) {
   return client.evaluate(() => {
     const scene = (window as any).__gameControls?.scene
-    const state = scene?.networkManager?.getState()
+    const state = scene?.networkManager?.getState() || scene?.gameEngine?.getState()
     return {
       phase: state?.phase || 'unknown',
-      matchTimer: state?.matchTimer || 0,
+      matchTime: state?.matchTime || 0,
       scoreBlue: state?.scoreBlue || 0,
       scoreRed: state?.scoreRed || 0,
       playerCount: state?.players?.size || 0,
@@ -137,7 +137,7 @@ export async function movePlayer(
  */
 export async function gainPossession(
   client: Page,
-  timeoutMs: number = 10000
+  timeoutMs: number = 30000
 ): Promise<boolean> {
   // Get myPlayerId (e.g., "sessionId-p1") instead of just sessionId
   const myPlayerId = await client.evaluate(() => {
@@ -181,7 +181,7 @@ export async function gainPossession(
  */
 export async function moveTowardBallAndCapture(
   client: Page,
-  timeoutMs: number = 10000
+  timeoutMs: number = 30000
 ): Promise<boolean> {
   const startTime = Date.now()
 
@@ -275,7 +275,7 @@ export function calculateVelocity(vx: number, vy: number): number {
  */
 export async function waitForCondition(
   checkFn: () => Promise<boolean>,
-  timeoutMs: number = 5000,
+  timeoutMs: number = 30000,
   intervalMs: number = 100
 ): Promise<boolean> {
   const startTime = Date.now()

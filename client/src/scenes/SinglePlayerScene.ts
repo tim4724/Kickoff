@@ -96,6 +96,28 @@ export class SinglePlayerScene extends BaseGameScene {
           requestAnimationFrame(queueInput)
         })
       },
+      teleportPlayer: (x: number, y: number, playerId?: string) => {
+        if (!this.gameEngine) return
+        const state = this.gameEngine.getState()
+        const targetId = playerId || this.controlledPlayerId
+        const player = state.players.get(targetId)
+        if (player) {
+            player.x = x
+            player.y = y
+            player.velocityX = 0
+            player.velocityY = 0
+            console.log(`🔮 Teleport player ${targetId} to ${x}, ${y}`)
+        }
+      },
+      teleportBall: (x: number, y: number) => {
+        if (!this.gameEngine) return
+        const state = this.gameEngine.getState()
+        state.ball.x = x
+        state.ball.y = y
+        state.ball.velocityX = 0
+        state.ball.velocityY = 0
+        console.log(`🔮 Teleport ball to ${x}, ${y}`)
+      },
     })
   }
 
