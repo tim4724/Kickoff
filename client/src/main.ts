@@ -1,4 +1,4 @@
-import { Application } from 'pixi.js'
+import { Application, Graphics } from 'pixi.js'
 import { MenuScene } from './scenes/MenuScene'
 import { MultiplayerScene } from './scenes/MultiplayerScene'
 import { SinglePlayerScene } from './scenes/SinglePlayerScene'
@@ -82,6 +82,19 @@ function setupFullscreenSplash(_app: Application) {
           padding: 20px;
         `
 
+        // Add a transparent blocker to PixiJS stage to prevent interaction with the game
+        // while the splash is up. This captures all pointer events on the canvas.
+        const blocker = new Graphics()
+        blocker.rect(-10000, -10000, 20000, 20000).fill({ color: 0x000000, alpha: 0.01 })
+        blocker.eventMode = 'static'
+        blocker.zIndex = 999999
+        _app.stage.addChild(blocker)
+
+        const cleanupSplash = () => {
+            splash.remove()
+            blocker.destroy()
+        }
+
         const title = document.createElement('div')
         title.textContent = 'KICKOFF'
         title.style.cssText = `
@@ -118,26 +131,19 @@ function setupFullscreenSplash(_app: Application) {
           console.log('📱 Fullscreen button clicked')
           const container = document.getElementById('game-container')
           if (!container) {
-            splash.remove()
+            cleanupSplash()
             return
           }
-          const restorePointerEvents = () => {
-            container.style.pointerEvents = ''
-          }
-
-          container.style.pointerEvents = 'none'
 
           const onSuccess = () => {
             console.log('✅ Fullscreen activated')
-            splash.remove()
-            restorePointerEvents()
+            cleanupSplash()
             // Resume logic here if we had pausing
           }
 
           const onFail = (err: unknown) => {
             console.error('❌ Fullscreen failed:', err)
-            splash.remove()
-            restorePointerEvents()
+            cleanupSplash()
           }
 
           if (container.requestFullscreen) {
