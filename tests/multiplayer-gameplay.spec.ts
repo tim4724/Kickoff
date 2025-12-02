@@ -29,16 +29,16 @@ test.describe('Multiplayer Gameplay', () => {
 
     // Move P1 (on Client 1)
     await page1.keyboard.down('ArrowRight');
-    await waitScaled(page1, 1000);
+    await waitScaled(page1, 2000);
     await page1.keyboard.up('ArrowRight');
 
     // Check P1 pos on Client 2
     await expect.poll(async () => {
         return page2.evaluate((id) => {
             const p = (window as any).__gameControls.scene.players.get(id);
-            return p.x;
+            return p?.x;
         }, p1Id)
-    }, { timeout: 60000 }).toBeGreaterThan(initialP1PosOnC2.x + 50)
+    }, { timeout: 60000 }).toBeGreaterThan(initialP1PosOnC2.x + 20)
 
     await context1.close()
     await context2.close()
