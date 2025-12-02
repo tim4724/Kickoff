@@ -12,6 +12,11 @@ const FIXED_TIMESTEP_MS = 1000 / 60 // 16.666ms - deterministic physics step
 const FIXED_TIMESTEP_S = FIXED_TIMESTEP_MS / 1000 // 0.01666s
 const MAX_PHYSICS_STEPS = 24 // Increased to handle high CPU contention during parallel tests (8 workers = 16 browser contexts)
 
+// Room registry to track active rooms by roomName
+// This helps handle the Colyseus filterBy race condition where multiple rooms
+// may be created before the first one's metadata is indexed for matching
+const roomRegistry = new Map<string, MatchRoom>()
+
 export class MatchRoom extends Room<GameState> {
   maxClients = 2 // 2 human players (1v1 match)
 
@@ -42,6 +47,33 @@ export class MatchRoom extends Room<GameState> {
     const roomName = options.roomName || 'match'
     await this.setMetadata({ roomName })
     console.log('🏷️  Room name set:', roomName)
+    
+    // Store roomName for cleanup
+    ;(this as any)._roomName = roomName
+    ;(this as any)._isPrimary = false
+    
+    // Check if another room with same roomName already exists
+    const existingRoom = roomRegistry.get(roomName)
+    if (!existingRoom) {
+      // This is the primary room
+      roomRegistry.set(roomName, this)
+      ;(this as any)._isPrimary = true
+      console.log(`📝 Registered as primary room for '${roomName}'`)
+    } else if (existingRoom.clients.length > 0) {
+      // Primary room already has clients - this room is a duplicate from filterBy race condition
+      // Schedule self-disposal to prevent orphaned rooms
+      console.log(`⚠️  Duplicate room for '${roomName}' (primary: ${existingRoom.roomId} has ${existingRoom.clients.length} clients)`)
+      console.log(`🗑️  Scheduling duplicate room ${this.roomId} for disposal`)
+      setTimeout(() => {
+        if (this.clients.length === 0) {
+          console.log(`🗑️  Disposing empty duplicate room ${this.roomId}`)
+          this.disconnect()
+        }
+      }, 5000) // Give it 5 seconds in case a client needs to join
+    } else {
+      // Primary room exists but has no clients yet - race condition in progress
+      console.log(`⚠️  Secondary room for '${roomName}' (primary: ${existingRoom.roomId}, waiting for clients)`)
+    }
 
     const gameState = new GameState()
     this.setState(gameState)
@@ -268,5 +300,12 @@ export class MatchRoom extends Room<GameState> {
 
   onDispose() {
     console.log('Match room disposed:', this.roomId)
+    
+    // Unregister from room registry if we were the primary room
+    const roomName = (this as any)._roomName
+    if (roomName && roomRegistry.get(roomName) === this) {
+      roomRegistry.delete(roomName)
+      console.log(`📝 Unregistered primary room for '${roomName}'`)
+    }
   }
 }

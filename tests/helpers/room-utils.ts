@@ -12,14 +12,17 @@ import { waitScaled } from './time-control'
  * Generate unique room ID for test isolation
  *
  * Format: test-w{workerIndex}-{timestamp}-{random}
+ * Uses a counter to ensure uniqueness even within the same millisecond
  *
  * @param workerIndex - Playwright worker index (0, 1, 2, ...)
  * @returns Unique room ID string
  */
+let roomIdCounter = 0
 export function generateTestRoomId(workerIndex: number): string {
   const timestamp = Date.now()
   const random = Math.random().toString(36).slice(2, 8)
-  return `test-w${workerIndex}-${timestamp}-${random}`
+  const counter = roomIdCounter++
+  return `test-w${workerIndex}-${timestamp}-${random}-${counter}`
 }
 
 /**
@@ -108,19 +111,28 @@ export async function setupMultiClientTest(
 ): Promise<string> {
   const roomId = generateTestRoomId(workerIndex)
 
-  // Set room ID for all pages
+  // Set room ID for all pages BEFORE any navigation
   await Promise.all(
     pages.map(page => setTestRoomId(page, roomId))
   )
 
-  // Navigate all pages
-  await Promise.all(
-    pages.map(page => page.goto(url))
-  )
+  // Navigate first client and wait for it to be ready
+  await pages[0].goto(url)
+  await waitForPlayerReady(pages[0])
+  
+  // Add delay to ensure room is indexed in Colyseus matchmaking
+  // This helps prevent the Colyseus filterBy race condition
+  await waitScaled(pages[0], 1500)
+  
+  // Navigate remaining clients sequentially
+  for (let i = 1; i < pages.length; i++) {
+    await pages[i].goto(url)
+    await waitForPlayerReady(pages[i])
+  }
 
-  // Wait for all players to be ready (server confirms initialization)
+  // Wait for match to start (happens when 2+ clients are connected)
   await Promise.all(
-    pages.map(page => waitForPlayerReady(page))
+    pages.map(page => waitForMatchPlaying(page))
   )
 
   return roomId
