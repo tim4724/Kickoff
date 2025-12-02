@@ -198,3 +198,24 @@ export async function waitForPlayerReady(
     return scene?.myPlayerId && scene?.networkManager?.getState()?.players?.has(scene.myPlayerId)
   }, { timeout: timeoutMs })
 }
+
+/**
+ * Wait for match to start (phase = 'playing')
+ *
+ * Use this after setting up multiplayer clients to ensure the match
+ * has actually started before running gameplay tests.
+ *
+ * @param page - Playwright page object
+ * @param timeoutMs - Maximum time to wait (default: 10000ms)
+ * @returns Promise that resolves when match is playing
+ */
+export async function waitForMatchPlaying(
+  page: Page,
+  timeoutMs: number = 10000
+): Promise<void> {
+  await page.waitForFunction(() => {
+    const scene = (window as any).__gameControls?.scene
+    const state = scene?.networkManager?.getState()
+    return state?.phase === 'playing'
+  }, { timeout: timeoutMs })
+}

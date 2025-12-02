@@ -76,6 +76,10 @@ export class MatchRoom extends Room<GameState> {
   async onJoin(client: Client, options: any) {
     console.log(`👋 Player joining: ${client.sessionId} (room: ${this.roomId}, clients: ${this.clients.length}/${this.maxClients})`)
 
+    // Clean up stale players from disconnected sessions before adding new player
+    // This prevents ghost sessions from causing the match to start prematurely
+    this.cleanupStalePlayers()
+
     // Add player to game state (wait for completion to ensure atomic team assignment)
     const playerInfo = await this.state.addPlayer(client.sessionId)
 
@@ -88,38 +92,56 @@ export class MatchRoom extends Room<GameState> {
 
     console.log(`🎮 Player ${client.sessionId} ready on ${playerInfo.team} team (${this.clients.length}/${this.maxClients} players)`)
 
-    // Count human players and check team distribution
-    let humanPlayerCount = 0
-    let hasBlueTeam = false
-    let hasRedTeam = false
+    // For multiplayer, wait until we have 2 actual connected clients
+    // This prevents starting with stale player data from disconnected sessions
+    if (this.clients.length >= 2) {
+      // Count human players and check team distribution
+      let humanPlayerCount = 0
+      let hasBlueTeam = false
+      let hasRedTeam = false
 
-    this.state.players.forEach((player) => {
-      if (player.isHuman) {
-        humanPlayerCount++
+      this.state.players.forEach((player) => {
+        if (player.isHuman) {
+          humanPlayerCount++
+        }
+        if (player.team === 'blue') hasBlueTeam = true
+        if (player.team === 'red') hasRedTeam = true
+      })
+
+      if (hasBlueTeam && hasRedTeam && this.state.phase === 'waiting') {
+        console.log(`🎮 Starting multiplayer match (${this.clients.length} clients, ${humanPlayerCount} human players)`)
+        this.startMatch()
       }
-      if (player.team === 'blue') hasBlueTeam = true
-      if (player.team === 'red') hasRedTeam = true
+    } else {
+      console.log(`⏳ Waiting for opponent (${this.clients.length}/${this.maxClients} clients connected)`)
+    }
+  }
+
+  /**
+   * Clean up players that belong to sessions no longer connected
+   * This handles cases where a client disconnected without proper cleanup
+   */
+  private cleanupStalePlayers(): void {
+    const connectedSessionIds = new Set(this.clients.map(c => c.sessionId))
+    const staleSessionIds = new Set<string>()
+
+    // Find session IDs that have players but no connected client
+    this.state.players.forEach((player) => {
+      // Extract session ID from player ID (format: sessionId-p1, sessionId-p2, sessionId-p3)
+      const sessionId = player.id.replace(/-p[123]$/, '')
+      if (!connectedSessionIds.has(sessionId)) {
+        staleSessionIds.add(sessionId)
+      }
     })
 
-    // Start match when both teams exist (either 2 human players or 1 human + AI)
-    if (hasBlueTeam && hasRedTeam) {
-      const mode = humanPlayerCount === 2 ? 'multiplayer' : 'single-player with AI'
-      console.log(`🎮 Starting ${mode} match (${humanPlayerCount} human players)`)
-      this.startMatch()
-    } else if (humanPlayerCount === 1) {
-      // Wait for GameState to create AI opponents, then check again
-      // Small delay to allow AI creation, then check if match should start
-      setTimeout(() => {
-        let hasBlue = false
-        let hasRed = false
-        this.state.players.forEach((player) => {
-          if (player.team === 'blue') hasBlue = true
-          if (player.team === 'red') hasRed = true
-        })
-        if (hasBlue && hasRed && this.state.phase === 'waiting') {
-          this.startMatch()
-        }
-      }, 100)
+    // Remove stale players
+    staleSessionIds.forEach((sessionId) => {
+      console.log(`🧹 Cleaning up stale player session: ${sessionId}`)
+      this.state.removePlayer(sessionId)
+    })
+
+    if (staleSessionIds.size > 0) {
+      console.log(`🧹 Removed ${staleSessionIds.size} stale session(s), ${this.state.players.size} players remaining`)
     }
   }
 

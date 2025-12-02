@@ -318,11 +318,34 @@ export class MultiplayerScene extends BaseGameScene {
 
       console.log(`[MultiplayerScene] Using server URL: ${serverUrl}`)
 
-      this.networkManager = new NetworkManager({
+      const networkManager = new NetworkManager({
         serverUrl,
         roomName: 'match',
       })
-      await this.networkManager.connect()
+      
+      // Store reference before await to check for race conditions after
+      this.networkManager = networkManager
+      
+      const connected = await networkManager.connect()
+      
+      // Guard: Check if scene was destroyed during async connection (e.g., user navigated away)
+      // If networkManager was set to undefined by cleanupGameState(), abort initialization
+      if (!this.networkManager || this.networkManager !== networkManager) {
+        console.warn('[MultiplayerScene] Scene was destroyed during connection, aborting')
+        networkManager.disconnect()
+        return
+      }
+      
+      if (!connected) {
+        console.error('❌ Multiplayer connection failed: connect() returned false')
+        this.isMultiplayer = false
+        if (this.roomDebugText) {
+          this.roomDebugText.text = 'Room: Connection failed'
+          this.roomDebugText.style.fill = '#ff4444'
+        }
+        return
+      }
+      
       this.mySessionId = this.networkManager.getMySessionId()
       this.myPlayerId = `${this.mySessionId}-p1`
       this.controlledPlayerId = `${this.mySessionId}-p1`
@@ -354,9 +377,14 @@ export class MultiplayerScene extends BaseGameScene {
       console.error('❌ Multiplayer connection failed:', error)
       this.isMultiplayer = false
       
+      // Guard: Only update UI if roomDebugText still exists (scene wasn't destroyed)
       if (this.roomDebugText) {
-        this.roomDebugText.text = 'Room: Connection failed'
-        this.roomDebugText.style.fill = '#ff4444'
+        try {
+          this.roomDebugText.text = 'Room: Connection failed'
+          this.roomDebugText.style.fill = '#ff4444'
+        } catch {
+          // Ignore errors when updating destroyed UI elements
+        }
       }
     }
   }
