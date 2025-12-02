@@ -82,16 +82,8 @@ function setupFullscreenSplash(_app: Application) {
           padding: 20px;
         `
 
-        // Disable interaction with the game while splash is up to prevent click-through
-        const gameContainer = document.getElementById('game-container')
-        if (gameContainer) {
-            gameContainer.style.pointerEvents = 'none'
-            const canvas = gameContainer.querySelector('canvas')
-            if (canvas) canvas.style.pointerEvents = 'none'
-        }
-
-        // Add a transparent blocker to PixiJS stage as a fallback
-        // This ensures events are captured even if CSS pointer-events fails
+        // Add a transparent blocker to PixiJS stage to prevent interaction with the game
+        // while the splash is up. This captures all pointer events on the canvas.
         const blocker = new Graphics()
         blocker.rect(-10000, -10000, 20000, 20000).fill({ color: 0x000000, alpha: 0.01 })
         blocker.eventMode = 'static'
@@ -101,11 +93,6 @@ function setupFullscreenSplash(_app: Application) {
         const cleanupSplash = () => {
             splash.remove()
             blocker.destroy()
-            if (gameContainer) {
-                gameContainer.style.pointerEvents = ''
-                const canvas = gameContainer.querySelector('canvas')
-                if (canvas) canvas.style.pointerEvents = ''
-            }
         }
 
         const title = document.createElement('div')
