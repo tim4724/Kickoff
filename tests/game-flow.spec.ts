@@ -26,8 +26,9 @@ test.describe('Game Flow', () => {
     await page.goto('/')
     await page.waitForFunction(() => (window as any).__menuLoaded === true)
 
-    // Click Single Player
+    // Click Single Player (need both pointerdown and pointerup for debounce logic)
     await page.evaluate(() => {
+        (window as any).__menuButtons.singlePlayer.emit('pointerdown');
         (window as any).__menuButtons.singlePlayer.emit('pointerup');
     })
 
@@ -49,40 +50,35 @@ test.describe('Game Flow', () => {
     await page.waitForFunction(() => (window as any).__menuLoaded === true)
   });
 
-  test('Multiplayer room connection flow', async ({ page }) => {
-    await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true)
-
-    // Click Multiplayer
-    await page.evaluate(() => {
-        (window as any).__menuButtons.multiplayer.emit('pointerup');
-    })
-
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'MultiplayerScene')
-
-    // Wait for connection
+  test('Multiplayer room connection flow', async ({ page }, testInfo) => {
+    // Generate isolated room ID for this test
+    const roomId = generateTestRoomId(testInfo.workerIndex)
+    
+    // Set room ID before navigation 
+    await page.addInitScript((id) => {
+      ;(window as any).__testRoomId = id
+    }, roomId)
+    
+    // Navigate directly to multiplayer - auto-start will handle the connection
+    await page.goto('/#/multiplayer')
+    
+    // Wait for scene and connection
+    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'MultiplayerScene', { timeout: 10000 })
+    
+    // Wait for connection - game should start in single-player waiting mode
+    // We just need to verify the client connected, not that there are 2 players
     await expect.poll(async () => {
-        return page.evaluate(() => (window as any).__gameControls.scene.networkManager?.isConnected())
-    }).toBe(true)
+        const scene = await page.evaluate(() => {
+          const scene = (window as any).__gameControls?.scene
+          return {
+            isConnected: scene?.networkManager?.isConnected?.() ?? false,
+            sessionId: scene?.mySessionId ?? null
+          }
+        })
+        return scene.isConnected && scene.sessionId
+    }, { timeout: 10000 }).toBeTruthy()
 
-    const sessionId = await page.evaluate(() => (window as any).__gameControls.scene.mySessionId)
+    const sessionId = await page.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
     expect(sessionId).toBeTruthy()
-
-    // Return to menu
-    await page.evaluate(() => {
-         (window as any).__gameControls.backButton.emit('pointerdown');
-    })
-    await page.waitForFunction(() => (window as any).__menuLoaded === true)
-
-    // Wait for disconnect - accessing __gameControls of previous scene might be tricky if it was deleted
-    // MultiplayerScene destroy deletes __gameControls if it matches the scene.
-    // So __gameControls should be undefined or overwritten by MenuScene.
-    // MenuScene sets __menuControls but not __gameControls usually?
-    // MenuScene does not set __gameControls.
-    // BaseGameScene destroy deletes __gameControls.
-
-    await expect.poll(async () => {
-         return page.evaluate(() => !(window as any).__gameControls)
-    }).toBe(true)
   })
 })

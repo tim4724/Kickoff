@@ -202,8 +202,8 @@ export class MenuScene extends PixiScene {
         (window as any).__menuLoaded = true
       }
 
-      // Auto-start multiplayer for tests
-      if (typeof window !== 'undefined' && (window as any).__testRoomId && import.meta.env.DEV) {
+      // Auto-start multiplayer for tests (unless explicitly disabled)
+      if (typeof window !== 'undefined' && (window as any).__testRoomId && import.meta.env.DEV && !(window as any).__disableMultiplayerAutoStart) {
         console.log('🧪 Test mode detected - auto-starting multiplayer')
         setTimeout(() => {
           sceneRouter.navigateTo('MultiplayerScene')

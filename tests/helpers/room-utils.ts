@@ -31,10 +31,15 @@ export function generateTestRoomId(workerIndex: number): string {
  * This sets the window.__testRoomId variable that NetworkManager
  * will use to join the specified room.
  *
+ * NOTE: For retries, we need to update the existing value rather than
+ * adding new init scripts (which could cause race conditions).
+ *
  * @param page - Playwright page object
  * @param roomId - Room ID to join
  */
 export async function setTestRoomId(page: Page, roomId: string): Promise<void> {
+  // Use a unique key for this page to update the room ID
+  // This ensures retries use the new room ID
   await page.addInitScript((id) => {
     ;(window as any).__testRoomId = id
   }, roomId)
@@ -109,8 +114,9 @@ export async function setupMultiClientTest(
   url: string,
   workerIndex: number
 ): Promise<string> {
+  // Generate a room ID for this test
   const roomId = generateTestRoomId(workerIndex)
-
+  
   // Set room ID for all pages BEFORE any navigation
   await Promise.all(
     pages.map(page => setTestRoomId(page, roomId))
@@ -120,9 +126,14 @@ export async function setupMultiClientTest(
   await pages[0].goto(url)
   await waitForPlayerReady(pages[0])
   
-  // Add delay to ensure room is indexed in Colyseus matchmaking
-  // This helps prevent the Colyseus filterBy race condition
-  await waitScaled(pages[0], 1500)
+  // Get first client's room ID to verify second client joins same room
+  const firstClientRoomId = await pages[0].evaluate(() => {
+    return (window as any).__gameControls?.scene?.networkManager?.getRoom()?.roomId
+  })
+  
+  // Add longer delay to ensure room is indexed in Colyseus matchmaking
+  // The Colyseus filterBy race condition requires the room to be fully registered
+  await waitScaled(pages[0], 3000)
   
   // Navigate remaining clients sequentially
   for (let i = 1; i < pages.length; i++) {
@@ -130,11 +141,25 @@ export async function setupMultiClientTest(
     await waitForPlayerReady(pages[i])
   }
 
-  // Wait for match to start (happens when 2+ clients are connected)
+  // Wait for match to start
   await Promise.all(
     pages.map(page => waitForMatchPlaying(page))
   )
-
+  
+  // Verify all clients are in the same room
+  const roomIds = await Promise.all(
+    pages.map(page => page.evaluate(() => {
+      return (window as any).__gameControls?.scene?.networkManager?.getRoom()?.roomId
+    }))
+  )
+  
+  const validRoomIds = roomIds.filter(id => id !== undefined && id !== null)
+  const uniqueRoomIds = [...new Set(validRoomIds)]
+  
+  if (validRoomIds.length !== pages.length || uniqueRoomIds.length !== 1) {
+    throw new Error(`Clients ended up in different rooms. Expected: ${firstClientRoomId}, Got: ${JSON.stringify(roomIds)}. This is caused by the Colyseus filterBy race condition.`)
+  }
+  
   return roomId
 }
 

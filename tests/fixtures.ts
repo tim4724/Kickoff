@@ -15,14 +15,6 @@ export const test = base.extend({
         ;(window as any).__testTimeScale = timeScale
       }, TIME_SCALE)
 
-      // Wait for page to load
-      await page.waitForLoadState('domcontentloaded')
-
-      // Apply client-side time acceleration
-      await setTimeScale(page, TIME_SCALE).catch(() => {
-        // Silently fail if GameClock not available yet
-      })
-
       console.log(`⏱️  Time acceleration enabled: ${TIME_SCALE}x (client + server)`)
     } catch (error) {
       // Ignore errors if page not ready
