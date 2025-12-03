@@ -14,19 +14,20 @@ test.describe('Multiplayer Gameplay', () => {
       await setupMultiClientTest([page1, page2], '/', testInfo.workerIndex)
 
       // Get P1 ID
-      const p1Id = await page1.evaluate(() => (window as any).__gameControls.scene.myPlayerId)
+      const p1Id = await page1.evaluate(() => (window as any).__gameControls?.scene?.myPlayerId)
+      expect(p1Id).toBeDefined()
 
       // Wait for P1 to appear on Client 2
       await expect.poll(async () => {
           return page2.evaluate((id) => {
-              return (window as any).__gameControls.scene.players.has(id);
+              return (window as any).__gameControls?.scene?.players?.has(id) ?? false
           }, p1Id)
       }, { timeout: 60000 }).toBe(true)
 
       // Record initial P1 pos on Client 2
       const initialP1PosOnC2 = await page2.evaluate((id) => {
-          const p = (window as any).__gameControls.scene.players.get(id);
-          return { x: p.x, y: p.y };
+          const p = (window as any).__gameControls?.scene?.players?.get(id)
+          return { x: p?.x ?? 0, y: p?.y ?? 0 }
       }, p1Id)
 
       // Move P1 (on Client 1)
@@ -37,8 +38,8 @@ test.describe('Multiplayer Gameplay', () => {
       // Check P1 pos on Client 2
       await expect.poll(async () => {
           return page2.evaluate((id) => {
-              const p = (window as any).__gameControls.scene.players.get(id);
-              return p?.x;
+              const p = (window as any).__gameControls?.scene?.players?.get(id)
+              return p?.x ?? 0
           }, p1Id)
       }, { timeout: 60000 }).toBeGreaterThan(initialP1PosOnC2.x + 20)
     } finally {

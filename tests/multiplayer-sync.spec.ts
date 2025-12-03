@@ -31,24 +31,29 @@ test.describe('Multiplayer Synchronization', () => {
       expect(state2.hasPlayers).toBe(true)
 
       // Verify they are in the same room
-      const roomId1 = await page1.evaluate(() => (window as any).__gameControls.scene.networkManager.getRoom().id)
-      const roomId2 = await page2.evaluate(() => (window as any).__gameControls.scene.networkManager.getRoom().id)
+      const roomId1 = await page1.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.getRoom()?.id)
+      const roomId2 = await page2.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.getRoom()?.id)
 
+      expect(roomId1).toBeDefined()
+      expect(roomId2).toBeDefined()
       expect(roomId1).toBe(roomId2)
 
       // Verify client 1 sees client 2
-      const c1Id = await page1.evaluate(() => (window as any).__gameControls.scene.mySessionId)
-      const c2Id = await page2.evaluate(() => (window as any).__gameControls.scene.mySessionId)
+      const c1Id = await page1.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
+      const c2Id = await page2.evaluate(() => (window as any).__gameControls?.scene?.mySessionId)
+
+      expect(c1Id).toBeDefined()
+      expect(c2Id).toBeDefined()
 
       await expect.poll(async () => {
           return page1.evaluate((targetId) => {
-              return (window as any).__gameControls.scene.players.has(targetId + '-p1')
+              return (window as any).__gameControls?.scene?.players?.has(targetId + '-p1') ?? false
           }, c2Id)
       }, { timeout: 60000 }).toBe(true)
 
       await expect.poll(async () => {
           return page2.evaluate((targetId) => {
-              return (window as any).__gameControls.scene.players.has(targetId + '-p1')
+              return (window as any).__gameControls?.scene?.players?.has(targetId + '-p1') ?? false
           }, c1Id)
       }, { timeout: 60000 }).toBe(true)
     } finally {
