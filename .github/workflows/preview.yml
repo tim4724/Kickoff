@@ -46,7 +46,12 @@ jobs:
           SERVER_IMAGE: ${{ needs.build.outputs.server_sha_tag }}
         run: |
           set -euo pipefail
+          # Convert to lowercase, replace invalid chars with hyphens
           SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g')
+          # Truncate to 54 chars (namespace = kickoff-{branch} must be <= 63 chars, and server subdomain = server-{branch} adds 7 chars)
+          SAFE_BRANCH=$(echo "$SAFE_BRANCH" | cut -c1-54)
+          # Remove trailing hyphens after truncation
+          SAFE_BRANCH=$(echo "$SAFE_BRANCH" | sed 's#-*$##')
           NS="kickoff-${SAFE_BRANCH}"
           HOST_CLIENT="${SAFE_BRANCH}.kickoff-game.duckdns.org"
           HOST_SERVER="server-${SAFE_BRANCH}.kickoff-game.duckdns.org"
@@ -214,6 +219,8 @@ jobs:
           BRANCH_RAW: ${{ github.ref_name }}
         run: |
           SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g')
+          SAFE_BRANCH=$(echo "$SAFE_BRANCH" | cut -c1-54)
+          SAFE_BRANCH=$(echo "$SAFE_BRANCH" | sed 's#-*$##')
           HOST_CLIENT="${SAFE_BRANCH}.kickoff-game.duckdns.org"
           {
             echo "### Preview Links"

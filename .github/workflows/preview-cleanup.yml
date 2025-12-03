@@ -26,6 +26,11 @@ jobs:
         run: |
           set -euo pipefail
           BRANCH_RAW="${{ github.event.ref }}"
+          # Convert to lowercase, replace invalid chars with hyphens
           SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g')
+          # Truncate to 54 chars (must match preview.yml logic)
+          SAFE_BRANCH=$(echo "$SAFE_BRANCH" | cut -c1-54)
+          # Remove trailing hyphens after truncation
+          SAFE_BRANCH=$(echo "$SAFE_BRANCH" | sed 's#-*$##')
           NS="kickoff-${SAFE_BRANCH}"
           kubectl delete namespace "$NS" --ignore-not-found
