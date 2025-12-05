@@ -101,25 +101,12 @@ export class MatchRoom extends Room<GameState> {
       if (player.team === 'red') hasRedTeam = true
     })
 
-    // Start match when both teams exist (either 2 human players or 1 human + AI)
-    if (hasBlueTeam && hasRedTeam) {
-      const mode = humanPlayerCount === 2 ? 'multiplayer' : 'single-player with AI'
-      console.log(`🎮 Starting ${mode} match (${humanPlayerCount} human players)`)
+    // Start match ONLY when 2 human players are present
+    if (humanPlayerCount === 2) {
+      console.log(`🎮 Starting multiplayer match (${humanPlayerCount} human players)`)
       this.startMatch()
-    } else if (humanPlayerCount === 1) {
-      // Wait for GameState to create AI opponents, then check again
-      // Small delay to allow AI creation, then check if match should start
-      setTimeout(() => {
-        let hasBlue = false
-        let hasRed = false
-        this.state.players.forEach((player) => {
-          if (player.team === 'blue') hasBlue = true
-          if (player.team === 'red') hasRed = true
-        })
-        if (hasBlue && hasRed && this.state.phase === 'waiting') {
-          this.startMatch()
-        }
-      }, 100)
+    } else {
+      console.log(`Waiting for more players... currently ${humanPlayerCount}`)
     }
   }
 
@@ -129,28 +116,11 @@ export class MatchRoom extends Room<GameState> {
     // Remove player
     this.state.removePlayer(client.sessionId)
 
-    // If only one human remains, close the room so the other client can return to menu
-    const humanPlayers = Array.from(this.state.players.values()).filter((player) => player.isHuman)
-    if (humanPlayers.length <= 1) {
-      console.log('Only one human remains, notifying clients and closing room')
-      this.broadcast('room_closed', { reason: 'opponent_left' })
-      // Small delay to allow message delivery before disconnecting
-      setTimeout(() => this.disconnect(), 50)
-      return
-    }
-
-    // Return to waiting phase if only 1 player remains
-    if (this.state.players.size === 1 && this.state.phase === 'playing') {
-      console.log('Only 1 player remaining, returning to waiting phase')
-      this.state.phase = 'waiting'
-      this.state.matchTime = GAME_CONFIG.MATCH_DURATION // Reset timer
-    }
-
-    // End match if no players left
-    if (this.state.players.size === 0) {
-      console.log('No players left, disposing room')
-      this.disconnect()
-    }
+    // Immediate cleanup on any disconnect in multiplayer context to prevent stale rooms
+    console.log('Player left, notifying remaining clients and closing room')
+    this.broadcast('room_closed', { reason: 'opponent_left' })
+    // Disconnect immediately to dispose the room
+    this.disconnect()
   }
 
   private onPlayerInputs(client: Client, message: any) {

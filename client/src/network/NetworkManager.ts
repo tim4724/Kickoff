@@ -80,6 +80,13 @@ export class NetworkManager {
   constructor(config: NetworkConfig) {
     this.config = config
     this.client = new Client(config.serverUrl)
+
+    // Ensure clean disconnect on window unload to prevent ghost connections
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        this.disconnect()
+      })
+    }
   }
 
   /**

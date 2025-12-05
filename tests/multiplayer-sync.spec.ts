@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { setupMultiClientTest } from './helpers/room-utils'
+import { setupMultiClientTest, setTestRoomId, generateTestRoomId } from './helpers/room-utils'
 
 test.describe('Multiplayer Synchronization', () => {
   test('Two clients join same room and see each other', async ({ browser }, testInfo) => {
@@ -8,7 +8,28 @@ test.describe('Multiplayer Synchronization', () => {
     const page1 = await context1.newPage()
     const page2 = await context2.newPage()
 
-    await setupMultiClientTest([page1, page2], '/', testInfo.workerIndex)
+    // Explicitly set roomId in URL to ensure unique room and prevent double-connection issues
+    // setupMultiClientTest uses setTestRoomId which sets window.__testRoomId
+    // But NetworkManager prioritizes URL param.
+    // Let's use URL param to be safe and consistent with my fix in connection test.
+
+    const roomId = generateTestRoomId(testInfo.workerIndex);
+    const url = `/?roomId=${roomId}#multiplayer`;
+
+    await Promise.all([
+        page1.goto(url),
+        page2.goto(url)
+    ]);
+
+    // Wait for players to be ready
+    await Promise.all([
+        expect.poll(async () => {
+            return page1.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.isConnected());
+        }, { timeout: 10000 }).toBe(true),
+        expect.poll(async () => {
+            return page2.evaluate(() => (window as any).__gameControls?.scene?.networkManager?.isConnected());
+        }, { timeout: 10000 }).toBe(true)
+    ]);
 
     // Verify both are connected
     const connected1 = await page1.evaluate(() => (window as any).__gameControls.scene.networkManager.isConnected())
@@ -29,6 +50,7 @@ test.describe('Multiplayer Synchronization', () => {
 
     await expect.poll(async () => {
         return page1.evaluate((targetId) => {
+            // Check for targetId-p1 (PixiJS sprite key)
             return (window as any).__gameControls.scene.players.has(targetId + '-p1')
         }, c2Id)
     }, { timeout: 60000 }).toBe(true)
