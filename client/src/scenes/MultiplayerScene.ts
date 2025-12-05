@@ -322,7 +322,11 @@ export class MultiplayerScene extends BaseGameScene {
         serverUrl,
         roomName: 'match',
       })
-      await this.networkManager.connect()
+      const connected = await this.networkManager.connect()
+      if (!connected) {
+        throw new Error('Connection failed (connect returned false)')
+      }
+
       this.mySessionId = this.networkManager.getMySessionId()
       this.myPlayerId = `${this.mySessionId}-p1`
       this.controlledPlayerId = `${this.mySessionId}-p1`
