@@ -64,6 +64,10 @@ export class SceneRouter {
       console.log(`[SceneRouter] Calling window.location.replace('#${path}')`)
       window.location.replace('#' + path)
       console.log(`[SceneRouter] Post-replace hash: "${window.location.hash}"`)
+
+      // Return early to allow hashchange event to handle the navigation
+      // This prevents double initialization of the scene
+      return
     }
 
     // Navigate to the initial scene
@@ -121,8 +125,7 @@ export class SceneRouter {
     // Check if already on this path
     if (this.currentPath === path) {
       console.log(`[SceneRouter] Already on ${path}, skipping navigation`)
-      // But we still force a start if it's the initial load or to be safe
-      // Actually, if we're here, we probably want to ensure the scene is active
+      return
     }
 
     const sceneKey = ROUTES[path]
