@@ -1,7 +1,7 @@
 # Client Dockerfile - Static files served by nginx
 # This is a lightweight image for serving static assets
 
-FROM node:20-alpine AS builder
+FROM node:20-alpine3.20 AS builder
 RUN apk add --no-cache git
 WORKDIR /app
 
@@ -27,7 +27,7 @@ ARG COMMIT_HASH
 RUN COMMIT_HASH=${COMMIT_HASH} npm run build --workspace=client
 
 # Production: nginx to serve static files
-FROM nginx:alpine
+FROM nginx:alpine3.20
 
 # Install sed for runtime HTML injection
 RUN apk add --no-cache sed
