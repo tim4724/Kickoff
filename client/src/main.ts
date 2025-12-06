@@ -1,5 +1,6 @@
 import { Application, Graphics } from 'pixi.js'
 import { MenuScene } from './scenes/MenuScene'
+import { LobbyScene } from './scenes/LobbyScene'
 import { MultiplayerScene } from './scenes/MultiplayerScene'
 import { SinglePlayerScene } from './scenes/SinglePlayerScene'
 import { AIOnlyScene } from './scenes/AIOnlyScene'
@@ -36,6 +37,7 @@ async function init() {
     // Note: We need to update these scenes to inherit from PixiScene first.
     // Casting them as any for now to avoid compilation errors while migrating.
     sceneManager.register('MenuScene', MenuScene as any)
+    sceneManager.register('LobbyScene', LobbyScene as any)
     sceneManager.register('MultiplayerScene', MultiplayerScene as any)
     sceneManager.register('SinglePlayerScene', SinglePlayerScene as any)
     sceneManager.register('AIOnlyScene', AIOnlyScene as any)

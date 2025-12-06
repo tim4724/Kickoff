@@ -280,49 +280,10 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   private async connectToMultiplayer() {
-    if (this.networkManager) {
-      console.warn('[MultiplayerScene] Previous NetworkManager exists, cleaning up first')
-      this.networkManager.disconnect()
-      this.networkManager = undefined
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
-
     try {
-      const resolveServerUrl = (): string => {
-        const pageIsHttps = window.location.protocol === 'https:'
-        const normalizeToWs = (url: string): string => {
-          if (url.startsWith('http://')) return url.replace('http://', 'ws://')
-          if (url.startsWith('https://')) return url.replace('https://', 'wss://')
-          if (!url.startsWith('ws://') && !url.startsWith('wss://')) return `ws://${url}`
-          return url
-        }
-
-        const winUrl = (window as any).__SERVER_URL__ as string | undefined
-        if (winUrl) return normalizeToWs(winUrl)
-
-        const portHint = import.meta.env.VITE_SERVER_PORT as string | undefined
-        if (portHint) {
-          const hostname = window.location.hostname
-          return `${pageIsHttps ? 'wss' : 'ws'}://${hostname}:${portHint}`
-        }
-
-        const hostname = window.location.hostname
-        return `${pageIsHttps ? 'wss' : 'ws'}://${hostname}:3000`
-      }
-
-      let serverUrl = resolveServerUrl()
-
-      if (window.location.protocol === 'https:' && serverUrl.startsWith('ws://')) {
-        serverUrl = serverUrl.replace('ws://', 'wss://')
-      }
-
-      console.log(`[MultiplayerScene] Using server URL: ${serverUrl}`)
-
-      this.networkManager = new NetworkManager({
-        serverUrl,
-        roomName: 'match',
-      })
+      this.networkManager = NetworkManager.getInstance()
       const connected = await this.networkManager.connect()
+
       if (!connected) {
         throw new Error('Connection failed (connect returned false)')
       }

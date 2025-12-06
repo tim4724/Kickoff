@@ -58,6 +58,16 @@ test.describe('Game Flow', () => {
         (window as any).__menuButtons.multiplayer.emit('pointerup');
     })
 
+    // Wait for Lobby
+    await page.waitForFunction(() => (window as any).sceneManager?.currentScene?.sceneKey === 'LobbyScene')
+
+    // Click Create Room
+    await page.evaluate(() => {
+         const lobby = (window as any).sceneManager.currentScene;
+         // Access private property in JS
+         (lobby as any).createButton.emit('pointerup');
+    })
+
     await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'MultiplayerScene')
 
     // Wait for connection

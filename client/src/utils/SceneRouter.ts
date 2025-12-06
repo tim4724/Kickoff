@@ -19,6 +19,7 @@ import { PixiSceneManager } from './PixiSceneManager'
  */
 const ROUTES = {
   '/menu': 'MenuScene',
+  '/lobby': 'LobbyScene',
   '/singleplayer': 'SinglePlayerScene',
   '/multiplayer': 'MultiplayerScene',
   '/ai-only': 'AIOnlyScene',

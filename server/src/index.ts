@@ -1,4 +1,4 @@
-import { Server } from 'colyseus'
+import { Server, matchMaker } from 'colyseus'
 import { createServer } from 'http'
 import express from 'express'
 import cors from 'cors'
@@ -49,6 +49,17 @@ app.get('/health', (_req, res) => {
     version: appVersion,
     server: `Kickoff v${appVersion}`,
   })
+})
+
+// List available rooms API
+app.get('/api/rooms', async (_req, res) => {
+  try {
+    const rooms = await matchMaker.query({ name: 'match' })
+    res.json(rooms)
+  } catch (err) {
+    console.error('Error in /api/rooms:', err);
+    res.status(500).json({ error: (err as Error).message, stack: (err as Error).stack })
+  }
 })
 
 // Start server

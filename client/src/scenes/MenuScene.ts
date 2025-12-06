@@ -163,7 +163,7 @@ export class MenuScene extends PixiScene {
 
       this.multiplayerButton = this.createButton('Multiplayer', 0x16a34a, 0x22c55e, () => {
         console.log('🌐 Starting Multiplayer mode')
-        sceneRouter.navigateTo('MultiplayerScene')
+        sceneRouter.navigateTo('LobbyScene')
       })
       this.multiplayerText = this.multiplayerButton.getChildAt(1) as Text
       this.container.addChild(this.multiplayerButton)
