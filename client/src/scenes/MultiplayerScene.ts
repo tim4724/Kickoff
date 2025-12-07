@@ -305,19 +305,25 @@ export class MultiplayerScene extends BaseGameScene {
         controlledPlayerId: this.controlledPlayerId
       })
 
-      const room = this.networkManager.getRoom() as (Room & { id?: string; roomId?: string }) | undefined
+      const room = this.networkManager.getRoom() as (Room & { id?: string; roomId?: string; metadata?: any }) | undefined
       const roomId = room?.id ?? room?.roomId ?? 'Unknown'
+      const roomName = room?.metadata?.roomName || 'Unknown'
+
+      // Update URL with room ID for deep linking
+      if (roomId !== 'Unknown') {
+          const currentHash = window.location.hash.split('?')[0]
+          const newUrl = `${currentHash}?roomId=${roomId}`
+          console.log(`🔗 Updating URL to: ${newUrl}`)
+          window.history.replaceState(null, '', newUrl)
+      }
+
       if (room && this.roomDebugText) {
-        this.roomDebugText.text = `Room: ${roomId}`
+        this.roomDebugText.text = `Room: ${roomName} (${roomId})`
       }
 
       console.log('🎮 Multiplayer mode enabled')
       console.log('📡 Session ID:', this.mySessionId)
       console.log('🏠 Room ID:', roomId)
-
-      if (this.roomDebugText) {
-        this.roomDebugText.text = `Room: ${roomId}`
-      }
 
       this.setupNetworkListeners()
       this.networkManager.checkExistingPlayers()
@@ -329,6 +335,12 @@ export class MultiplayerScene extends BaseGameScene {
         this.roomDebugText.text = 'Room: Connection failed'
         this.roomDebugText.style.fill = '#ff4444'
       }
+
+      // Redirect to menu on failure
+      console.log('🔙 Redirecting to menu due to connection failure')
+      setTimeout(() => {
+          sceneRouter.navigateTo('MenuScene')
+      }, 2000)
     }
   }
 

@@ -11,6 +11,7 @@ export class LobbyScene extends PixiScene {
   private createButton!: Container
   private backButton!: Container
   private statusText!: Text
+  private refreshInterval: any = null
 
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
@@ -54,6 +55,20 @@ export class LobbyScene extends PixiScene {
     this.container.addChild(this.statusText)
 
     this.refreshRooms()
+    this.startPolling()
+  }
+
+  private startPolling() {
+      if (this.refreshInterval) clearInterval(this.refreshInterval)
+      this.refreshInterval = setInterval(() => this.refreshRooms(), 5000)
+  }
+
+  destroy() {
+      if (this.refreshInterval) {
+          clearInterval(this.refreshInterval)
+          this.refreshInterval = null
+      }
+      super.destroy()
   }
 
   resize(width: number, height: number) {

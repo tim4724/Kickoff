@@ -173,10 +173,20 @@ export class NetworkManager {
   }
 
   private getRoomName(): string {
+    // 1. Check URL query params (e.g. /?roomId=...)
     const urlParams = new URLSearchParams(window.location.search)
     const urlRoomId = urlParams.get('roomId')
     if (urlRoomId) return urlRoomId
 
+    // 2. Check Hash query params (e.g. #/multiplayer?roomId=...)
+    if (window.location.hash.includes('?')) {
+        const hashQuery = window.location.hash.split('?')[1]
+        const hashParams = new URLSearchParams(hashQuery)
+        const hashRoomId = hashParams.get('roomId')
+        if (hashRoomId) return hashRoomId
+    }
+
+    // 3. Check Test ID
     const testRoomId = (window as any).__testRoomId
     if (testRoomId) return testRoomId
 
