@@ -79,9 +79,9 @@ test.describe('Game Flow', () => {
     await expect.poll(async () => page.url()).toContain('roomId=')
 
     // Verify Debug Text
-    const debugText = await page.evaluate(() => (window as any).__gameControls.scene.roomDebugText.text)
-    expect(debugText).toContain('Room')
-    expect(debugText).toContain('(')
+    await expect.poll(async () => {
+        return page.evaluate(() => (window as any).__gameControls.scene.roomDebugText.text)
+    }).toContain('(')
 
     const sessionId = await page.evaluate(() => (window as any).__gameControls.scene.mySessionId)
     expect(sessionId).toBeTruthy()

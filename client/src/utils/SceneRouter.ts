@@ -54,16 +54,22 @@ export class SceneRouter {
   private handleInitialRoute(): void {
     const originalHash = window.location.hash.slice(1)
     const hash = originalHash || '/menu'
-    const path = this.normalizePath(hash)
+
+    // Split query params
+    const [baseHash, query] = hash.split('?')
+    const path = this.normalizePath(baseHash)
 
     console.log(`[SceneRouter] Initial route check: raw="${originalHash}", hash="${hash}", normalized="${path}"`)
 
-    // Update URL if there was no hash OR if normalized path differs
-    // This must happen synchronously so tests can verify the URL immediately
-    if (!originalHash || hash !== path) {
-      console.log(`[SceneRouter] Redirecting invalid/empty route: "${hash}" -> "${path}"`)
-      console.log(`[SceneRouter] Calling window.location.replace('#${path}')`)
-      window.location.replace('#' + path)
+    // Construct valid full hash
+    const validHash = path + (query ? '?' + query : '')
+
+    // Update URL if there was no hash OR if normalized path differs from base hash
+    // We compare constructed validHash with original hash
+    if (!originalHash || hash !== validHash) {
+      console.log(`[SceneRouter] Redirecting invalid/empty route: "${hash}" -> "${validHash}"`)
+      console.log(`[SceneRouter] Calling window.location.replace('#${validHash}')`)
+      window.location.replace('#' + validHash)
       console.log(`[SceneRouter] Post-replace hash: "${window.location.hash}"`)
 
       // Return early to allow hashchange event to handle the navigation
@@ -84,14 +90,17 @@ export class SceneRouter {
     }
 
     const hash = window.location.hash.slice(1) || '/menu'
-    const path = this.normalizePath(hash)
+    const [baseHash, query] = hash.split('?')
+    const path = this.normalizePath(baseHash)
 
     console.log(`[SceneRouter] Hash changed: ${hash} -> ${path}`)
 
-    // If hash was invalid/normalized, correct the URL
-    if (hash !== path) {
-      console.log(`[SceneRouter] Correcting invalid hash: "${hash}" -> "${path}"`)
-      window.location.replace('#' + path)
+    const validHash = path + (query ? '?' + query : '')
+
+    // If hash was invalid/normalized (base part mismatch), correct the URL
+    if (hash !== validHash) {
+      console.log(`[SceneRouter] Correcting invalid hash: "${hash}" -> "${validHash}"`)
+      window.location.replace('#' + validHash)
       return // The replace will trigger another hashchange
     }
 

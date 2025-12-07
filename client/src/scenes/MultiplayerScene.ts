@@ -241,6 +241,14 @@ export class MultiplayerScene extends BaseGameScene {
 
     this.cameraManager.getUIContainer().addChild(this.roomDebugText)
 
+    // Update text if already connected (race condition with initializeGameState)
+    if (this.networkManager?.isConnected()) {
+        const room = this.networkManager.getRoom() as any
+        const roomName = room?.metadata?.roomName || 'Unknown'
+        const roomId = room?.id ?? room?.roomId ?? 'Unknown'
+        this.roomDebugText.text = `Room: ${roomName} (${roomId})`
+    }
+
     this.setupTestAPI({
       getState: () => ({
         joystick: this.joystick ? this.joystick.__test_getState() : null,
