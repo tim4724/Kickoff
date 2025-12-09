@@ -56,6 +56,7 @@ export class NetworkManager {
   private sessionId: string = ''
   private lastRoomClosedReason: string | null = null
   private roomClosedListeners: Array<(reason: string) => void> = []
+  public roomName: string = 'Unknown'
 
   private inputBuffer: Map<string, PlayerInput> = new Map()
 
@@ -66,7 +67,7 @@ export class NetworkManager {
   private onMatchStart?: (duration: number) => void
   private onMatchEnd?: (winner: 'blue' | 'red', scoreBlue: number, scoreRed: number) => void
   private onConnectionError?: (error: string) => void
-  private onPlayerReady?: (sessionId: string, team: 'blue' | 'red') => void
+  private onPlayerReady?: (sessionId: string, team: 'blue' | 'red', roomName?: string) => void
 
   constructor(config: NetworkConfig) {
     this.config = config
@@ -368,7 +369,8 @@ export class NetworkManager {
 
     this.room.onMessage('player_ready', (message) => {
       this.sessionId = message.sessionId
-      this.onPlayerReady?.(message.sessionId, message.team)
+      this.roomName = message.roomName || 'Unknown'
+      this.onPlayerReady?.(message.sessionId, message.team, message.roomName)
     })
 
     this.room.onMessage('match_start', (message) => {

@@ -81,7 +81,7 @@ test.describe('Game Flow', () => {
     // Verify Debug Text
     await expect.poll(async () => {
         return page.evaluate(() => (window as any).__gameControls.scene.roomDebugText.text)
-    }).toContain('(')
+    }).toContain('Room 1 (')
 
     const sessionId = await page.evaluate(() => (window as any).__gameControls.scene.mySessionId)
     expect(sessionId).toBeTruthy()

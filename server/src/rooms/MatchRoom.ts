@@ -84,6 +84,7 @@ export class MatchRoom extends Room<GameState> {
     client.send('player_ready', {
       sessionId: client.sessionId,
       team: playerInfo.team,
+      roomName: this.metadata.roomName,
     })
 
     console.log(`🎮 Player ${client.sessionId} ready on ${playerInfo.team} team (${this.clients.length}/${this.maxClients} players)`)

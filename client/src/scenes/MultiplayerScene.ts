@@ -244,7 +244,9 @@ export class MultiplayerScene extends BaseGameScene {
     // Update text if already connected (race condition with initializeGameState)
     if (this.networkManager?.isConnected()) {
         const room = this.networkManager.getRoom() as any
-        const roomName = room?.metadata?.roomName || 'Unknown'
+        const roomName = this.networkManager.roomName !== 'Unknown'
+            ? this.networkManager.roomName
+            : (room?.metadata?.roomName || 'Unknown')
         const roomId = room?.id ?? room?.roomId ?? 'Unknown'
         this.roomDebugText.text = `Room: ${roomName} (${roomId})`
     }
@@ -315,7 +317,9 @@ export class MultiplayerScene extends BaseGameScene {
 
       const room = this.networkManager.getRoom() as (Room & { id?: string; roomId?: string; metadata?: any }) | undefined
       const roomId = room?.id ?? room?.roomId ?? 'Unknown'
-      const roomName = room?.metadata?.roomName || 'Unknown'
+      const roomName = this.networkManager.roomName !== 'Unknown'
+          ? this.networkManager.roomName
+          : (room?.metadata?.roomName || 'Unknown')
 
       // Update URL with room ID for deep linking
       if (roomId !== 'Unknown') {
@@ -356,6 +360,13 @@ export class MultiplayerScene extends BaseGameScene {
     if (!this.networkManager) return
 
     try {
+      this.networkManager.on('playerReady', (sessionId: string, team: string, roomName?: string) => {
+          if (roomName && this.roomDebugText) {
+               const roomId = this.networkManager?.getRoom()?.roomId || 'Unknown'
+               this.roomDebugText.text = `Room: ${roomName} (${roomId})`
+          }
+      })
+
       this.networkManager.on('playerJoin', (player: any) => {
         try {
           console.log('👤 Remote player joined:', player.id, player.team)
