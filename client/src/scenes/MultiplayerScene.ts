@@ -360,7 +360,7 @@ export class MultiplayerScene extends BaseGameScene {
     if (!this.networkManager) return
 
     try {
-      this.networkManager.on('playerReady', (sessionId: string, team: string, roomName?: string) => {
+      this.networkManager.on('playerReady', (_sessionId: string, _team: string, roomName?: string) => {
           if (roomName && this.roomDebugText) {
                const roomId = this.networkManager?.getRoom()?.roomId || 'Unknown'
                this.roomDebugText.text = `Room: ${roomName} (${roomId})`
