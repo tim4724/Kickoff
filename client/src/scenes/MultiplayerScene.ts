@@ -324,7 +324,7 @@ export class MultiplayerScene extends BaseGameScene {
       // Update URL with room ID for deep linking
       if (roomId !== 'Unknown') {
           const currentHash = window.location.hash.split('?')[0]
-          const newUrl = `${currentHash}?roomId=${roomId}`
+          const newUrl = `${currentHash}?id=${roomId}`
           console.log(`🔗 Updating URL to: ${newUrl}`)
           window.history.replaceState(null, '', newUrl)
       }
@@ -348,10 +348,10 @@ export class MultiplayerScene extends BaseGameScene {
         this.roomDebugText.style.fill = '#ff4444'
       }
 
-      // Redirect to menu on failure
-      console.log('🔙 Redirecting to menu due to connection failure')
+      // Redirect to lobby on failure
+      console.log('🔙 Redirecting to lobby due to connection failure')
       setTimeout(() => {
-          sceneRouter.navigateTo('MenuScene')
+          sceneRouter.navigateTo('LobbyScene')
       }, 2000)
     }
   }

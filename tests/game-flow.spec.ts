@@ -75,8 +75,8 @@ test.describe('Game Flow', () => {
         return page.evaluate(() => (window as any).__gameControls.scene.networkManager?.isConnected())
     }).toBe(true)
 
-    // Verify URL update with roomId
-    await expect.poll(async () => page.url()).toContain('roomId=')
+    // Verify URL update with ID (using new param 'id')
+    await expect.poll(async () => page.url()).toContain('id=')
 
     // Verify Debug Text
     await expect.poll(async () => {

@@ -173,13 +173,22 @@ export class NetworkManager {
     }
   }
 
+  private getRoomIdFromHash(): string | null {
+    if (window.location.hash.includes('?')) {
+      const hashQuery = window.location.hash.split('?')[1]
+      const hashParams = new URLSearchParams(hashQuery)
+      return hashParams.get('id') // Changed from roomId to id for deep link ID
+    }
+    return null
+  }
+
   private getRoomName(): string {
-    // 1. Check URL query params (e.g. /?roomId=...)
+    // 1. Check URL query params (legacy/test isolation)
     const urlParams = new URLSearchParams(window.location.search)
     const urlRoomId = urlParams.get('roomId')
     if (urlRoomId) return urlRoomId
 
-    // 2. Check Hash query params (e.g. #/multiplayer?roomId=...)
+    // 2. Check Hash query params (legacy/test isolation)
     if (window.location.hash.includes('?')) {
         const hashQuery = window.location.hash.split('?')[1]
         const hashParams = new URLSearchParams(hashQuery)
@@ -195,14 +204,25 @@ export class NetworkManager {
   }
 
   async connect(): Promise<boolean> {
-      // If already connected, do nothing?
-      // MultiplayerScene calls this. If we joined via Lobby, we are connected.
       if (this.connected && this.room) {
           console.log('[NetworkManager] Already connected to room:', this.room.roomId)
           return true
       }
 
     try {
+      // Priority 1: Join by ID (Deep Link)
+      const joinId = this.getRoomIdFromHash()
+      if (joinId) {
+        console.log('[NetworkManager] Attempting to join by ID:', joinId)
+        try {
+          return await this.internalConnect(() => this.client.joinById(joinId))
+        } catch (error) {
+          console.warn('[NetworkManager] Failed to join by ID, not falling back to create:', error)
+          return false // Stop here, do not create a new room
+        }
+      }
+
+      // Priority 2: Join or Create by Name (Lobby / Test)
       const roomName = this.getRoomName()
       const options: any = { roomName }
 
