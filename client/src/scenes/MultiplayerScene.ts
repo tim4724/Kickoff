@@ -241,6 +241,16 @@ export class MultiplayerScene extends BaseGameScene {
 
     this.cameraManager.getUIContainer().addChild(this.roomDebugText)
 
+    // Update text if already connected (race condition with initializeGameState)
+    if (this.networkManager?.isConnected()) {
+        const room = this.networkManager.getRoom() as any
+        const roomName = this.networkManager.roomName !== 'Unknown'
+            ? this.networkManager.roomName
+            : (room?.metadata?.roomName || 'Unknown')
+        const roomId = room?.id ?? room?.roomId ?? 'Unknown'
+        this.roomDebugText.text = `Room: ${roomName} (${roomId})`
+    }
+
     this.setupTestAPI({
       getState: () => ({
         joystick: this.joystick ? this.joystick.__test_getState() : null,
@@ -280,49 +290,10 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   private async connectToMultiplayer() {
-    if (this.networkManager) {
-      console.warn('[MultiplayerScene] Previous NetworkManager exists, cleaning up first')
-      this.networkManager.disconnect()
-      this.networkManager = undefined
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
-
     try {
-      const resolveServerUrl = (): string => {
-        const pageIsHttps = window.location.protocol === 'https:'
-        const normalizeToWs = (url: string): string => {
-          if (url.startsWith('http://')) return url.replace('http://', 'ws://')
-          if (url.startsWith('https://')) return url.replace('https://', 'wss://')
-          if (!url.startsWith('ws://') && !url.startsWith('wss://')) return `ws://${url}`
-          return url
-        }
-
-        const winUrl = (window as any).__SERVER_URL__ as string | undefined
-        if (winUrl) return normalizeToWs(winUrl)
-
-        const portHint = import.meta.env.VITE_SERVER_PORT as string | undefined
-        if (portHint) {
-          const hostname = window.location.hostname
-          return `${pageIsHttps ? 'wss' : 'ws'}://${hostname}:${portHint}`
-        }
-
-        const hostname = window.location.hostname
-        return `${pageIsHttps ? 'wss' : 'ws'}://${hostname}:3000`
-      }
-
-      let serverUrl = resolveServerUrl()
-
-      if (window.location.protocol === 'https:' && serverUrl.startsWith('ws://')) {
-        serverUrl = serverUrl.replace('ws://', 'wss://')
-      }
-
-      console.log(`[MultiplayerScene] Using server URL: ${serverUrl}`)
-
-      this.networkManager = new NetworkManager({
-        serverUrl,
-        roomName: 'match',
-      })
+      this.networkManager = NetworkManager.getInstance()
       const connected = await this.networkManager.connect()
+
       if (!connected) {
         throw new Error('Connection failed (connect returned false)')
       }
@@ -344,19 +315,27 @@ export class MultiplayerScene extends BaseGameScene {
         controlledPlayerId: this.controlledPlayerId
       })
 
-      const room = this.networkManager.getRoom() as (Room & { id?: string; roomId?: string }) | undefined
+      const room = this.networkManager.getRoom() as (Room & { id?: string; roomId?: string; metadata?: any }) | undefined
       const roomId = room?.id ?? room?.roomId ?? 'Unknown'
+      const roomName = this.networkManager.roomName !== 'Unknown'
+          ? this.networkManager.roomName
+          : (room?.metadata?.roomName || 'Unknown')
+
+      // Update URL with room ID for deep linking
+      if (roomId !== 'Unknown') {
+          const currentHash = window.location.hash.split('?')[0]
+          const newUrl = `${currentHash}?id=${roomId}`
+          console.log(`🔗 Updating URL to: ${newUrl}`)
+          window.history.replaceState(null, '', newUrl)
+      }
+
       if (room && this.roomDebugText) {
-        this.roomDebugText.text = `Room: ${roomId}`
+        this.roomDebugText.text = `Room: ${roomName} (${roomId})`
       }
 
       console.log('🎮 Multiplayer mode enabled')
       console.log('📡 Session ID:', this.mySessionId)
       console.log('🏠 Room ID:', roomId)
-
-      if (this.roomDebugText) {
-        this.roomDebugText.text = `Room: ${roomId}`
-      }
 
       this.setupNetworkListeners()
       this.networkManager.checkExistingPlayers()
@@ -368,6 +347,12 @@ export class MultiplayerScene extends BaseGameScene {
         this.roomDebugText.text = 'Room: Connection failed'
         this.roomDebugText.style.fill = '#ff4444'
       }
+
+      // Redirect to lobby on failure
+      console.log('🔙 Redirecting to lobby due to connection failure')
+      setTimeout(() => {
+          sceneRouter.navigateTo('LobbyScene')
+      }, 2000)
     }
   }
 
@@ -375,6 +360,13 @@ export class MultiplayerScene extends BaseGameScene {
     if (!this.networkManager) return
 
     try {
+      this.networkManager.on('playerReady', (_sessionId: string, _team: string, roomName?: string) => {
+          if (roomName && this.roomDebugText) {
+               const roomId = this.networkManager?.getRoom()?.roomId || 'Unknown'
+               this.roomDebugText.text = `Room: ${roomName} (${roomId})`
+          }
+      })
+
       this.networkManager.on('playerJoin', (player: any) => {
         try {
           console.log('👤 Remote player joined:', player.id, player.team)

@@ -9,13 +9,13 @@ export interface NetworkConfig {
 export interface PlayerInput {
   movement: { x: number; y: number }
   action: boolean
-  actionPower?: number // 0.0-1.0, power for shooting (optional, defaults to 0.8)
+  actionPower?: number
   timestamp: number
-  playerId: string // Player ID this input is for
+  playerId: string
 }
 
 export interface MultiPlayerInput {
-  inputs: Map<string, PlayerInput> // Map of playerId -> input
+  inputs: Map<string, PlayerInput>
   timestamp: number
 }
 
@@ -42,32 +42,24 @@ export interface GameStateData {
     velocityX: number
     velocityY: number
     possessedBy: string
-    pressureLevel: number // 0.0-1.0, how much pressure on possessor
+    pressureLevel: number
   }
 }
 
-/**
- * NetworkManager handles all client-server communication
- * - Connection management
- * - State synchronization
- * - Input buffering and transmission
- * - Event handling
- */
 export class NetworkManager {
+  private static instance: NetworkManager
   private client: Client
   private room?: Room
   private config: NetworkConfig
 
-  // Connection state
   private connected: boolean = false
   private sessionId: string = ''
   private lastRoomClosedReason: string | null = null
   private roomClosedListeners: Array<(reason: string) => void> = []
+  public roomName: string = 'Unknown'
 
-  // Input buffering - collect all player inputs and send together
   private inputBuffer: Map<string, PlayerInput> = new Map()
 
-  // Event callbacks
   private onStateChange?: (state: GameStateData) => void
   private onPlayerJoin?: (player: RemotePlayer) => void
   private onPlayerLeave?: (playerId: string) => void
@@ -75,13 +67,12 @@ export class NetworkManager {
   private onMatchStart?: (duration: number) => void
   private onMatchEnd?: (winner: 'blue' | 'red', scoreBlue: number, scoreRed: number) => void
   private onConnectionError?: (error: string) => void
-  private onPlayerReady?: (sessionId: string, team: 'blue' | 'red') => void
+  private onPlayerReady?: (sessionId: string, team: 'blue' | 'red', roomName?: string) => void
 
   constructor(config: NetworkConfig) {
     this.config = config
     this.client = new Client(config.serverUrl)
 
-    // Ensure clean disconnect on window unload to prevent ghost connections
     if (typeof window !== 'undefined') {
       window.addEventListener('beforeunload', () => {
         this.disconnect()
@@ -89,112 +80,164 @@ export class NetworkManager {
     }
   }
 
-  /**
-   * Get room name with support for test isolation
-   * Priority: URL param > window variable > default config
-   */
-  private getRoomName(): string {
-    // Check URL parameters for ?roomId=...
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlRoomId = urlParams.get('roomId')
-    if (urlRoomId) {
-      return urlRoomId
-    }
+  public static getInstance(): NetworkManager {
+    if (!NetworkManager.instance) {
+      const resolveServerUrl = (): string => {
+        const pageIsHttps = window.location.protocol === 'https:'
+        const normalizeToWs = (url: string): string => {
+          if (url.startsWith('http://')) return url.replace('http://', 'ws://')
+          if (url.startsWith('https://')) return url.replace('https://', 'wss://')
+          if (!url.startsWith('ws://') && !url.startsWith('wss://')) return `ws://${url}`
+          return url
+        }
 
-    // Check window variable for test isolation
-    const testRoomId = (window as any).__testRoomId
-    if (testRoomId) {
-      // Log for test verification (dev/test mode only)
-      if (import.meta.env.DEV) {
-        console.log('[NetworkManager] Using test room:', testRoomId)
+        const winUrl = (window as any).__SERVER_URL__ as string | undefined
+        if (winUrl) return normalizeToWs(winUrl)
+
+        const portHint = import.meta.env.VITE_SERVER_PORT as string | undefined
+        if (portHint) {
+          const hostname = window.location.hostname
+          return `${pageIsHttps ? 'wss' : 'ws'}://${hostname}:${portHint}`
+        }
+
+        const hostname = window.location.hostname
+        return `${pageIsHttps ? 'wss' : 'ws'}://${hostname}:3000`
       }
-      return testRoomId
-    }
 
-    // Default to config room name
-    return this.config.roomName
+      let serverUrl = resolveServerUrl()
+      if (window.location.protocol === 'https:' && serverUrl.startsWith('ws://')) {
+        serverUrl = serverUrl.replace('ws://', 'wss://')
+      }
+
+      NetworkManager.instance = new NetworkManager({
+        serverUrl,
+        roomName: 'match',
+      })
+    }
+    return NetworkManager.instance
   }
 
-  /**
-   * Connect to the game server and join a match room
-   */
-  async connect(): Promise<boolean> {
+  async getRooms(): Promise<any[]> {
+    const httpUrl = this.config.serverUrl.replace(/^ws/, 'http')
     try {
-      // Suppress console errors during Colyseus connection (schema deserialization warnings)
-      const originalError = console.error
-      const filteredError = (...args: any[]) => {
-        const msg = args[0]?.toString() || ''
-        if (msg.includes('Cannot read properties of undefined')) {
-          // Suppress harmless Colyseus schema initialization errors
-          return
-        }
-        originalError.apply(console, args)
+        const response = await fetch(`${httpUrl}/api/rooms`)
+        if (!response.ok) throw new Error(`Failed to fetch rooms: ${response.statusText}`)
+        return await response.json()
+    } catch (error) {
+        console.error('[NetworkManager] Error fetching rooms:', error)
+        throw error
+    }
+  }
+
+  async joinById(roomId: string): Promise<boolean> {
+      return this.internalConnect(async () => {
+          return await this.client.joinById(roomId)
+      })
+  }
+
+  async joinRoom(options: any): Promise<boolean> {
+      return this.internalConnect(async () => {
+          return await this.client.joinOrCreate(this.config.roomName, options)
+      })
+  }
+
+  private async internalConnect(joinAction: () => Promise<Room>): Promise<boolean> {
+    try {
+      if (this.room) {
+          this.room.leave()
       }
-      console.error = filteredError
 
-      // Get room name (test room ID or production room)
-      const roomName = this.getRoomName()
-      console.log('[NetworkManager] Connecting with roomName:', roomName)
-
-      // Build options object with roomName and optional timeScale (for tests)
-      const options: any = { roomName }
-
-      // Check for test time scale
-      const testTimeScale = (window as any).__testTimeScale
-      if (testTimeScale) {
-        options.timeScale = testTimeScale
-      }
-
-      // ALWAYS pass roomName for filterBy to work correctly
-      // Tests: unique room ID for isolation + time scale
-      // Production: use config room name for matchmaking
-      this.room = await this.client.joinOrCreate('match', options)
-
-      // Restore console.error
-      console.error = originalError
-
+      this.room = await joinAction()
       this.sessionId = this.room.sessionId
       this.connected = true
 
-      // Log for test verification (dev/test mode only)
-      if (import.meta.env.DEV) {
-        console.log('[NetworkManager] Connected! Session ID:', this.sessionId)
-      }
+      // Update config roomName if changed? Not really needed.
 
-      // Handle room errors
       this.room.onError((code, message) => {
         console.error('[NetworkManager] Room error:', code, message)
         this.onConnectionError?.(`Room error: ${message}`)
       })
 
-      // Handle room leave (will be set up in setupMessageListeners)
-      // This is just to mark as disconnected for early connection issues
       this.room.onLeave(() => {
         this.connected = false
       })
 
-      // Set up state change listeners
       this.setupStateListeners()
-
-      // Set up message listeners
       this.setupMessageListeners()
 
       return true
     } catch (error) {
       console.error('[NetworkManager] Connection failed:', error)
       this.onConnectionError?.((error as Error).message)
+      throw error // Re-throw for caller to handle
+    }
+  }
+
+  private getRoomIdFromHash(): string | null {
+    if (window.location.hash.includes('?')) {
+      const hashQuery = window.location.hash.split('?')[1]
+      const hashParams = new URLSearchParams(hashQuery)
+      return hashParams.get('id') // Changed from roomId to id for deep link ID
+    }
+    return null
+  }
+
+  private getRoomName(): string {
+    // 1. Check URL query params (legacy/test isolation)
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlRoomId = urlParams.get('roomId')
+    if (urlRoomId) return urlRoomId
+
+    // 2. Check Hash query params (legacy/test isolation)
+    if (window.location.hash.includes('?')) {
+        const hashQuery = window.location.hash.split('?')[1]
+        const hashParams = new URLSearchParams(hashQuery)
+        const hashRoomId = hashParams.get('roomId')
+        if (hashRoomId) return hashRoomId
+    }
+
+    // 3. Check Test ID
+    const testRoomId = (window as any).__testRoomId
+    if (testRoomId) return testRoomId
+
+    return this.config.roomName
+  }
+
+  async connect(): Promise<boolean> {
+      if (this.connected && this.room) {
+          console.log('[NetworkManager] Already connected to room:', this.room.roomId)
+          return true
+      }
+
+    try {
+      // Priority 1: Join by ID (Deep Link)
+      const joinId = this.getRoomIdFromHash()
+      if (joinId) {
+        console.log('[NetworkManager] Attempting to join by ID:', joinId)
+        try {
+          return await this.internalConnect(() => this.client.joinById(joinId))
+        } catch (error) {
+          console.warn('[NetworkManager] Failed to join by ID, not falling back to create:', error)
+          return false // Stop here, do not create a new room
+        }
+      }
+
+      // Priority 2: Join or Create by Name (Lobby / Test)
+      const roomName = this.getRoomName()
+      const options: any = { roomName }
+
+      const testTimeScale = (window as any).__testTimeScale
+      if (testTimeScale) {
+        options.timeScale = testTimeScale
+      }
+
+      return await this.internalConnect(() => this.client.joinOrCreate('match', options))
+    } catch (error) {
       return false
     }
   }
 
-  /**
-   * Disconnect from the server
-   */
   disconnect(): void {
-    console.log('[NetworkManager] Disconnecting...')
-    
-    // Clear all event callbacks first to prevent triggering during disconnect
-    
     if (this.room) {
       try {
         this.room.leave()
@@ -205,10 +248,8 @@ export class NetworkManager {
       this.room = undefined
     }
     
-    // Clear input buffer
     this.inputBuffer.clear()
     
-    // Clear all event callbacks to prevent stale references
     this.onStateChange = undefined
     this.onPlayerJoin = undefined
     this.onPlayerLeave = undefined
@@ -218,114 +259,62 @@ export class NetworkManager {
     this.onConnectionError = undefined
     this.onPlayerReady = undefined
     this.roomClosedListeners = []
-    
-    console.log('[NetworkManager] Disconnected and cleaned up')
   }
 
-  /**
-   * Send input for a single player (adds to buffer, sends when ready)
-   * Note: Action inputs (shooting) are buffered and sent with other inputs, not immediately
-   * Movement inputs from human players are sent immediately for lower latency
-   */
   sendInput(movement: { x: number; y: number }, action: boolean, actionPower: number | undefined, playerId: string, isHuman: boolean = false): void {
-    if (!this.connected || !this.room) {
-      return
-    }
+    if (!this.connected || !this.room) return
 
     const input: PlayerInput = {
       movement,
       action,
       actionPower,
       timestamp: gameClock.now(),
-      playerId, // Always required - which player this input is for
+      playerId,
     }
 
-    // Add to buffer (overwrites previous input for same player)
-    // If player already has an input in buffer, merge appropriately
     const existingInput = this.inputBuffer.get(playerId)
     if (existingInput) {
-      // Safety: If existing input is from human and new input is from AI, preserve human input
-      // This prevents AI from overwriting human input
       const existingIsHuman = (existingInput as any).isHuman ?? false
-      if (existingIsHuman && !isHuman) {
-        // Human input takes priority - don't overwrite with AI input
-        return
-      }
+      if (existingIsHuman && !isHuman) return
       
       if (action) {
-        // Shooting: preserve existing movement, add action
         input.movement = existingInput.movement
       } else if (existingInput.action) {
-        // Movement update: preserve action if it exists
         input.action = existingInput.action
         input.actionPower = existingInput.actionPower
       }
     }
 
-    // Mark input source for priority handling
     ;(input as any).isHuman = isHuman
-
     this.inputBuffer.set(playerId, input)
     
-    // Send immediately for human movement inputs (reduces latency by ~16ms)
-    // Action inputs (shooting) are still buffered to merge with movement
     if (isHuman && !action && (Math.abs(movement.x) > 0.01 || Math.abs(movement.y) > 0.01)) {
       this.flushInputBuffer()
     }
   }
 
-  /**
-   * Send all buffered inputs to server (called every frame)
-   */
   flushInputs(): void {
-    if (!this.room || this.inputBuffer.size === 0) {
-      return
-    }
-
-    // Always send if there's input - don't rate limit
-    // The server can handle the input rate
+    if (!this.room || this.inputBuffer.size === 0) return
     this.flushInputBuffer()
   }
 
-  /**
-   * Flush input buffer to server
-   */
   private flushInputBuffer(): void {
-    // Don't send if not connected or no room
-    if (!this.connected || !this.room || this.inputBuffer.size === 0) {
-      return
-    }
+    if (!this.connected || !this.room || this.inputBuffer.size === 0) return
 
-    // Convert Map to serializable format
     const inputsMap: { [key: string]: PlayerInput } = {}
     this.inputBuffer.forEach((input, playerId) => {
       inputsMap[playerId] = input
     })
 
     const multiInput: MultiPlayerInput = {
-      inputs: inputsMap as any, // Will be serialized as object
+      inputs: inputsMap as any,
       timestamp: gameClock.now(),
     }
 
-    // Debug: Log what we're sending (occasionally)
-    if (Math.random() < 0.05) { // 5% of the time
-      const playerIds = Object.keys(inputsMap)
-      console.log(`[NetworkManager] Sending inputs for ${playerIds.length} players:`, playerIds)
-      playerIds.forEach(id => {
-        const input = inputsMap[id]
-        console.log(`  ${id}: move(${input.movement.x.toFixed(2)}, ${input.movement.y.toFixed(2)}), action=${input.action}`)
-      })
-    }
-
     this.room.send('inputs', multiInput)
-
-    // Clear buffer after sending
     this.inputBuffer.clear()
   }
 
-  /**
-   * Set up listeners for server state changes
-   */
   private setupStateListeners(): void {
     if (!this.room) return
 
@@ -337,236 +326,127 @@ export class NetworkManager {
         playersHooksRegistered = true
 
         players.onAdd((player: any, key: string) => {
-          try {
-            if (key === this.sessionId) return
-            this.onPlayerJoin?.({
-              id: player.id || key,
-              team: player.team || 'blue',
-              x: player.x || 0,
-              y: player.y || 0,
-              velocityX: player.velocityX || 0,
-              velocityY: player.velocityY || 0,
-              state: player.state || 'idle',
-              direction: player.direction || 0,
-            })
-          } catch (error) {
-            console.error('[NetworkManager] Error in player join:', error)
-          }
+          if (key === this.sessionId) return
+          this.onPlayerJoin?.({
+            id: player.id || key,
+            team: player.team || 'blue',
+            x: player.x || 0,
+            y: player.y || 0,
+            velocityX: player.velocityX || 0,
+            velocityY: player.velocityY || 0,
+            state: player.state || 'idle',
+            direction: player.direction || 0,
+          })
         })
 
         players.onRemove((_player: any, key: string) => {
-          try {
-            this.onPlayerLeave?.(key)
-          } catch (error) {
-            console.error('[NetworkManager] Error in player leave:', error)
-          }
+          this.onPlayerLeave?.(key)
         })
       }
     }
 
-    // Attempt immediate hook with current state
     tryHookPlayers(this.room.state)
 
-    // Listen for state changes
     this.room.onStateChange((state) => {
-      try {
-        tryHookPlayers(state)
+      tryHookPlayers(state)
+      if (!state || !state.ball || !state.players) return
 
-        if (!state || !state.ball || !state.players || typeof state.players.forEach !== 'function') {
-          console.warn('[NetworkManager] State or ball not ready yet')
-          return
-        }
-
-        const gameState: GameStateData = {
-          matchTime: state.matchTime || 0,
-          scoreBlue: state.scoreBlue || 0,
-          scoreRed: state.scoreRed || 0,
-          phase: state.phase || 'waiting',
-          players: new Map(),
-          ball: {
-            x: state.ball.x || 0,
-            y: state.ball.y || 0,
-            velocityX: state.ball.velocityX || 0,
-            velocityY: state.ball.velocityY || 0,
-            possessedBy: state.ball.possessedBy || '',
-            pressureLevel: state.ball.pressureLevel || 0,
-          },
-        }
-
-        // Convert players
-        if (state.players) {
-          state.players.forEach((player: any, key: string) => {
-            gameState.players.set(key, {
-              id: player.id || key,
-              team: player.team || 'blue',
-              x: player.x || 0,
-              y: player.y || 0,
-              velocityX: player.velocityX || 0,
-              velocityY: player.velocityY || 0,
-              state: player.state || 'idle',
-              direction: player.direction || 0,
-            })
-          })
-        }
-
-        this.onStateChange?.(gameState)
-      } catch (error) {
-        console.error('[NetworkManager] Error in state change:', error)
+      const gameState: GameStateData = {
+        matchTime: state.matchTime || 0,
+        scoreBlue: state.scoreBlue || 0,
+        scoreRed: state.scoreRed || 0,
+        phase: state.phase || 'waiting',
+        players: new Map(),
+        ball: {
+          x: state.ball.x || 0,
+          y: state.ball.y || 0,
+          velocityX: state.ball.velocityX || 0,
+          velocityY: state.ball.velocityY || 0,
+          possessedBy: state.ball.possessedBy || '',
+          pressureLevel: state.ball.pressureLevel || 0,
+        },
       }
-    })
 
+      state.players.forEach((player: any, key: string) => {
+        gameState.players.set(key, {
+          id: player.id || key,
+          team: player.team || 'blue',
+          x: player.x || 0,
+          y: player.y || 0,
+          velocityX: player.velocityX || 0,
+          velocityY: player.velocityY || 0,
+          state: player.state || 'idle',
+          direction: player.direction || 0,
+        })
+      })
+
+      this.onStateChange?.(gameState)
+    })
   }
 
-  /**
-   * Set up listeners for server messages
-   */
   private setupMessageListeners(): void {
     if (!this.room) return
 
-    // Player ready event - confirms player is fully initialized on server
     this.room.onMessage('player_ready', (message) => {
-      // Update sessionId from server confirmation (though it should already match)
       this.sessionId = message.sessionId
-      this.onPlayerReady?.(message.sessionId, message.team)
+      this.roomName = message.roomName || 'Unknown'
+      this.onPlayerReady?.(message.sessionId, message.team, message.roomName)
     })
 
-    // Match start event
     this.room.onMessage('match_start', (message) => {
       this.onMatchStart?.(message.duration)
     })
 
-    // Match end event
     this.room.onMessage('match_end', (message) => {
       this.onMatchEnd?.(message.winner, message.scoreBlue, message.scoreRed)
     })
 
-    // Goal scored event (optional - can also track via state changes)
     this.room.onMessage('goal_scored', (message) => {
       this.onGoalScored?.(message.team, message.scoreBlue, message.scoreRed)
     })
 
-    // Room closed event (when opponent leaves in 2-player game)
     this.room.onMessage('room_closed', (message) => {
-      console.log('[NetworkManager] Room closed:', message.reason)
       this.lastRoomClosedReason = message.reason || 'unknown'
       this.emitRoomClosed(message.reason || 'unknown')
     })
 
-    // Listen for room disconnect (when room is destroyed)
-    // This is the main handler that triggers navigation back to menu
-    // The onLeave in connect() just sets connected = false for early connection issues
     this.room.onLeave((code) => {
-      console.log('[NetworkManager] Room disconnected, code:', code)
       this.connected = false
-      // Trigger roomClosed callback to navigate back to menu
-      // This happens when room is destroyed (opponent left in 2-player game)
       const reason = this.lastRoomClosedReason || (code === 4000 ? 'opponent_left' : 'disconnected')
       this.emitRoomClosed(reason)
       this.lastRoomClosedReason = null
     })
   }
 
-  /**
-   * Register event callbacks
-   */
-  on(event: 'stateChange', callback: (state: GameStateData) => void): void
-  on(event: 'playerJoin', callback: (player: RemotePlayer) => void): void
-  on(event: 'playerLeave', callback: (playerId: string) => void): void
-  on(event: 'goalScored', callback: (team: 'blue' | 'red', scoreBlue: number, scoreRed: number) => void): void
-  on(event: 'matchStart', callback: (duration: number) => void): void
-  on(event: 'matchEnd', callback: (winner: 'blue' | 'red', scoreBlue: number, scoreRed: number) => void): void
-  on(event: 'connectionError', callback: (error: string) => void): void
-  on(event: 'playerReady', callback: (sessionId: string, team: 'blue' | 'red') => void): void
-  on(event: 'roomClosed', callback: (reason: string) => void): void
   on(event: string, callback: any): void {
     switch (event) {
-      case 'stateChange':
-        this.onStateChange = callback
-        break
-      case 'playerJoin':
-        this.onPlayerJoin = callback
-        break
-      case 'playerLeave':
-        this.onPlayerLeave = callback
-        break
-      case 'goalScored':
-        this.onGoalScored = callback
-        break
-      case 'matchStart':
-        this.onMatchStart = callback
-        break
-      case 'matchEnd':
-        this.onMatchEnd = callback
-        break
-      case 'connectionError':
-        this.onConnectionError = callback
-        break
-      case 'playerReady':
-        this.onPlayerReady = callback
-        break
-      case 'roomClosed':
-        this.roomClosedListeners.push(callback)
-        break
+      case 'stateChange': this.onStateChange = callback; break
+      case 'playerJoin': this.onPlayerJoin = callback; break
+      case 'playerLeave': this.onPlayerLeave = callback; break
+      case 'goalScored': this.onGoalScored = callback; break
+      case 'matchStart': this.onMatchStart = callback; break
+      case 'matchEnd': this.onMatchEnd = callback; break
+      case 'connectionError': this.onConnectionError = callback; break
+      case 'playerReady': this.onPlayerReady = callback; break
+      case 'roomClosed': this.roomClosedListeners.push(callback); break
     }
   }
 
-  /**
-   * Get current connection status
-   */
-  isConnected(): boolean {
-    return this.connected
-  }
-
-  /**
-   * Get session ID
-   */
-  getSessionId(): string {
-    return this.sessionId
-  }
+  isConnected(): boolean { return this.connected }
+  getSessionId(): string { return this.sessionId }
+  getRoom(): Room | undefined { return this.room }
+  getMySessionId(): string { return this.sessionId }
+  getState(): any { return this.room?.state }
 
   private emitRoomClosed(reason: string) {
-    if (!this.roomClosedListeners.length) return
-
     const listeners = [...this.roomClosedListeners]
     for (const listener of listeners) {
-      try {
-        listener(reason)
-      } catch (error) {
-        console.error('[NetworkManager] Error in roomClosed listener:', error)
-      }
+      try { listener(reason) } catch (error) { console.error(error) }
     }
   }
 
-  /**
-   * Get room instance (for advanced usage)
-   */
-  getRoom(): Room | undefined {
-    return this.room
-  }
-
-  /**
-   * Get current session ID (alias for getSessionId)
-   */
-  getMySessionId(): string {
-    return this.sessionId
-  }
-
-  /**
-   * Get current game state
-   */
-  getState(): any {
-    return this.room?.state
-  }
-
-  /**
-   * Check for existing players in the room and emit playerJoin events
-   * Call this AFTER registering event callbacks to handle players who joined before connection
-   */
   checkExistingPlayers(): void {
-    if (!this.room || !this.room.state || !this.room.state.players) {
-      return
-    }
-
+    if (!this.room || !this.room.state || !this.room.state.players) return
     this.room.state.players.forEach((player: any, key: string) => {
       if (key !== this.sessionId) {
         this.onPlayerJoin?.({

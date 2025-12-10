@@ -58,12 +58,30 @@ test.describe('Game Flow', () => {
         (window as any).__menuButtons.multiplayer.emit('pointerup');
     })
 
+    // Wait for Lobby
+    await page.waitForFunction(() => (window as any).sceneManager?.currentScene?.sceneKey === 'LobbyScene')
+
+    // Click Create Room
+    await page.evaluate(() => {
+         const lobby = (window as any).sceneManager.currentScene;
+         // Access private property in JS
+         (lobby as any).createButton.emit('pointerup');
+    })
+
     await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'MultiplayerScene')
 
     // Wait for connection
     await expect.poll(async () => {
         return page.evaluate(() => (window as any).__gameControls.scene.networkManager?.isConnected())
     }).toBe(true)
+
+    // Verify URL update with ID (using new param 'id')
+    await expect.poll(async () => page.url()).toContain('id=')
+
+    // Verify Debug Text
+    await expect.poll(async () => {
+        return page.evaluate(() => (window as any).__gameControls.scene.roomDebugText.text)
+    }).toContain('Room 1 (')
 
     const sessionId = await page.evaluate(() => (window as any).__gameControls.scene.mySessionId)
     expect(sessionId).toBeTruthy()
