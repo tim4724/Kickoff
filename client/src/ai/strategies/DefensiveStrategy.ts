@@ -105,15 +105,16 @@ export class DefensiveStrategy {
       spreadRoles.forEach((role, playerId) => roles.set(playerId, role))
     } else {
       // Opponent reaches ball first - assign our player to intercept them
-      const predictPath = this.createOpponentPathPredictor(ballInterceptor)
+      let predictPath: (t: number) => Vector2D = () => ball.position
+      if (InterceptionCalculator.distance(ball.position, this.ourGoal) <= InterceptionCalculator.distance(ballInterceptor.position, this.ourGoal)) {
+        predictPath = this.createOpponentPathPredictor(ballInterceptor)
+      }
       const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
         remainingPlayers,
         predictPath,
         0
       )
-
       roles.set(interceptor.id, { goal: 'interceptOpponent', target: interceptPoint })
-
       remainingPlayers = remainingPlayers.filter(p => p.id !== interceptor.id)
       remainingOpponents = remainingOpponents.filter(o => o.id !== ballInterceptor.id)
 
