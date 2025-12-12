@@ -15,8 +15,7 @@ import { PhysicsEngine } from '../../../../shared/src/engine/PhysicsEngine'
 export class InterceptionCalculator {
   /**
    * Find earliest interception from multiple players
-   * Checks all players at each time step, returns immediately when first match found
-   * Much more efficient than calculating all time steps for each player individually
+   * Returns the first player to intercept, the point, and the time.
    *
    * IMPORTANT: Accounts for interceptionRadius - players can capture ball when within this distance,
    * not just at exact position. This is critical for accurate pass/interception calculations.
@@ -24,13 +23,13 @@ export class InterceptionCalculator {
    * @param players - Array of players that could potentially intercept
    * @param predictPosition - Function that predicts ball position at a given time
    * @param interceptionRadius - Maximum distance at which a player can intercept the ball
-   * @returns Interception data if any player can intercept, null otherwise
+   * @returns Interception data with time (Infinity if no interception within lookahead)
    */
   static calculateInterception(
     players: PlayerData[],
     predictPosition: (timeSeconds: number) => Vector2D,
     interceptionRadius: number
-  ): { interceptor: PlayerData; interceptPoint: Vector2D } {
+  ): { interceptor: PlayerData; interceptPoint: Vector2D; time: number } {
     const playerSpeed = GAME_CONFIG.PLAYER_SPEED
     const maxLookAhead = 4.0 // seconds
     const timeStep = 0.1 // check every 0.1 seconds
@@ -41,7 +40,7 @@ export class InterceptionCalculator {
     for (let t = timeStep; t <= maxLookAhead; t += timeStep) {
       const futurePos = predictPosition(t)
       lastFuturePos = futurePos
-      const maxPlayerTravel = playerSpeed * t // How far can a player travel in time t?
+      const maxPlayerTravel = playerSpeed * t
 
       // Find ALL players who can intercept at this time, then pick the closest
       let closestInterceptor: PlayerData | null = null
@@ -52,7 +51,6 @@ export class InterceptionCalculator {
 
         // Can this player reach the ball (within interception radius) in time t?
         if (distanceToBall - interceptionRadius <= maxPlayerTravel) {
-          // This player CAN intercept - check if they're closest
           if (distanceToBall < closestDistance) {
             closestInterceptor = player
             closestDistance = distanceToBall
@@ -62,7 +60,7 @@ export class InterceptionCalculator {
 
       // If any player can intercept at this time, return the closest one
       if (closestInterceptor) {
-        return { interceptor: closestInterceptor, interceptPoint: futurePos }
+        return { interceptor: closestInterceptor, interceptPoint: futurePos, time: t }
       }
     }
 
@@ -76,9 +74,9 @@ export class InterceptionCalculator {
 
     const closestPlayer = players.reduce((best, p) =>
       this.distance(p.position, finalPos) < this.distance(best.position, finalPos) ? p : best
-    , players[0]) // Provide initial value to avoid reduce error
+    , players[0])
 
-    return { interceptor: closestPlayer, interceptPoint: finalPos }
+    return { interceptor: closestPlayer, interceptPoint: finalPos, time: Infinity }
   }
 
   /**

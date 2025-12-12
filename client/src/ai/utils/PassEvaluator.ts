@@ -25,7 +25,9 @@ export class PassEvaluator {
   private static readonly SCORE_WEIGHT_FORWARD_PROGRESS = 0.4
   private static readonly SCORE_WEIGHT_SPACE = 0.5
   private static readonly SCORE_WEIGHT_MOVEMENT = 0.1
-  private static readonly SPACE_CAP = 300
+  private static readonly SPACE_CAP = GAME_CONFIG.FIELD_HEIGHT / 3
+  private static readonly MIN_SPACING = PassEvaluator.SPACE_CAP / 2
+  private static readonly MIN_SPACING_SQUARED = PassEvaluator.MIN_SPACING * PassEvaluator.MIN_SPACING
 
   /**
    * Get cached fixed grid positions (15×8 = 120 positions)
@@ -81,12 +83,10 @@ export class PassEvaluator {
     ballPos: Vector2D,
     teammates: PlayerData[],
     opponents: PlayerData[],
-    opponentGoal: Vector2D,
-    minSpacing = 200
+    opponentGoal: Vector2D
   ): PassOption[] {
     if (teammates.length === 0) return []
 
-    const allPlayers = [...teammates, ...opponents]
     const passSpeed =
       GAME_CONFIG.MIN_SHOOT_SPEED +
       (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * this.PASS_POWER
@@ -95,57 +95,58 @@ export class PassEvaluator {
     const optionsByTeammate = new Map(teammates.map(t => [t.id, [] as PassOption[]]))
 
     // Evaluate each grid position
-    const minSpacingSquared = minSpacing * minSpacing
     for (const pos of this.getGrid()) {
       // Use squared distance for comparison (no sqrt needed)
-      if (this.distSquared(ballPos, pos) < minSpacingSquared) continue
+      if (this.distSquared(ballPos, pos) < this.MIN_SPACING_SQUARED) continue
 
-      // Check who intercepts
       const predictor = this.ballPredictor(ballPos, pos, passSpeed)
-      const { interceptor } = InterceptionCalculator.calculateInterception(
-        allPlayers,
-        predictor,
-        GAME_CONFIG.PRESSURE_RADIUS
-      )
 
-      const options = optionsByTeammate.get(interceptor.id)
-      if (!options) continue
-
-      // Score: forward progress + space - movement distance
-      const forwardProgress = this.dist(ballPos, opponentGoal) - this.dist(pos, opponentGoal)
-      
-      // Calculate space from nearest opponent (more efficient than spread operator)
-      // If no opponents, use maximum space (field diagonal as fallback)
+      // Find earliest opponent interception and use that opponent for space calculation
+      let earliestOpponentTime = Infinity
       let spaceAtTarget: number
-      if (opponents.length === 0) {
-        spaceAtTarget = this.dist({ x: 0, y: 0 }, { x: GAME_CONFIG.FIELD_WIDTH, y: GAME_CONFIG.FIELD_HEIGHT })
+      if (opponents.length > 0) {
+        const { interceptor, time } = InterceptionCalculator.calculateInterception(
+          opponents,
+          predictor,
+          GAME_CONFIG.PRESSURE_RADIUS
+        )
+        earliestOpponentTime = time
+        spaceAtTarget = this.dist(pos, interceptor.position)
       } else {
-        // Use squared distance for comparison to find minimum (no sqrt until final value)
-        let minSpaceSquared = Infinity
-        for (const opp of opponents) {
-          const dSquared = this.distSquared(pos, opp.position)
-          if (dSquared < minSpaceSquared) {
-            minSpaceSquared = dSquared
-          }
-        }
-        // Calculate real distance from squared value (only one sqrt instead of N)
-        spaceAtTarget = Math.sqrt(minSpaceSquared)
+        spaceAtTarget = this.SPACE_CAP
       }
-      
-      const movement = this.dist(interceptor.position, pos)
-      const score =
-        forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS +
-        Math.min(this.SPACE_CAP, spaceAtTarget) * this.SCORE_WEIGHT_SPACE -
-        movement * this.SCORE_WEIGHT_MOVEMENT
 
-      options.push({ teammate: interceptor, position: pos, score })
+      // Forward progress is same for all teammates at this position
+      const forwardProgress = this.dist(ballPos, opponentGoal) - this.dist(pos, opponentGoal)
+
+      // Check each teammate's interception time
+      for (const teammate of teammates) {
+        const { time } = InterceptionCalculator.calculateInterception(
+          [teammate],
+          predictor,
+          GAME_CONFIG.PRESSURE_RADIUS
+        )
+
+        // Skip if teammate intercepts at or after earliest opponent
+        if (time >= earliestOpponentTime) continue
+
+        const options = optionsByTeammate.get(teammate.id)
+        if (!options) continue
+
+        // Score: forward progress + space - movement distance
+        const movement = this.dist(teammate.position, pos)
+        const score =
+          forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS +
+          Math.min(this.SPACE_CAP, spaceAtTarget) * this.SCORE_WEIGHT_SPACE -
+          movement * this.SCORE_WEIGHT_MOVEMENT
+
+        options.push({ teammate, position: pos, score })
+      }
     }
 
-    // Sort options once per teammate (by score, descending)
-    // This avoids redundant sorting when selecting best options later
-    const sortedOptionsByTeammate = new Map<string, PassOption[]>()
-    for (const [teammateId, options] of optionsByTeammate.entries()) {
-      sortedOptionsByTeammate.set(teammateId, options.sort((a, b) => b.score - a.score))
+    // Sort options in-place per teammate (by score, descending)
+    for (const options of optionsByTeammate.values()) {
+      options.sort((a, b) => b.score - a.score)
     }
 
     // Select best position per teammate with anti-clustering
@@ -156,35 +157,19 @@ export class PassEvaluator {
     // Filter out teammates with no options - they won't get a position assigned
     const teammatesByBestOption = teammates
       .map(t => {
-        const sortedOptions = sortedOptionsByTeammate.get(t.id) || []
-        return { sortedOptions, bestOption: sortedOptions[0] }
+        const options = optionsByTeammate.get(t.id) || []
+        return { options, bestOption: options[0] }
       })
       .filter(x => x.bestOption !== undefined)
       .sort((a, b) => b.bestOption.score - a.bestOption.score)
 
     // Assign positions with spacing constraint (from ball and other positions)
     // Process teammates in order of best option score to prioritize higher-quality passes
-    // minSpacingSquared already calculated above, reuse it
-    
-    for (const { sortedOptions } of teammatesByBestOption) {
-      // Find first option that maintains minimum spacing from used positions
-      // Use squared distance comparison to avoid sqrt calculations
-      // Fallback to best option if no spacing-compliant option exists
-      let option: PassOption | undefined
-      
-      for (const candidate of sortedOptions) {
-        // Check spacing using squared distance (faster)
-        const hasSpacing = usedPositions.every(
-          p => this.distSquared(candidate.position, p) >= minSpacingSquared
-        )
-        if (hasSpacing) {
-          option = candidate
-          break // Found a valid option, no need to check more
-        }
-      }
-      
-      // Fallback to best option if none met spacing requirements
-      option = option || sortedOptions[0]
+    for (const { options } of teammatesByBestOption) {
+      // Find first option with minimum spacing, or fallback to best option
+      const option = options.find(candidate =>
+        usedPositions.every(p => this.distSquared(candidate.position, p) >= this.MIN_SPACING_SQUARED)
+      ) || options[0]
 
       if (option) {
         selected.push(option)
