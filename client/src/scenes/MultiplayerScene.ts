@@ -145,11 +145,6 @@ export class MultiplayerScene extends BaseGameScene {
       this.isMultiplayer = false
       
       try {
-        const room = this.networkManager.getRoom() as (Room & { id?: string }) | undefined
-        if (room && this.networkManager.isConnected()) {
-          console.log('🚪 [Cleanup] Leaving room immediately:', room.id ?? 'unknown')
-          room.leave()
-        }
         this.networkManager.disconnect()
       } catch (e) {
         console.error('[MultiplayerScene] Error during NetworkManager disconnect:', e)
@@ -485,6 +480,12 @@ export class MultiplayerScene extends BaseGameScene {
 
     this.returningToMenu = true
     console.log(`🔙 Returning to menu: ${message}`)
+
+    // Disconnect immediately to allow server to clean up session while user sees the message
+    if (this.networkManager) {
+      console.log('🔌 [ReturnToMenu] Disconnecting early to facilitate cleanup')
+      this.networkManager.disconnect()
+    }
     
     // Create popup overlay
     // Use container in UI

@@ -240,7 +240,9 @@ export class NetworkManager {
   disconnect(): void {
     if (this.room) {
       try {
-        this.room.leave()
+        if (this.connected) {
+          this.room.leave()
+        }
       } catch (e) {
         console.warn('[NetworkManager] Error during room.leave():', e)
       }
