@@ -99,7 +99,7 @@ export class InterceptionCalculator {
       ballFriction: GAME_CONFIG.BALL_FRICTION,
       fieldWidth: GAME_CONFIG.FIELD_WIDTH,
       fieldHeight: GAME_CONFIG.FIELD_HEIGHT,
-      fieldMargin: 10,
+      fieldMargin: GAME_CONFIG.FIELD_MARGIN,
       goalYMin: GAME_CONFIG.GOAL_Y_MIN,
       goalYMax: GAME_CONFIG.GOAL_Y_MAX,
     }
