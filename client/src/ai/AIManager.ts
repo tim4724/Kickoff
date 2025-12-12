@@ -7,7 +7,7 @@
 
 import { TeamAI } from './TeamAI'
 import { AIGameState, AIDecision } from './types'
-import { GameStateData, Team } from '../../../shared/src/types'
+import { GameStateData, Team } from '@shared/types'
 
 export class AIManager {
   private teamAIs: Map<Team, TeamAI>

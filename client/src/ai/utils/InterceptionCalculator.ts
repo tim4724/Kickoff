@@ -8,10 +8,9 @@
  */
 
 import { Vector2D } from '../types'
-import { PlayerData } from '../../../../shared/src/types'
-import { GAME_CONFIG } from '../../../../shared/src/types'
-import { PhysicsEngine } from '../../../../shared/src/engine/PhysicsEngine'
-import { GeometryUtils } from '../../../../shared/src/utils/geometry'
+import { PlayerData, GAME_CONFIG } from '@shared/types'
+import { PhysicsEngine } from '@shared/engine/PhysicsEngine'
+import { GeometryUtils } from '@shared/utils/geometry'
 
 export class InterceptionCalculator {
   /**

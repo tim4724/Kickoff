@@ -11,7 +11,7 @@
  */
 
 import { PlayerRole } from '../types'
-import { PlayerData } from '../../../../shared/src/types'
+import { PlayerData } from '@shared/types'
 import { PassOption } from '../utils/PassEvaluator'
 
 export class SpreadPositionStrategy {

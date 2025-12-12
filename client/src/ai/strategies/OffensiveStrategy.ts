@@ -11,7 +11,7 @@
  */
 
 import { Vector2D, AIGameState, PlayerRole } from '../types'
-import { GAME_CONFIG, Team } from '../../../../shared/src/types'
+import { GAME_CONFIG, Team } from '@shared/types'
 import { HasBallStrategy } from './HasBallStrategy'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { SpreadPositionStrategy } from './SpreadPositionStrategy'

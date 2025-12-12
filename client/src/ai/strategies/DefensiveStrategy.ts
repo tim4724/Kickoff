@@ -12,11 +12,11 @@
  */
 
 import { Vector2D, AIGameState, PlayerRole } from '../types'
-import { PlayerData, GAME_CONFIG, Team } from '../../../../shared/src/types'
+import { PlayerData, GAME_CONFIG, Team } from '@shared/types'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { SpreadPositionStrategy } from './SpreadPositionStrategy'
 import { PassEvaluator } from '../utils/PassEvaluator'
-import { GeometryUtils } from '../../../../shared/src/utils/geometry'
+import { GeometryUtils } from '@shared/utils/geometry'
 
 export class DefensiveStrategy {
   private readonly ourGoal: Vector2D
