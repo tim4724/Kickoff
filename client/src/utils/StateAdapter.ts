@@ -29,6 +29,7 @@
 
 import type { EnginePlayerData, GameEngineState } from '@shared/engine/types'
 import type { GameStateData, Team } from '@shared/types'
+import { GeometryUtils } from '../../../shared/src/utils/geometry'
 
 /**
  * Unified player interface with normalized position/velocity access
@@ -227,12 +228,13 @@ export class StateAdapter {
       const player = state.players.get(playerId)
       if (!player) continue
 
-      const dx = player.x - ballX
-      const dy = player.y - ballY
-      const distance = Math.sqrt(dx * dx + dy * dy)
+      const distanceSq = GeometryUtils.distanceSquared(
+        { x: player.x, y: player.y },
+        { x: ballX, y: ballY }
+      )
 
-      if (distance < bestDistance) {
-        bestDistance = distance
+      if (distanceSq < bestDistance) {
+        bestDistance = distanceSq
         bestPlayerId = playerId
       }
     }

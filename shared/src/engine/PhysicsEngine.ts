@@ -8,6 +8,7 @@ import type { EnginePlayerData, EngineBallData, PhysicsConfig, EnginePlayerInput
 import type { Team } from '../types.js'
 import { GAME_CONFIG } from '../types.js'
 import { gameClock } from './GameClock.js'
+import { GeometryUtils } from '../utils/geometry.js'
 
 export class PhysicsEngine {
   private config: PhysicsConfig
@@ -190,9 +191,7 @@ export class PhysicsEngine {
     players.forEach((player) => {
       if (player.id === possessor.id) return
 
-      const dx = player.x - ball.x
-      const dy = player.y - ball.y
-      const distSq = dx * dx + dy * dy
+      const distSq = GeometryUtils.distanceSquared(player, ball)
 
       if (distSq < this.pressureRadiusSq && player.team !== possessor.team) {
         opponentsNearby++
@@ -248,9 +247,7 @@ export class PhysicsEngine {
     if (ball.possessedBy !== '') {
       const possessor = players.get(ball.possessedBy)
       if (possessor) {
-        const dx = ball.x - possessor.x
-        const dy = ball.y - possessor.y
-        const distSq = dx * dx + dy * dy
+        const distSq = GeometryUtils.distanceSquared(ball, possessor)
 
         if (distSq > this.releaseThresholdSq) {
           ball.possessedBy = ''
@@ -279,9 +276,7 @@ export class PhysicsEngine {
         // Skip shooter during immunity
         if (hasImmunity && player.id === ball.lastShooter) return
 
-        const dx = ball.x - player.x
-        const dy = ball.y - player.y
-        const distSq = dx * dx + dy * dy
+        const distSq = GeometryUtils.distanceSquared(ball, player)
 
         if (distSq < this.possessionRadiusSq) {
           // Check loss lockout
@@ -331,9 +326,7 @@ export class PhysicsEngine {
       }
     } else {
       // Try to gain possession
-      const dx = ball.x - player.x
-      const dy = ball.y - player.y
-      const distSq = dx * dx + dy * dy
+      const distSq = GeometryUtils.distanceSquared(ball, player)
 
       const SHOT_IMMUNITY_MS = 300
       const timeSinceShot = gameClock.now() - (ball.lastShotTime || 0)

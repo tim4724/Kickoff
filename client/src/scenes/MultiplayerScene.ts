@@ -9,6 +9,7 @@ import { AIManager } from '../ai'
 import { sceneRouter } from '../utils/SceneRouter'
 import type { Room } from 'colyseus.js'
 import { PixiSceneManager } from '../utils/PixiSceneManager'
+import { GeometryUtils } from '../../../shared/src/utils/geometry'
 
 /**
  * Multiplayer Game Scene (PixiJS)
@@ -256,7 +257,8 @@ export class MultiplayerScene extends BaseGameScene {
           throw new Error('NetworkManager not available')
         }
 
-        const length = Math.sqrt(dx * dx + dy * dy)
+        const lengthSq = GeometryUtils.distanceSquared({ x: 0, y: 0 }, { x: dx, y: dy })
+        const length = Math.sqrt(lengthSq)
         const normalizedX = length > 0 ? dx / length : 0
         const normalizedY = length > 0 ? dy / length : 0
 

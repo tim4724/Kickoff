@@ -6,6 +6,7 @@ import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '../ai'
 import { StateAdapter } from '../utils/StateAdapter'
 import { PixiSceneManager } from '../utils/PixiSceneManager'
+import { GeometryUtils } from '../../../shared/src/utils/geometry'
 
 /**
  * Single Player Scene (PixiJS)
@@ -63,7 +64,8 @@ export class SinglePlayerScene extends BaseGameScene {
         console.log(`🔄 Auto-switch ${enabled ? 'enabled' : 'disabled'}`)
       },
       directMove: async (dx: number, dy: number, gameTimeDurationMs: number) => {
-        const length = Math.sqrt(dx * dx + dy * dy)
+        const lengthSq = GeometryUtils.distanceSquared({ x: 0, y: 0 }, { x: dx, y: dy })
+        const length = Math.sqrt(lengthSq)
         const normalizedX = length > 0 ? dx / length : 0
         const normalizedY = length > 0 ? dy / length : 0
 

@@ -93,10 +93,11 @@ export async function waitForBallMoving(
         const ball = state?.ball
         if (!ball) return false
 
-        const velocity = Math.sqrt(
-          (ball.velocityX || 0) ** 2 + (ball.velocityY || 0) ** 2
-        )
-        return velocity >= minVel
+        const vx = ball.velocityX || 0
+        const vy = ball.velocityY || 0
+        const velocitySq = vx * vx + vy * vy
+
+        return velocitySq >= minVel * minVel
       },
       minVelocity,
       { timeout }
@@ -154,8 +155,8 @@ export async function waitForPlayerNearPosition(
 
         const dx = player.x - x
         const dy = player.y - y
-        const distance = Math.sqrt(dx * dx + dy * dy)
-        return distance <= dist
+        const distSq = dx * dx + dy * dy
+        return distSq <= dist * dist
       },
       { x: targetX, y: targetY, dist: maxDistance },
       { timeout }

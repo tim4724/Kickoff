@@ -210,9 +210,9 @@ export async function moveTowardBallAndCapture(
 
     const dx = state.ballX - state.playerX
     const dy = state.ballY - state.playerY
-    const distance = Math.sqrt(dx * dx + dy * dy)
+    const distSq = dx * dx + dy * dy
 
-    if (state.ballPossessor === state.controlledId || distance < GAME_CONFIG.POSSESSION_RADIUS) {
+    if (state.ballPossessor === state.controlledId || distSq < GAME_CONFIG.POSSESSION_RADIUS ** 2) {
       return true
     }
 
@@ -261,6 +261,20 @@ export function calculateDistance(
   const dx = x2 - x1
   const dy = y2 - y1
   return Math.sqrt(dx * dx + dy * dy)
+}
+
+/**
+ * Calculate distance squared between two points
+ */
+export function calculateDistanceSquared(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): number {
+  const dx = x2 - x1
+  const dy = y2 - y1
+  return dx * dx + dy * dy
 }
 
 /**
@@ -331,9 +345,10 @@ export async function assertDifferentColors(client1: Page, client2: Page) {
  */
 export async function assertBallAtCenter(client: Page, variance: number = 100) {
   const state = await getServerState(client)
-  const distanceFromCenter = calculateDistance(state.ball.x, state.ball.y, 960, 540)
+  const distSq = calculateDistanceSquared(state.ball.x, state.ball.y, 960, 540)
 
-  if (distanceFromCenter > variance) {
+  if (distSq > variance * variance) {
+    const distanceFromCenter = Math.sqrt(distSq)
     throw new Error(
       `Ball not at center! Position: (${state.ball.x}, ${state.ball.y}), Distance from center: ${distanceFromCenter}px`
     )

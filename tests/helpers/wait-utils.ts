@@ -95,7 +95,8 @@ export async function waitForBallMovement(
 
       const dx = ball.x - x
       const dy = ball.y - y
-      return Math.sqrt(dx * dx + dy * dy) > dist
+      const distSq = dx * dx + dy * dy
+      return distSq > dist * dist
     },
     { x: initialX, y: initialY, dist: minDistance },
     { timeout }
@@ -125,7 +126,8 @@ export async function waitForPlayerMovement(
 
       const dx = player.x - x
       const dy = player.y - y
-      return Math.sqrt(dx * dx + dy * dy) > dist
+      const distSq = dx * dx + dy * dy
+      return distSq > dist * dist
     },
     { x: initialX, y: initialY, dist: minDistance },
     { timeout }

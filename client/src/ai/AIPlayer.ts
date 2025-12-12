@@ -70,13 +70,14 @@ export class AIPlayer {
 
     const dx = this.targetX - currentPos.x
     const dy = this.targetY - currentPos.y
-    const distance = GeometryUtils.distance(currentPos, { x: this.targetX, y: this.targetY })
+    const distSq = GeometryUtils.distanceSquared(currentPos, { x: this.targetX, y: this.targetY })
 
     // For shooting/passing, always return direction even if close (to rotate player)
     if (this.shootPower !== null) {
-      if (distance < 1) {
+      if (distSq < 1) {
         return { x: 0, y: 0 }
       }
+      const distance = Math.sqrt(distSq)
       return {
         x: dx / distance,
         y: dy / distance,
@@ -85,10 +86,11 @@ export class AIPlayer {
 
     // For movement goals, stop when close enough
     const ARRIVAL_THRESHOLD = 5
-    if (distance < ARRIVAL_THRESHOLD) {
+    if (distSq < ARRIVAL_THRESHOLD * ARRIVAL_THRESHOLD) {
       return { x: 0, y: 0 }
     }
 
+    const distance = Math.sqrt(distSq)
     return {
       x: dx / distance,
       y: dy / distance,

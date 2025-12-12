@@ -53,7 +53,8 @@ export class PassEvaluator {
    * Create ball trajectory predictor for interception calculation
    */
   private static ballPredictor(from: Vector2D, to: Vector2D, speed: number) {
-    const dist = GeometryUtils.distance(from, to)
+    const distSq = GeometryUtils.distanceSquared(from, to)
+    const dist = Math.sqrt(distSq)
     const vx = dist > 0 ? ((to.x - from.x) / dist) * speed : 0
     const vy = dist > 0 ? ((to.y - from.y) / dist) * speed : 0
     return (t: number) => InterceptionCalculator.simulateBallPosition(from, { x: vx, y: vy }, t)
@@ -94,13 +95,16 @@ export class PassEvaluator {
           GAME_CONFIG.PRESSURE_RADIUS
         )
         earliestOpponentTime = time
-        spaceAtTarget = GeometryUtils.distance(pos, interceptor.position)
+        const spaceDistSq = GeometryUtils.distanceSquared(pos, interceptor.position)
+        spaceAtTarget = Math.sqrt(spaceDistSq)
       } else {
         spaceAtTarget = this.SPACE_CAP
       }
 
       // Forward progress is same for all teammates at this position
-      const forwardProgress = GeometryUtils.distance(ballPos, opponentGoal) - GeometryUtils.distance(pos, opponentGoal)
+      const ballToGoalDist = Math.sqrt(GeometryUtils.distanceSquared(ballPos, opponentGoal))
+      const posToGoalDist = Math.sqrt(GeometryUtils.distanceSquared(pos, opponentGoal))
+      const forwardProgress = ballToGoalDist - posToGoalDist
 
       // Check each teammate's interception time
       for (const teammate of teammates) {
@@ -117,7 +121,7 @@ export class PassEvaluator {
         if (!options) continue
 
         // Score: forward progress + space - movement distance
-        const movement = GeometryUtils.distance(teammate.position, pos)
+        const movement = Math.sqrt(GeometryUtils.distanceSquared(teammate.position, pos))
         const score =
           forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS +
           Math.min(this.SPACE_CAP, spaceAtTarget) * this.SCORE_WEIGHT_SPACE -
