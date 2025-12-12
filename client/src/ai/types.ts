@@ -5,6 +5,10 @@
  */
 
 import { PlayerData, BallData } from '../../../shared/src/types'
+import { Point } from '../../../shared/src/utils/geometry'
+
+// Re-export Point as Vector2D for semantic clarity in AI code
+export type Vector2D = Point
 
 /**
  * Available game information for AI decision-making
@@ -47,10 +51,3 @@ export interface PlayerRole {
   shootPower?: number | null // 0.0-1.0 shooting power, or null for no shoot
 }
 
-/**
- * Vector2D type (position in 2D space)
- */
-export interface Vector2D {
-  x: number
-  y: number
-}
