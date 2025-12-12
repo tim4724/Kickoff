@@ -14,8 +14,16 @@ export class PhysicsEngine {
   private lastPossessionGainTime = new Map<string, number>()
   private lastPossessionLossTime = new Map<string, number>()
 
+  // Pre-calculated squared values for performance
+  private pressureRadiusSq: number
+  private possessionRadiusSq: number
+  private releaseThresholdSq: number
+
   constructor(config: PhysicsConfig) {
     this.config = config
+    this.pressureRadiusSq = config.pressureRadius * config.pressureRadius
+    this.possessionRadiusSq = config.possessionRadius * config.possessionRadius
+    this.releaseThresholdSq = (config.possessionRadius + 10) * (config.possessionRadius + 10)
   }
 
   /**
@@ -184,13 +192,13 @@ export class PhysicsEngine {
 
       const dx = player.x - ball.x
       const dy = player.y - ball.y
-      const dist = Math.sqrt(dx * dx + dy * dy)
+      const distSq = dx * dx + dy * dy
 
-      if (dist < this.config.pressureRadius && player.team !== possessor.team) {
+      if (distSq < this.pressureRadiusSq && player.team !== possessor.team) {
         opponentsNearby++
-        if (dist < nearestOpponentDist) {
+        if (distSq < nearestOpponentDist) {
           nearestOpponent = player
-          nearestOpponentDist = dist
+          nearestOpponentDist = distSq
         }
       }
     })
@@ -242,10 +250,9 @@ export class PhysicsEngine {
       if (possessor) {
         const dx = ball.x - possessor.x
         const dy = ball.y - possessor.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
+        const distSq = dx * dx + dy * dy
 
-        const releaseThreshold = this.config.possessionRadius + 10
-        if (dist > releaseThreshold) {
+        if (distSq > this.releaseThresholdSq) {
           ball.possessedBy = ''
           this.lastPossessionLossTime.set(possessor.id, gameClock.now())
         } else {
@@ -274,9 +281,9 @@ export class PhysicsEngine {
 
         const dx = ball.x - player.x
         const dy = ball.y - player.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
+        const distSq = dx * dx + dy * dy
 
-        if (dist < this.config.possessionRadius) {
+        if (distSq < this.possessionRadiusSq) {
           // Check loss lockout
           const timeSinceLoss = gameClock.now() - (this.lastPossessionLossTime.get(player.id) || 0)
           if (timeSinceLoss < this.config.lossLockoutMs) return
@@ -326,7 +333,7 @@ export class PhysicsEngine {
       // Try to gain possession
       const dx = ball.x - player.x
       const dy = ball.y - player.y
-      const dist = Math.sqrt(dx * dx + dy * dy)
+      const distSq = dx * dx + dy * dy
 
       const SHOT_IMMUNITY_MS = 300
       const timeSinceShot = gameClock.now() - (ball.lastShotTime || 0)
@@ -334,7 +341,7 @@ export class PhysicsEngine {
       const isShooter = player.id === ball.lastShooter
 
       if (
-        dist < this.config.possessionRadius &&
+        distSq < this.possessionRadiusSq &&
         ball.possessedBy === '' &&
         !(hasImmunity && isShooter)
       ) {
