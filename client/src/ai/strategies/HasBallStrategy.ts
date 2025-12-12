@@ -37,6 +37,7 @@ export class HasBallStrategy {
    * @param carrier - Player with ball possession
    * @param opponents - Opponent players
    * @param opponentGoal - Target goal position
+   * @param targetBehindGoal - Target position behind opponent goal
    * @param passOptions - Pre-calculated pass options (optional, will calculate if not provided)
    * @returns Role assignment for the ball carrier
    */
@@ -44,6 +45,7 @@ export class HasBallStrategy {
     carrier: PlayerData,
     opponents: PlayerData[],
     opponentGoal: Vector2D,
+    targetBehindGoal: Vector2D,
     passOptions: PassOption[]
   ): PlayerRole {
     const distToGoal = InterceptionCalculator.distance(carrier.position, opponentGoal)
@@ -61,18 +63,18 @@ export class HasBallStrategy {
     const { interceptDistance } = this.evaluateOpponentIntercept(
       carrier,
       opponents,
-      opponentGoal
+      targetBehindGoal
     )
 
     // Check if path is blocked (opponent can intercept within threshold)
     const isPathBlocked = interceptDistance < this.INTERCEPT_THRESHOLD
 
     if (!isPathBlocked) {
-      return { goal: 'dribbleToGoal', target: opponentGoal }
+      return { goal: 'dribbleToGoal', target: targetBehindGoal }
     }
 
     const passOption = passOptions[0]
-    const dribbleOption = this.findBestDribbleSpace(carrier, opponents, opponentGoal)
+    const dribbleOption = this.findBestDribbleSpace(carrier, opponents, opponentGoal, targetBehindGoal)
 
     // XOR case: Only one option available - choose it
     const hasPass = passOption !== undefined
@@ -92,28 +94,28 @@ export class HasBallStrategy {
   }
 
   /**
-   * Evaluate opponent interception of carrier's path to goal
+   * Evaluate opponent interception of carrier's path to target behind goal
    * Returns the closest intercept point and distance
    */
   private static evaluateOpponentIntercept(
     carrier: PlayerData,
     opponents: PlayerData[],
-    goal: Vector2D
+    targetBehindGoal: Vector2D
   ): { interceptPoint: Vector2D; interceptDistance: number } {
-    // Direction vector from carrier to goal
-    const dx = goal.x - carrier.position.x
-    const dy = goal.y - carrier.position.y
+    // Direction vector from carrier to target behind goal
+    const dx = targetBehindGoal.x - carrier.position.x
+    const dy = targetBehindGoal.y - carrier.position.y
     const dist = Math.sqrt(dx * dx + dy * dy)
 
     if (dist < 1) {
-      // Already at goal
-      return { interceptPoint: goal, interceptDistance: Infinity }
+      // Already at target
+      return { interceptPoint: targetBehindGoal, interceptDistance: Infinity }
     }
 
     const dirX = dx / dist
     const dirY = dy / dist
 
-    // Predict carrier's path to goal (moving at player speed)
+    // Predict carrier's path to target behind goal (moving at player speed)
     const predictCarrierPosition = (t: number): Vector2D => {
       return InterceptionCalculator.predictPlayerBallPosition(
         carrier.position,
@@ -225,16 +227,18 @@ export class HasBallStrategy {
    * @param carrier - Player with the ball
    * @param opponents - Opponent players
    * @param opponentGoal - Target goal position
+   * @param targetBehindGoal - Target position behind opponent goal
    * @returns Best dribble target position with score, or null if no good space found
    */
   private static findBestDribbleSpace(
     carrier: PlayerData,
     opponents: PlayerData[],
-    opponentGoal: Vector2D
+    opponentGoal: Vector2D,
+    targetBehindGoal: Vector2D
   ): { position: Vector2D; score: number } {
-    // Initialize best option with opponentGoal and infinity score (fallback if no better option found)
+    // Initialize best option with targetBehindGoal and infinity score (fallback if no better option found)
     let bestOption: { position: Vector2D; score: number } = {
-      position: opponentGoal,
+      position: targetBehindGoal,
       score: 0
     }
 

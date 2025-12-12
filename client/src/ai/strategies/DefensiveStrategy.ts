@@ -20,6 +20,7 @@ import { PassEvaluator } from '../utils/PassEvaluator'
 export class DefensiveStrategy {
   private readonly ourGoal: Vector2D
   private readonly opponentGoal: Vector2D
+  private readonly targetBehindGoal: Vector2D
   private readonly teamId: Team
 
   constructor(teamId: Team) {
@@ -29,6 +30,14 @@ export class DefensiveStrategy {
     const goalY = GAME_CONFIG.FIELD_HEIGHT / 2
     this.ourGoal = { x: ourGoalX, y: goalY }
     this.opponentGoal = { x: opponentGoalX, y: goalY }
+    
+    // Target behind goal: x position offset by goal size/2 from goal line
+    const goalSize = GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN
+    const xOffset = goalSize / 2
+    const targetX = teamId === 'blue' 
+      ? -xOffset
+      : GAME_CONFIG.FIELD_WIDTH + xOffset
+    this.targetBehindGoal = { x: targetX, y: goalY }
   }
 
   /**
@@ -96,7 +105,7 @@ export class DefensiveStrategy {
       spreadRoles.forEach((role, playerId) => roles.set(playerId, role))
     } else {
       // Opponent reaches ball first - assign our player to intercept them
-      const predictPath = this.createOpponentPathPredictor(ballInterceptor, this.ourGoal)
+      const predictPath = this.createOpponentPathPredictor(ballInterceptor)
       const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
         remainingPlayers,
         predictPath,
@@ -145,15 +154,15 @@ export class DefensiveStrategy {
 
   /**
    * Create opponent path predictor function
-   * Predicts opponent's movement toward our goal over time
+   * Predicts opponent's movement toward target behind our goal over time
    */
   private createOpponentPathPredictor(
-    opponent: PlayerData,
-    ourGoal: Vector2D
+    opponent: PlayerData
   ): (t: number) => Vector2D {
-    // Direction from opponent toward our goal
-    const dx = ourGoal.x - opponent.position.x
-    const dy = ourGoal.y - opponent.position.y
+    // Use target behind goal instead of goal center for better defensive coverage
+    // Direction from opponent toward target behind goal
+    const dx = this.targetBehindGoal.x - opponent.position.x
+    const dy = this.targetBehindGoal.y - opponent.position.y
     const dist = Math.sqrt(dx ** 2 + dy ** 2)
 
     const direction = dist < 1 ? { x: 1, y: 0 } : { x: dx / dist, y: dy / dist }
@@ -252,7 +261,7 @@ export class DefensiveStrategy {
 
       if (opponentInDefensiveThird) {
         // Close marking: Intercept opponent's path to goal
-        const predictPath = this.createOpponentPathPredictor(opponent, ourGoal)
+        const predictPath = this.createOpponentPathPredictor(opponent)
 
         const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
           availablePlayers,
@@ -302,24 +311,25 @@ export class DefensiveStrategy {
     ballPosition: Vector2D,
     ourGoal: Vector2D
   ): Vector2D {
-    // Get the point between opponent and goal (60% toward goal from opponent)
-    const toGoalX = ourGoal.x - opponent.position.x
-    const toGoalY = ourGoal.y - opponent.position.y
-    const baseX = opponent.position.x + toGoalX * 0.6
-    const baseY = opponent.position.y + toGoalY * 0.6
+    // Use target behind goal instead of goal center for better defensive coverage
+    // Get the point between opponent and target behind goal (60% toward target from opponent)
+    const toTargetX = this.targetBehindGoal.x - opponent.position.x
+    const toTargetY = this.targetBehindGoal.y - opponent.position.y
+    const baseX = opponent.position.x + toTargetX * 0.6
+    const baseY = opponent.position.y + toTargetY * 0.6
 
     // Adjust to also be behind ball if ball is closer to our goal
     const ballDistToGoal = InterceptionCalculator.distance(ballPosition, ourGoal)
     const opponentDistToGoal = InterceptionCalculator.distance(opponent.position, ourGoal)
 
     if (ballDistToGoal < opponentDistToGoal) {
-      // Ball is closer to our goal, position between ball and goal too
-      const toBallGoalX = ourGoal.x - ballPosition.x
-      const toBallGoalY = ourGoal.y - ballPosition.y
-      const ballDefenseX = ballPosition.x + toBallGoalX * 0.4
-      const ballDefenseY = ballPosition.y + toBallGoalY * 0.4
+      // Ball is closer to our goal, position between ball and target behind goal too
+      const toBallTargetX = this.targetBehindGoal.x - ballPosition.x
+      const toBallTargetY = this.targetBehindGoal.y - ballPosition.y
+      const ballDefenseX = ballPosition.x + toBallTargetX * 0.4
+      const ballDefenseY = ballPosition.y + toBallTargetY * 0.4
 
-      // Average the two defensive positions (between opponent-goal and ball-goal)
+      // Average the two defensive positions (between opponent-target and ball-target)
       return {
         x: (baseX + ballDefenseX) / 2,
         y: (baseY + ballDefenseY) / 2,

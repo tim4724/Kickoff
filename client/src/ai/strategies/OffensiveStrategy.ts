@@ -19,6 +19,7 @@ import { PassEvaluator, PassOption } from '../utils/PassEvaluator'
 
 export class OffensiveStrategy {
   private readonly opponentGoal: Vector2D
+  private readonly targetBehindGoal: Vector2D
   private readonly teamId: Team
 
   constructor(teamId: Team) {
@@ -26,6 +27,14 @@ export class OffensiveStrategy {
     const opponentGoalX = teamId === 'blue' ? GAME_CONFIG.FIELD_WIDTH : 0
     const goalY = GAME_CONFIG.FIELD_HEIGHT / 2
     this.opponentGoal = { x: opponentGoalX, y: goalY }
+    
+    // Target behind opponent goal: x position offset by goal size/2 from goal line
+    const goalSize = GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN
+    const xOffset = goalSize / 2
+    const targetX = teamId === 'blue' 
+      ? GAME_CONFIG.FIELD_WIDTH + xOffset
+      : -xOffset
+    this.targetBehindGoal = { x: targetX, y: goalY }
   }
 
   /**
@@ -65,6 +74,7 @@ export class OffensiveStrategy {
         ballCarrier,
         opponents,
         this.opponentGoal,
+        this.targetBehindGoal,
         passOptions
       )
 
