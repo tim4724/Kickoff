@@ -11,6 +11,7 @@ import { Vector2D } from '../types'
 import { PlayerData } from '../../../../shared/src/types'
 import { GAME_CONFIG } from '../../../../shared/src/types'
 import { PhysicsEngine } from '../../../../shared/src/engine/PhysicsEngine'
+import { GeometryUtils } from '../../../../shared/src/utils/geometry'
 
 export class InterceptionCalculator {
   /**
@@ -47,7 +48,7 @@ export class InterceptionCalculator {
       let closestDistance = Infinity
 
       for (const player of players) {
-        const distanceToBall = this.distance(player.position, futurePos)
+        const distanceToBall = GeometryUtils.distance(player.position, futurePos)
 
         // Can this player reach the ball (within interception radius) in time t?
         if (distanceToBall - interceptionRadius <= maxPlayerTravel) {
@@ -73,7 +74,7 @@ export class InterceptionCalculator {
     }
 
     const closestPlayer = players.reduce((best, p) =>
-      this.distance(p.position, finalPos) < this.distance(best.position, finalPos) ? p : best
+      GeometryUtils.distanceSquared(p.position, finalPos) < GeometryUtils.distanceSquared(best.position, finalPos) ? p : best
     , players[0])
 
     return { interceptor: closestPlayer, interceptPoint: finalPos, time: Infinity }
@@ -143,14 +144,5 @@ export class InterceptionCalculator {
       x: currentBallX + direction.x * GAME_CONFIG.PLAYER_SPEED * timeSeconds,
       y: currentBallY + direction.y * GAME_CONFIG.PLAYER_SPEED * timeSeconds,
     }
-  }
-
-  /**
-   * Calculate distance between two points
-   */
-  static distance(p1: Vector2D, p2: Vector2D): number {
-    const dx = p2.x - p1.x
-    const dy = p2.y - p1.y
-    return Math.sqrt(dx * dx + dy * dy)
   }
 }

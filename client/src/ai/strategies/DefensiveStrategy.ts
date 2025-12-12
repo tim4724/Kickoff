@@ -16,6 +16,7 @@ import { PlayerData, GAME_CONFIG, Team } from '../../../../shared/src/types'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { SpreadPositionStrategy } from './SpreadPositionStrategy'
 import { PassEvaluator } from '../utils/PassEvaluator'
+import { GeometryUtils } from '../../../../shared/src/utils/geometry'
 
 export class DefensiveStrategy {
   private readonly ourGoal: Vector2D
@@ -77,9 +78,9 @@ export class DefensiveStrategy {
 
       // Sort remaining players by distance to our goal (closest = most defensive)
       remainingPlayers.sort((a, b) =>
-        InterceptionCalculator.distance(a.position, this.ourGoal) - InterceptionCalculator.distance(b.position, this.ourGoal))
+        GeometryUtils.distanceSquared(a.position, this.ourGoal) - GeometryUtils.distanceSquared(b.position, this.ourGoal))
       remainingOpponents.sort((a, b) =>
-        InterceptionCalculator.distance(a.position, this.ourGoal) - InterceptionCalculator.distance(b.position, this.ourGoal))
+        GeometryUtils.distanceSquared(a.position, this.ourGoal) - GeometryUtils.distanceSquared(b.position, this.ourGoal))
 
       const defensive = remainingPlayers.slice(0,  Math.floor(remainingOpponents.length / 2))
 
@@ -106,7 +107,7 @@ export class DefensiveStrategy {
     } else {
       // Opponent reaches ball first - assign our player to intercept them
       let predictPath: (t: number) => Vector2D = () => ball.position
-      if (InterceptionCalculator.distance(ball.position, this.ourGoal) <= InterceptionCalculator.distance(ballInterceptor.position, this.ourGoal)) {
+      if (GeometryUtils.distanceSquared(ball.position, this.ourGoal) <= GeometryUtils.distanceSquared(ballInterceptor.position, this.ourGoal)) {
         predictPath = this.createOpponentPathPredictor(ballInterceptor)
       }
       const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
@@ -164,7 +165,7 @@ export class DefensiveStrategy {
     // Direction from opponent toward target behind goal
     const dx = this.targetBehindGoal.x - opponent.position.x
     const dy = this.targetBehindGoal.y - opponent.position.y
-    const dist = Math.sqrt(dx ** 2 + dy ** 2)
+    const dist = GeometryUtils.distance(opponent.position, this.targetBehindGoal)
 
     const direction = dist < 1 ? { x: 1, y: 0 } : { x: dx / dist, y: dy / dist }
 
@@ -185,7 +186,7 @@ export class DefensiveStrategy {
     // Direction from opponent toward our goal
     const dx = ourGoal.x - opponent.position.x
     const dy = ourGoal.y - opponent.position.y
-    const dist = Math.sqrt(dx ** 2 + dy ** 2)
+    const dist = GeometryUtils.distance(opponent.position, ourGoal)
 
     if (dist < 1) {
       // Opponent is at our goal, stay nearby
@@ -238,11 +239,9 @@ export class DefensiveStrategy {
       : (GAME_CONFIG.FIELD_WIDTH * 2) / 3
 
     // Sort opponents by distance to our goal (closest = most dangerous = highest priority)
-    const sortedOpponents = [...opponentRemainingPlayers].sort((a, b) => {
-      const aDist = InterceptionCalculator.distance(a.position, ourGoal)
-      const bDist = InterceptionCalculator.distance(b.position, ourGoal)
-      return aDist - bDist
-    })
+    const sortedOpponents = [...opponentRemainingPlayers].sort((a, b) =>
+      GeometryUtils.distanceSquared(a.position, ourGoal) - GeometryUtils.distanceSquared(b.position, ourGoal)
+    )
 
     // For each opponent (in priority order), assign best defender
     for (const opponent of sortedOpponents) {
@@ -277,13 +276,13 @@ export class DefensiveStrategy {
 
         // Assign closest available player
         assignedPlayer = availablePlayers[0]
-        let closestDist = InterceptionCalculator.distance(assignedPlayer.position, markingTarget)
+        let closestDistSq = GeometryUtils.distanceSquared(assignedPlayer.position, markingTarget)
 
         for (const player of availablePlayers) {
-          const dist = InterceptionCalculator.distance(player.position, markingTarget)
-          if (dist < closestDist) {
+          const distSq = GeometryUtils.distanceSquared(player.position, markingTarget)
+          if (distSq < closestDistSq) {
             assignedPlayer = player
-            closestDist = dist
+            closestDistSq = distSq
           }
         }
       }

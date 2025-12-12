@@ -5,6 +5,7 @@
  */
 
 import { AIGameState, AIDecision, PlayerGoal } from './types'
+import { GeometryUtils } from '../../../shared/src/utils/geometry'
 
 export class AIPlayer {
   private playerId: string
@@ -69,7 +70,7 @@ export class AIPlayer {
 
     const dx = this.targetX - currentPos.x
     const dy = this.targetY - currentPos.y
-    const distance = Math.sqrt(dx * dx + dy * dy)
+    const distance = GeometryUtils.distance(currentPos, { x: this.targetX, y: this.targetY })
 
     // For shooting/passing, always return direction even if close (to rotate player)
     if (this.shootPower !== null) {
