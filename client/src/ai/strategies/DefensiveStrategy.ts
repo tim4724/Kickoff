@@ -118,7 +118,7 @@ export class DefensiveStrategy {
       remainingOpponents = remainingOpponents.filter(o => o.id !== ballInterceptor.id)
 
       // Defensive marking: mark all opponents
-      const markingRoles = this.getOpponentMarking(remainingPlayers, remainingOpponents, ball.position, this.ourGoal)
+      const markingRoles = this.getOpponentMarking(remainingPlayers, remainingOpponents, this.ourGoal)
       markingRoles.forEach((role, playerId) => roles.set(playerId, role))
     }
 
@@ -222,7 +222,6 @@ export class DefensiveStrategy {
   private getOpponentMarking(
     ownRemainingPlayers: PlayerData[],
     opponentRemainingPlayers: PlayerData[],
-    ballPosition: Vector2D,
     ourGoal: Vector2D
   ): Map<string, PlayerRole> {
     const roles = new Map<string, PlayerRole>()
@@ -273,7 +272,7 @@ export class DefensiveStrategy {
         markingTarget = interceptPoint
       } else {
         // Zonal marking: Position between opponent, ball, and goal
-        markingTarget = this.getZonalMarkingPosition(opponent, ballPosition, ourGoal)
+        markingTarget = this.getZonalMarkingPosition(opponent)
 
         // Assign closest available player
         assignedPlayer = availablePlayers[0]
@@ -303,39 +302,14 @@ export class DefensiveStrategy {
   }
 
   /**
-   * Calculate zonal marking position between opponent, ball, and goal
-   * Position is behind both opponent and ball, closer to goal
+   * Calculate zonal marking position between opponent and our goal
+   * If ball is more dangerous (closer to goal), blend in ball coverage
    */
-  private getZonalMarkingPosition(
-    opponent: PlayerData,
-    ballPosition: Vector2D,
-    ourGoal: Vector2D
-  ): Vector2D {
-    // Use target behind goal instead of goal center for better defensive coverage
-    // Get the point between opponent and target behind goal (60% toward target from opponent)
-    const toTargetX = this.targetBehindGoal.x - opponent.position.x
-    const toTargetY = this.targetBehindGoal.y - opponent.position.y
-    const baseX = opponent.position.x + toTargetX * 0.6
-    const baseY = opponent.position.y + toTargetY * 0.6
-
-    // Adjust to also be behind ball if ball is closer to our goal
-    const ballDistToGoal = InterceptionCalculator.distance(ballPosition, ourGoal)
-    const opponentDistToGoal = InterceptionCalculator.distance(opponent.position, ourGoal)
-
-    if (ballDistToGoal < opponentDistToGoal) {
-      // Ball is closer to our goal, position between ball and target behind goal too
-      const toBallTargetX = this.targetBehindGoal.x - ballPosition.x
-      const toBallTargetY = this.targetBehindGoal.y - ballPosition.y
-      const ballDefenseX = ballPosition.x + toBallTargetX * 0.4
-      const ballDefenseY = ballPosition.y + toBallTargetY * 0.4
-
-      // Average the two defensive positions (between opponent-target and ball-target)
-      return {
-        x: (baseX + ballDefenseX) / 2,
-        y: (baseY + ballDefenseY) / 2,
-      }
-    }
-
+  private getZonalMarkingPosition(opponent: PlayerData): Vector2D {
+    const target = this.targetBehindGoal
+    // Base position: 60% from opponent toward target behind goal
+    const baseX = opponent.position.x + (target.x - opponent.position.x) * 0.5
+    const baseY = opponent.position.y + (target.y - opponent.position.y) * 0.5
     return { x: baseX, y: baseY }
   }
 }
