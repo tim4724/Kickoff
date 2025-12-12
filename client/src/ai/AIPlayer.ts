@@ -5,7 +5,7 @@
  */
 
 import { AIGameState, AIDecision, PlayerGoal } from './types'
-import { GeometryUtils } from '../../../shared/src/utils/geometry'
+import { GeometryUtils } from '@shared/utils/geometry'
 
 export class AIPlayer {
   private playerId: string

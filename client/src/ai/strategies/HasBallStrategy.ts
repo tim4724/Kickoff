@@ -6,10 +6,10 @@
  */
 
 import { Vector2D, PlayerRole } from '../types'
-import { PlayerData, GAME_CONFIG } from '../../../../shared/src/types'
+import { PlayerData, GAME_CONFIG } from '@shared/types'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { PassOption } from '../utils/PassEvaluator'
-import { GeometryUtils } from '../../../../shared/src/utils/geometry'
+import { GeometryUtils } from '@shared/utils/geometry'
 
 export class HasBallStrategy {
   // Shooting constants

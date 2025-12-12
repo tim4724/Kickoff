@@ -6,7 +6,7 @@
  */
 
 import { AIGameState, AIDecision } from './types'
-import { Team } from '../../../shared/src/types'
+import { Team } from '@shared/types'
 import { AIPlayer } from './AIPlayer'
 import { DefensiveStrategy } from './strategies/DefensiveStrategy'
 import { OffensiveStrategy } from './strategies/OffensiveStrategy'

@@ -6,9 +6,9 @@
  */
 
 import { Vector2D } from '../types'
-import { PlayerData, GAME_CONFIG } from '../../../../shared/src/types'
+import { PlayerData, GAME_CONFIG } from '@shared/types'
 import { InterceptionCalculator } from './InterceptionCalculator'
-import { GeometryUtils } from '../../../../shared/src/utils/geometry'
+import { GeometryUtils } from '@shared/utils/geometry'
 
 export interface PassOption {
   teammate: PlayerData
