@@ -5,9 +5,9 @@
  */
 
 import { Container, Graphics, Text, FederatedPointerEvent } from 'pixi.js'
-import { HapticFeedback } from '../utils/HapticFeedback'
+import { HapticFeedback } from '@/utils/HapticFeedback'
 import { gameClock } from '@shared/engine/GameClock'
-import { PixiScene } from '../utils/PixiScene'
+import { PixiScene } from '@/utils/PixiScene'
 
 export class ActionButton {
   private scene: PixiScene

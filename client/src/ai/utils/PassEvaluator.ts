@@ -5,10 +5,10 @@
  * Returns one best position per teammate with anti-clustering.
  */
 
-import { Vector2D } from '../types'
+import { Vector2D } from '@/ai/types'
 import { PlayerData, GAME_CONFIG } from '@shared/types'
-import { InterceptionCalculator } from './InterceptionCalculator'
 import { GeometryUtils } from '@shared/utils/geometry'
+import { InterceptionCalculator } from './InterceptionCalculator'
 
 export interface PassOption {
   teammate: PlayerData

@@ -3,10 +3,10 @@ import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
-import { AIManager } from '../ai'
+import { AIManager } from '@/ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
-import { StateAdapter } from '../utils/StateAdapter'
-import { PixiSceneManager } from '../utils/PixiSceneManager'
+import { StateAdapter } from '@/utils/StateAdapter'
+import { PixiSceneManager } from '@/utils/PixiSceneManager'
 
 /**
  * AI-Only Scene (PixiJS)

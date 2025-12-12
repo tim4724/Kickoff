@@ -11,11 +11,11 @@
  * - Set goals for all players on the team
  */
 
-import { Vector2D, AIGameState, PlayerRole } from '../types'
+import { Vector2D, AIGameState, PlayerRole } from '@/ai/types'
 import { PlayerData, GAME_CONFIG, Team } from '@shared/types'
-import { InterceptionCalculator } from '../utils/InterceptionCalculator'
+import { InterceptionCalculator } from '@/ai/utils/InterceptionCalculator'
 import { SpreadPositionStrategy } from './SpreadPositionStrategy'
-import { PassEvaluator } from '../utils/PassEvaluator'
+import { PassEvaluator } from '@/ai/utils/PassEvaluator'
 import { GeometryUtils } from '@shared/utils/geometry'
 
 export class DefensiveStrategy {

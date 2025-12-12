@@ -1,14 +1,14 @@
 import { Application, Text } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
-import { NetworkManager } from '../network/NetworkManager'
+import { NetworkManager } from '@/network/NetworkManager'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
-import { StateAdapter, type UnifiedGameState } from '../utils/StateAdapter'
+import { StateAdapter, type UnifiedGameState } from '@/utils/StateAdapter'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
-import { AIManager } from '../ai'
-import { sceneRouter } from '../utils/SceneRouter'
+import { AIManager } from '@/ai'
+import { sceneRouter } from '@/utils/SceneRouter'
 import type { Room } from 'colyseus.js'
-import { PixiSceneManager } from '../utils/PixiSceneManager'
+import { PixiSceneManager } from '@/utils/PixiSceneManager'
 
 /**
  * Multiplayer Game Scene (PixiJS)

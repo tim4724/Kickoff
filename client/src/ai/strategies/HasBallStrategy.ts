@@ -5,10 +5,10 @@
  * Returns a role assignment (shoot, dribble, pass) based on game state.
  */
 
-import { Vector2D, PlayerRole } from '../types'
+import { Vector2D, PlayerRole } from '@/ai/types'
 import { PlayerData, GAME_CONFIG } from '@shared/types'
-import { InterceptionCalculator } from '../utils/InterceptionCalculator'
-import { PassOption } from '../utils/PassEvaluator'
+import { InterceptionCalculator } from '@/ai/utils/InterceptionCalculator'
+import { PassOption } from '@/ai/utils/PassEvaluator'
 import { GeometryUtils } from '@shared/utils/geometry'
 
 export class HasBallStrategy {

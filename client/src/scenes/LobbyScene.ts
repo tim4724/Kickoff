@@ -1,8 +1,8 @@
 import { Application, Container, Graphics, Text } from 'pixi.js'
-import { sceneRouter } from '../utils/SceneRouter'
-import { PixiScene } from '../utils/PixiScene'
-import { PixiSceneManager } from '../utils/PixiSceneManager'
-import { NetworkManager } from '../network/NetworkManager'
+import { sceneRouter } from '@/utils/SceneRouter'
+import { PixiScene } from '@/utils/PixiScene'
+import { PixiSceneManager } from '@/utils/PixiSceneManager'
+import { NetworkManager } from '@/network/NetworkManager'
 
 export class LobbyScene extends PixiScene {
   private background!: Graphics

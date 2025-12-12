@@ -7,7 +7,7 @@
  * Extracted from TeamAI.ts existing logic.
  */
 
-import { Vector2D } from '../types'
+import { Vector2D } from '@/ai/types'
 import { PlayerData, GAME_CONFIG } from '@shared/types'
 import { PhysicsEngine } from '@shared/engine/PhysicsEngine'
 import { GeometryUtils } from '@shared/utils/geometry'

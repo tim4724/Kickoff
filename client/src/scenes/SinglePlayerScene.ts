@@ -3,9 +3,9 @@ import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
-import { AIManager } from '../ai'
-import { StateAdapter } from '../utils/StateAdapter'
-import { PixiSceneManager } from '../utils/PixiSceneManager'
+import { AIManager } from '@/ai'
+import { StateAdapter } from '@/utils/StateAdapter'
+import { PixiSceneManager } from '@/utils/PixiSceneManager'
 
 /**
  * Single Player Scene (PixiJS)
