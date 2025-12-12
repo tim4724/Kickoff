@@ -14,7 +14,6 @@ import { AIManager } from '../ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { PixiScene } from '../utils/PixiScene'
 import { PixiSceneManager } from '../utils/PixiSceneManager'
-import { GeometryUtils } from '../../../shared/src/utils/geometry'
 
 /**
  * Base Game Scene for PixiJS
@@ -549,7 +548,7 @@ export abstract class BaseGameScene extends PixiScene {
       return
     }
 
-    const speedSq = GeometryUtils.distanceSquared({ x: 0, y: 0 }, { x: vx, y: vy })
+    const speedSq = vx * vx + vy * vy
     const MIN_SPEED_THRESHOLD = 15
 
     if (speedSq < MIN_SPEED_THRESHOLD * MIN_SPEED_THRESHOLD) {
@@ -691,7 +690,7 @@ export abstract class BaseGameScene extends PixiScene {
         if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) moveY = -1
         else if (this.keys.has('ArrowDown') || this.keys.has('KeyS')) moveY = 1
 
-        const lengthSq = GeometryUtils.distanceSquared({ x: 0, y: 0 }, { x: moveX, y: moveY })
+        const lengthSq = moveX * moveX + moveY * moveY
         if (lengthSq > 0) {
             const length = Math.sqrt(lengthSq)
             moveX /= length

@@ -49,8 +49,7 @@ export class HasBallStrategy {
     targetBehindGoal: Vector2D,
     passOptions: PassOption[]
   ): PlayerRole {
-    const distToGoalSq = GeometryUtils.distanceSquared(carrier.position, opponentGoal)
-    const distToGoal = Math.sqrt(distToGoalSq)
+    const distToGoal = GeometryUtils.distance(carrier.position, opponentGoal)
 
     if (distToGoal < this.SHOOTING_RANGE) {
       // Evaluate shot angles using interception logic
@@ -107,14 +106,13 @@ export class HasBallStrategy {
     // Direction vector from carrier to target behind goal
     const dx = targetBehindGoal.x - carrier.position.x
     const dy = targetBehindGoal.y - carrier.position.y
-    const distSq = GeometryUtils.distanceSquared(carrier.position, targetBehindGoal)
+    const dist = GeometryUtils.distance(carrier.position, targetBehindGoal)
 
-    if (distSq < 1) {
+    if (dist < 1) {
       // Already at target
       return { interceptPoint: targetBehindGoal, interceptDistance: Infinity }
     }
 
-    const dist = Math.sqrt(distSq)
     const dirX = dx / dist
     const dirY = dy / dist
 
@@ -135,7 +133,7 @@ export class HasBallStrategy {
     )
 
     // Calculate distance from intercept point to carrier's current position
-    const interceptDistance = Math.sqrt(GeometryUtils.distanceSquared(carrier.position, interceptPoint))
+    const interceptDistance = GeometryUtils.distance(carrier.position, interceptPoint)
 
     return { interceptPoint, interceptDistance }
   }
@@ -178,11 +176,10 @@ export class HasBallStrategy {
       // Calculate shot trajectory direction
       const dx = shotTarget.x - carrier.position.x
       const dy = shotTarget.y - carrier.position.y
-      const distSq = GeometryUtils.distanceSquared(carrier.position, shotTarget)
+      const dist = GeometryUtils.distance(carrier.position, shotTarget)
 
-      if (distSq < 1) continue // Skip if already at target
+      if (dist < 1) continue // Skip if already at target
 
-      const dist = Math.sqrt(distSq)
       const dirX = dx / dist
       const dirY = dy / dist
 
@@ -203,7 +200,7 @@ export class HasBallStrategy {
       )
 
       // Calculate how far the intercept point is from carrier (further = better)
-      const interceptDistance = Math.sqrt(GeometryUtils.distanceSquared(carrier.position, interceptPoint))
+      const interceptDistance = GeometryUtils.distance(carrier.position, interceptPoint)
 
       shotOptions.push({ target: shotTarget, interceptDistance })
     }
@@ -301,9 +298,9 @@ export class HasBallStrategy {
     const space = minOpponentDistSq === Infinity ? Infinity : Math.sqrt(minOpponentDistSq)
 
     // Forward progress toward goal (positive = forward, negative = backward)
-    const carrierDistToGoal = Math.sqrt(GeometryUtils.distanceSquared(carrier.position, opponentGoal))
-    const targetDistToGoal = Math.sqrt(GeometryUtils.distanceSquared(targetPosition, opponentGoal))
-    const forwardProgress = carrierDistToGoal - targetDistToGoal
+    const forwardProgress =
+      GeometryUtils.distance(carrier.position, opponentGoal) -
+      GeometryUtils.distance(targetPosition, opponentGoal)
 
     // Simplified scoring: prioritize space and forward progress
     return Math.min(this.MAX_SPACE_CAP, space) * this.SCORE_WEIGHT_SPACE + forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS

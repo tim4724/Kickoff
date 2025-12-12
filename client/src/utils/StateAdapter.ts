@@ -228,10 +228,7 @@ export class StateAdapter {
       const player = state.players.get(playerId)
       if (!player) continue
 
-      const distanceSq = GeometryUtils.distanceSquared(
-        { x: player.x, y: player.y },
-        { x: ballX, y: ballY }
-      )
+      const distanceSq = GeometryUtils.distanceSquared(player, state.ball)
 
       if (distanceSq < bestDistance) {
         bestDistance = distanceSq

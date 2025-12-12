@@ -165,15 +165,9 @@ export class DefensiveStrategy {
     // Direction from opponent toward target behind goal
     const dx = this.targetBehindGoal.x - opponent.position.x
     const dy = this.targetBehindGoal.y - opponent.position.y
-    const distSq = GeometryUtils.distanceSquared(opponent.position, this.targetBehindGoal)
+    const dist = GeometryUtils.distance(opponent.position, this.targetBehindGoal)
 
-    let direction
-    if (distSq < 1) {
-      direction = { x: 1, y: 0 }
-    } else {
-      const dist = Math.sqrt(distSq)
-      direction = { x: dx / dist, y: dy / dist }
-    }
+    const direction = dist < 1 ? { x: 1, y: 0 } : { x: dx / dist, y: dy / dist }
 
     return (t: number) => InterceptionCalculator.predictPlayerBallPosition(opponent.position, direction, t)
   }
@@ -192,14 +186,13 @@ export class DefensiveStrategy {
     // Direction from opponent toward our goal
     const dx = ourGoal.x - opponent.position.x
     const dy = ourGoal.y - opponent.position.y
-    const distSq = GeometryUtils.distanceSquared(opponent.position, ourGoal)
+    const dist = GeometryUtils.distance(opponent.position, ourGoal)
 
-    if (distSq < 1) {
+    if (dist < 1) {
       // Opponent is at our goal, stay nearby
       return { goal: 'receivePass-defensive', target: ourGoal }
     }
 
-    const dist = Math.sqrt(distSq)
     const dirX = dx / dist
     const dirY = dy / dist
 
