@@ -215,10 +215,10 @@ export class ActionButton {
     this.screenWidth = newWidth
     this.scene.app.stage.hitArea = this.scene.app.screen;
 
-    // Re-anchor to a symmetric default on the right side if not pressed
+    // Re-anchor to a symmetric default on the right side if not pressed - closer to right edge
     if (!this.isPressed) {
-      this.x = Math.min(newWidth - 70, Math.max(newWidth * 0.82, newWidth / 2 + 70))
-      this.y = Math.max(100, newHeight * 0.8)
+      this.x = Math.min(newWidth - 70, Math.max(newWidth * 0.90, newWidth / 2 + 70))
+      this.y = Math.max(100, newHeight * 0.7)
     }
 
     // Update button position

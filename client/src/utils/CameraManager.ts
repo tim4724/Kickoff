@@ -5,19 +5,28 @@ import { PixiScene } from './PixiScene'
 /**
  * Camera Manager Utility for PixiJS
  * Simulates a dual-camera system using Containers.
+ * 
+ * The visual field includes a margin around the logical field:
+ * - Logical field (physics): 0 to FIELD_WIDTH, 0 to FIELD_HEIGHT
+ * - Visual field (rendered): -VISUAL_MARGIN to FIELD_WIDTH+VISUAL_MARGIN, etc.
+ * 
+ * The camera scales to fit the entire visual field while maintaining aspect ratio.
  */
 export class CameraManager {
   private gameContainer: Container
   private uiContainer: Container
+  private isMobile: boolean
 
-  // We need to mask the game container to create letterboxing effect visually if needed,
-  // or simply rely on the fact that outside area is background color.
-  // Phaser's setViewport creates a clipping region effectively.
-  // In Pixi, we can use a mask or just position/scale the container.
+  // Mobile zoom factor - makes field smaller to leave more room for touch controls
+  private static readonly MOBILE_ZOOM_FACTOR = 0.85
 
-  constructor(scene: PixiScene) {
+  // Visual margin around the logical field (matches FieldRenderer.FIELD_LINE_MARGIN)
+  private static readonly VISUAL_MARGIN = 40
+
+  constructor(scene: PixiScene, isMobile: boolean = false) {
     this.gameContainer = new Container()
     this.uiContainer = new Container()
+    this.isMobile = isMobile
 
     // Add containers to the scene
     scene.container.addChild(this.gameContainer)
@@ -38,48 +47,46 @@ export class CameraManager {
 
   public handleResize(screenWidth: number, screenHeight: number): void {
     // 1. Resize UI Container (Fullscreen)
-    // UI elements are usually positioned relative to screen corners in the scene code.
-    // So the container itself is just at 0,0 and 1:1 scale.
     this.uiContainer.position.set(0, 0)
     this.uiContainer.scale.set(1)
 
-    // 2. Resize Game Container (Letterbox/Pillarbox)
-    const targetAspect = GAME_CONFIG.FIELD_WIDTH / GAME_CONFIG.FIELD_HEIGHT
+    // 2. Resize Game Container to fit the VISUAL field (including margins)
+    const margin = CameraManager.VISUAL_MARGIN
+    const visualWidth = GAME_CONFIG.FIELD_WIDTH + margin * 2   // 1680
+    const visualHeight = GAME_CONFIG.FIELD_HEIGHT + margin * 2  // 1080
+    const visualAspect = visualWidth / visualHeight
 
-    let viewportX = 0
-    let viewportY = 0
-    let viewportWidth = screenWidth
-    let viewportHeight = screenHeight
-
-    if (screenWidth / screenHeight > targetAspect) {
-      // Screen is wider - pillarbox
-      viewportHeight = screenHeight
-      viewportWidth = screenHeight * targetAspect
-      viewportX = (screenWidth - viewportWidth) / 2
-      viewportY = 0
+    // Calculate zoom to fit the entire visual field
+    let zoom: number
+    if (screenWidth / screenHeight > visualAspect) {
+      // Screen is wider than visual field - fit to height
+      zoom = screenHeight / visualHeight
     } else {
-      // Screen is taller - letterbox
-      viewportWidth = screenWidth
-      viewportHeight = screenWidth / targetAspect
-      viewportX = 0
-      viewportY = (screenHeight - viewportHeight) / 2
+      // Screen is taller than visual field - fit to width
+      zoom = screenWidth / visualWidth
     }
 
-    // Position the game container
-    this.gameContainer.position.set(viewportX, viewportY)
+    // Apply mobile zoom factor only in landscape mode
+    const isLandscape = screenWidth > screenHeight
+    if (this.isMobile && isLandscape) {
+      zoom *= CameraManager.MOBILE_ZOOM_FACTOR
+    }
 
-    // Calculate zoom to fit field in viewport
-    const zoomX = viewportWidth / GAME_CONFIG.FIELD_WIDTH
-    const zoomY = viewportHeight / GAME_CONFIG.FIELD_HEIGHT
-    const zoom = Math.min(zoomX, zoomY)
+    // Calculate the screen position for the visual field to be centered
+    // Visual field spans from -margin to FIELD_WIDTH+margin in logical coords
+    const visualScreenWidth = visualWidth * zoom
+    const visualScreenHeight = visualHeight * zoom
+    const visualScreenX = (screenWidth - visualScreenWidth) / 2
+    const visualScreenY = (screenHeight - visualScreenHeight) / 2
 
+    // The game container origin (0,0) needs to be offset by margin from the visual corner
+    // Because the visual field starts at -margin, the container position should be:
+    // visualScreenX + margin * zoom (to account for the -margin offset)
+    const containerX = visualScreenX + margin * zoom
+    const containerY = visualScreenY + margin * zoom
+
+    this.gameContainer.position.set(containerX, containerY)
     this.gameContainer.scale.set(zoom)
-
-    // Optional: Masking
-    // If we want to strictly clip content outside the viewport:
-    // const mask = new Graphics().rect(0, 0, GAME_CONFIG.FIELD_WIDTH, GAME_CONFIG.FIELD_HEIGHT).fill(0xffffff);
-    // this.gameContainer.mask = mask;
-    // this.gameContainer.addChild(mask); // Mask needs to be in display list usually or just assigned
   }
 
   destroy(): void {
