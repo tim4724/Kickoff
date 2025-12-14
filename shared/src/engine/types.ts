@@ -56,8 +56,6 @@ export interface EnginePlayerInput {
 export interface PhysicsConfig {
   fieldWidth: number
   fieldHeight: number
-  fieldMargin: number
-  playerMargin: number
   playerSpeed: number
   ballRadius: number
   ballFriction: number

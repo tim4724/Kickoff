@@ -6,6 +6,10 @@ import { GAME_CONFIG } from '@shared/types'
  * Shared rendering logic for field, goals, and field elements
  */
 export class FieldRenderer {
+  // Visual constants (UI only, do not affect physics)
+  private static readonly FIELD_LINE_MARGIN = 40
+  private static readonly GOAL_DEPTH = 40 // How far goal extends visually outside field
+
   /**
    * Create the field background and boundaries
    * Appends elements to the game container
@@ -13,19 +17,19 @@ export class FieldRenderer {
   static createField(container: Container): void {
     const width = GAME_CONFIG.FIELD_WIDTH
     const height = GAME_CONFIG.FIELD_HEIGHT
-    const margin = GAME_CONFIG.FIELD_MARGIN
+    const margin = FieldRenderer.FIELD_LINE_MARGIN
 
-    // Field background (green)
+    // Field background (green) - extends beyond field bounds by margin
     const fieldBg = new Graphics()
-    fieldBg.rect(0, 0, width, height)
+    fieldBg.rect(-margin, -margin, width + margin * 2, height + margin * 2)
     fieldBg.fill(0x2d5016)
     container.addChild(fieldBg)
 
-    // Field lines
+    // Field lines (white boundary at the edge of playable area)
     const borderGraphics = new Graphics()
 
-    // Border
-    borderGraphics.rect(margin, margin, width - margin * 2, height - margin * 2)
+    // Border at the actual field edge (0,0 to width,height)
+    borderGraphics.rect(0, 0, width, height)
     borderGraphics.stroke({ width: 4, color: 0xffffff, alpha: 1 })
 
     // Center circle
@@ -33,49 +37,41 @@ export class FieldRenderer {
     borderGraphics.stroke({ width: 2, color: 0xffffff, alpha: 0.5 })
 
     // Halfway line (Vertical Center)
-    borderGraphics.moveTo(width / 2, margin)
-    borderGraphics.lineTo(width / 2, height - margin)
+    borderGraphics.moveTo(width / 2, 0)
+    borderGraphics.lineTo(width / 2, height)
     borderGraphics.stroke({ width: 2, color: 0xffffff, alpha: 0.5 })
-
-    // Penalty Areas (Simplified if no config available, but standard size is approx 16.5m)
-    // Assuming field is approx 100m x 60m.
-    // Let's just stick to the requested Halfway Line + Center Circle fix.
-    // The user said "Vertical middle line is missing", implying the halfway line was missing.
-    // I fixed the stroke order above.
-
-    // Removing the horizontal line as it is not standard soccer.
 
     container.addChild(borderGraphics)
 
-    // Goals
+    // Goals - positioned at field edges (x=0 and x=width)
     const goalHeight = GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN
-    const goalDepth = GAME_CONFIG.GOAL_DEPTH
+    const goalDepth = FieldRenderer.GOAL_DEPTH
 
-    // Left Goal
+    // Left Goal (extends outside left edge)
     const leftGoal = new Graphics()
-    leftGoal.rect(0, 0, goalDepth, goalHeight) // Origin 0,0 for rect
+    leftGoal.rect(-goalDepth, 0, goalDepth, goalHeight)
     leftGoal.fill(0xffffff)
-    leftGoal.pivot.set(0, goalHeight / 2) // setOrigin(0, 0.5) equivalent
+    leftGoal.pivot.set(0, goalHeight / 2)
     leftGoal.position.set(0, height / 2)
     container.addChild(leftGoal)
 
-    // Right Goal
+    // Right Goal (extends outside right edge)
     const rightGoal = new Graphics()
     rightGoal.rect(0, 0, goalDepth, goalHeight)
     rightGoal.fill(0xffffff)
-    rightGoal.pivot.set(goalDepth, goalHeight / 2) // setOrigin(1, 0.5) equivalent
+    rightGoal.pivot.set(0, goalHeight / 2)
     rightGoal.position.set(width, height / 2)
     container.addChild(rightGoal)
 
-    // Goal posts
+    // Goal posts at the field boundary (x=0 and x=width)
     const postColor = 0xffffff
     const postRadius = 10
 
     const posts = [
-        { x: margin, y: GAME_CONFIG.GOAL_Y_MIN },
-        { x: margin, y: GAME_CONFIG.GOAL_Y_MAX },
-        { x: width - margin, y: GAME_CONFIG.GOAL_Y_MIN },
-        { x: width - margin, y: GAME_CONFIG.GOAL_Y_MAX }
+        { x: 0, y: GAME_CONFIG.GOAL_Y_MIN },
+        { x: 0, y: GAME_CONFIG.GOAL_Y_MAX },
+        { x: width, y: GAME_CONFIG.GOAL_Y_MIN },
+        { x: width, y: GAME_CONFIG.GOAL_Y_MAX }
     ]
 
     posts.forEach(pos => {

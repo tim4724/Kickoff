@@ -30,6 +30,7 @@ export class PhysicsEngine {
   /**
    * Simulate one physics step for the ball (static helper for AI)
    * Returns new position and velocity after applying friction and bounces
+   * Ball uses full field bounds (0 to fieldWidth/fieldHeight)
    */
   static simulateBallStep(
     x: number,
@@ -41,7 +42,6 @@ export class PhysicsEngine {
       ballFriction: number
       fieldWidth: number
       fieldHeight: number
-      fieldMargin: number
       goalYMin: number
       goalYMax: number
     },
@@ -69,27 +69,25 @@ export class PhysicsEngine {
     x += vx * dt
     y += vy * dt
 
-    // Bounce off left/right boundaries (exclude goal zones)
-    if (x <= config.fieldMargin && (y < config.goalYMin || y > config.goalYMax)) {
+    // Bounce off left boundary (exclude goal zone)
+    if (x <= 0 && (y < config.goalYMin || y > config.goalYMax)) {
       vx *= bounceCoef
-      x = config.fieldMargin
+      x = 0
     }
-    if (
-      x >= config.fieldWidth - config.fieldMargin &&
-      (y < config.goalYMin || y > config.goalYMax)
-    ) {
+    // Bounce off right boundary (exclude goal zone)
+    if (x >= config.fieldWidth && (y < config.goalYMin || y > config.goalYMax)) {
       vx *= bounceCoef
-      x = config.fieldWidth - config.fieldMargin
+      x = config.fieldWidth
     }
 
     // Bounce off top/bottom boundaries
-    if (y <= config.fieldMargin) {
+    if (y <= 0) {
       vy *= bounceCoef
-      y = config.fieldMargin
+      y = 0
     }
-    if (y >= config.fieldHeight - config.fieldMargin) {
+    if (y >= config.fieldHeight) {
       vy *= bounceCoef
-      y = config.fieldHeight - config.fieldMargin
+      y = config.fieldHeight
     }
 
     if (out) {
@@ -119,15 +117,9 @@ export class PhysicsEngine {
     player.x += player.velocityX * dt
     player.y += player.velocityY * dt
 
-    // Clamp to field bounds
-    player.x = Math.max(
-      this.config.playerMargin,
-      Math.min(this.config.fieldWidth - this.config.playerMargin, player.x)
-    )
-    player.y = Math.max(
-      this.config.playerMargin,
-      Math.min(this.config.fieldHeight - this.config.playerMargin, player.y)
-    )
+    // Clamp to field bounds (players can go to edges)
+    player.x = Math.max(0, Math.min(this.config.fieldWidth, player.x))
+    player.y = Math.max(0, Math.min(this.config.fieldHeight, player.y))
 
     // Update state (preserve 'kicking' if still active)
     const now = gameClock.now()
@@ -365,11 +357,12 @@ export class PhysicsEngine {
 
   /**
    * Check for goals
+   * Goals are at x < 0 (left/red scores) and x > fieldWidth (right/blue scores)
    */
   checkGoals(ball: EngineBallData): Team | null {
-    // Left goal (red scores)
+    // Left goal (red scores) - ball fully past left edge
     if (
-      ball.x + this.config.ballRadius < this.config.fieldMargin &&
+      ball.x + this.config.ballRadius < 0 &&
       ball.y >= this.config.goalYMin &&
       ball.y <= this.config.goalYMax
     ) {
@@ -377,9 +370,9 @@ export class PhysicsEngine {
       return 'red'
     }
 
-    // Right goal (blue scores)
+    // Right goal (blue scores) - ball fully past right edge
     if (
-      ball.x - this.config.ballRadius > this.config.fieldWidth - this.config.fieldMargin &&
+      ball.x - this.config.ballRadius > this.config.fieldWidth &&
       ball.y >= this.config.goalYMin &&
       ball.y <= this.config.goalYMax
     ) {

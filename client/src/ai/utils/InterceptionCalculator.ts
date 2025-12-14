@@ -96,12 +96,11 @@ export class InterceptionCalculator {
     const dt = 1 / PHYSICS_HZ // 0.01666s per step (matches GameEngine)
     const steps = Math.ceil(timeSeconds / dt)
 
-    // Physics config matching game engine
+    // Physics config matching game engine (full field bounds, no margin)
     const physicsConfig = {
       ballFriction: GAME_CONFIG.BALL_FRICTION,
       fieldWidth: GAME_CONFIG.FIELD_WIDTH,
       fieldHeight: GAME_CONFIG.FIELD_HEIGHT,
-      fieldMargin: GAME_CONFIG.FIELD_MARGIN,
       goalYMin: GAME_CONFIG.GOAL_Y_MIN,
       goalYMax: GAME_CONFIG.GOAL_Y_MAX,
     }

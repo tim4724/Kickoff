@@ -55,8 +55,6 @@ export class GameEngine {
     const physicsConfig: PhysicsConfig = {
       fieldWidth: GAME_CONFIG.FIELD_WIDTH,
       fieldHeight: GAME_CONFIG.FIELD_HEIGHT,
-      fieldMargin: GAME_CONFIG.FIELD_MARGIN,
-      playerMargin: GAME_CONFIG.PLAYER_MARGIN,
       playerSpeed: GAME_CONFIG.PLAYER_SPEED,
       ballRadius: GAME_CONFIG.BALL_RADIUS,
       ballFriction: GAME_CONFIG.BALL_FRICTION,

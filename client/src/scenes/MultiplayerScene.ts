@@ -73,14 +73,9 @@ export class MultiplayerScene extends BaseGameScene {
           controlledSprite.x += movement.x * GAME_CONFIG.PLAYER_SPEED * dt
           controlledSprite.y += movement.y * GAME_CONFIG.PLAYER_SPEED * dt
 
-          controlledSprite.x = Math.max(
-            GAME_CONFIG.PLAYER_MARGIN,
-            Math.min(controlledSprite.x, GAME_CONFIG.FIELD_WIDTH - GAME_CONFIG.PLAYER_MARGIN)
-          )
-          controlledSprite.y = Math.max(
-            GAME_CONFIG.PLAYER_MARGIN,
-            Math.min(controlledSprite.y, GAME_CONFIG.FIELD_HEIGHT - GAME_CONFIG.PLAYER_MARGIN)
-          )
+          // Clamp to field bounds (matches server physics)
+          controlledSprite.x = Math.max(0, Math.min(controlledSprite.x, GAME_CONFIG.FIELD_WIDTH))
+          controlledSprite.y = Math.max(0, Math.min(controlledSprite.y, GAME_CONFIG.FIELD_HEIGHT))
         }
       }
 
@@ -531,16 +526,27 @@ export class MultiplayerScene extends BaseGameScene {
       }
     })
 
-    this.scoreText.text = `${state.scoreBlue} - ${state.scoreRed}`
+    // Update broadcast-style scoreboard
+    if (this.blueScoreText) this.blueScoreText.text = `${state.scoreBlue}`
+    if (this.redScoreText) this.redScoreText.text = `${state.scoreRed}`
 
     const minutes = Math.floor(state.matchTime / 60)
     const seconds = Math.floor(state.matchTime % 60)
     this.timerText.text = `${minutes}:${seconds.toString().padStart(2, '0')}`
 
+    // Timer urgency effect in last 30 seconds
     if (state.matchTime <= 30 && state.matchTime > 0) {
-      this.timerText.style.fill = '#ff4444'
+      this.timerText.style.fill = '#ff5252'
+      if (this.timerBg) {
+        this.timerBg.tint = 0xff5252
+        this.timerBg.alpha = 0.15 + Math.sin(Date.now() / 200) * 0.05
+      }
     } else {
       this.timerText.style.fill = '#ffffff'
+      if (this.timerBg) {
+        this.timerBg.tint = 0xffffff
+        this.timerBg.alpha = 1
+      }
     }
   }
 
