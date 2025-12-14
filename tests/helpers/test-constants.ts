@@ -19,8 +19,8 @@ export const PHYSICS_CONSTANTS = {
   PLAYER_SPEED: 450,
   SHOOT_SPEED: 2000,
   MIN_SHOOT_SPEED: 800,
-  FIELD_WIDTH: 1920,
-  FIELD_HEIGHT: 1080,
+  FIELD_WIDTH: 1600,
+  FIELD_HEIGHT: 1000,
 } as const
 
 // Test timing constants

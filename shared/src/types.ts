@@ -49,38 +49,53 @@ export interface GameStateData {
   ball: BallData
 }
 
+// Base field dimensions
+const FIELD_WIDTH = 1600
+const FIELD_HEIGHT = 1000
+
+// Goal configuration
+const GOAL_HEIGHT_RATIO = 0.25 // Goal spans 25% of field height
+
+// Player and ball sizing (derived from possession mechanics)
+const POSSESSION_BALL_OFFSET = 25 // distance ball is positioned in front of player
+const PLAYER_RADIUS = Math.round(POSSESSION_BALL_OFFSET * 1.4) // ~35px, player visual radius
+const BALL_RADIUS = Math.round(PLAYER_RADIUS * 0.4) // ~14px, ball visual radius
+
 export const GAME_CONFIG = {
-  // Fixed coordinate system for client, server, and physics
-  FIELD_WIDTH: 1920,
-  FIELD_HEIGHT: 1080,
+  // Field dimensions
+  FIELD_WIDTH,
+  FIELD_HEIGHT,
 
-  // Physics
-  PLAYER_SPEED: 284, // pixels per second (10% slower: 315 * 0.9 ≈ 284)
-  BALL_RADIUS: 15, // ball visual radius (30x30 ellipse / 2)
+  // Player physics
+  PLAYER_SPEED: 284, // pixels per second
+  PLAYER_RADIUS, // derived from POSSESSION_BALL_OFFSET
+
+  // Ball physics
+  BALL_RADIUS, // derived from PLAYER_RADIUS
   BALL_FRICTION: 0.98,
-  SHOOT_SPEED: 1440, // max shoot speed at full power (10% slower: 1600 * 0.9)
-  MIN_SHOOT_SPEED: 720, // min shoot speed (10% slower: 800 * 0.9)
-  POSSESSION_RADIUS: 45, // reduced for less magnetic ball capture (requires more precise positioning)
-  POSSESSION_BALL_OFFSET: 25, // distance ball is positioned in front of player during possession
+  SHOOT_SPEED: 1440, // max shoot speed at full power
+  MIN_SHOOT_SPEED: 720, // min shoot speed
 
-  // Field boundaries and goals
-  FIELD_MARGIN: 40, // px from edge (field line position)
-  PLAYER_MARGIN: 60, // px from edge for player bounds
-  GOAL_DEPTH: 40, // How far goal extends outside field boundary (matches FIELD_MARGIN)
-  GOAL_Y_MIN: 360, // 1080/2 - 180 (33% of height, centered)
-  GOAL_Y_MAX: 720, // 1080/2 + 180
+  // Possession mechanics
+  POSSESSION_RADIUS: 45, // capture distance
+  POSSESSION_BALL_OFFSET, // ball offset when possessed
+  PRESSURE_RADIUS: 45, // opponent pressure distance
+
+  // Pressure system
+  PRESSURE_BUILDUP_RATE: 2, // per second per opponent
+  PRESSURE_DECAY_RATE: 3, // per second when no opponents
+  PRESSURE_RELEASE_THRESHOLD: 1.0, // triggers ball release
+
+  // Possession lockouts
+  CAPTURE_LOCKOUT_MS: 300,
+  LOSS_LOCKOUT_MS: 300,
+
+  // Goal bounds (derived from field height)
+  GOAL_HEIGHT_RATIO,
+  GOAL_Y_MIN: FIELD_HEIGHT / 2 - (FIELD_HEIGHT * GOAL_HEIGHT_RATIO) / 2,
+  GOAL_Y_MAX: FIELD_HEIGHT / 2 + (FIELD_HEIGHT * GOAL_HEIGHT_RATIO) / 2,
 
   // Game timing
-  TICK_RATE: 30, // server updates per second
-  MATCH_DURATION: 120, // seconds (2 minutes)
-
-  // Ball capture / pressure system
-  PRESSURE_RADIUS: 45, // distance at which opponent applies pressure (matches possession radius)
-  PRESSURE_BUILDUP_RATE: 2, // pressure per second per opponent (~0.5s to capture with 1 opponent)
-  PRESSURE_DECAY_RATE: 3, // pressure decay per second when no opponents near
-  PRESSURE_RELEASE_THRESHOLD: 1.0, // pressure level that causes ball release (100%)
-
-  // Possession lockout periods
-  CAPTURE_LOCKOUT_MS: 300, // can't lose possession for 300ms after capturing
-  LOSS_LOCKOUT_MS: 300, // can't capture possession for 300ms after losing
+  TICK_RATE: 30, // server ticks per second
+  MATCH_DURATION: 120, // seconds
 } as const

@@ -54,7 +54,7 @@ Kickoff/
 
 ## Current Status
 
-- Authoritative server with 30 Hz tick, unified 1920×1080 coordinates
+- Authoritative server with 30 Hz tick, unified 1600×1000 coordinates
 - Client prediction + reconciliation; ~55 ms measured input lag
 - Ball capture with pressure + lockouts; variable-power shooting
 - 3v3 gameplay with hierarchical AI (AIManager → TeamAI → AIPlayer)
