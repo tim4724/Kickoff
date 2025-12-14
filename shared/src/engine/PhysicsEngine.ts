@@ -187,21 +187,22 @@ export class PhysicsEngine {
     let nearestOpponent: EnginePlayerData | null = null
     let nearestOpponentDist = Infinity
 
-    players.forEach((player) => {
-      if (player.id === possessor.id) return
+    for (const player of players.values()) {
+      // Optimization: Skip self and teammates early to avoid distance calculation
+      if (player.id === possessor.id || player.team === possessor.team) continue
 
       const dx = player.x - ball.x
       const dy = player.y - ball.y
       const distSq = dx * dx + dy * dy
 
-      if (distSq < this.pressureRadiusSq && player.team !== possessor.team) {
+      if (distSq < this.pressureRadiusSq) {
         opponentsNearby++
         if (distSq < nearestOpponentDist) {
           nearestOpponent = player
           nearestOpponentDist = distSq
         }
       }
-    })
+    }
 
     // Update pressure level
     if (opponentsNearby > 0) {
@@ -273,11 +274,11 @@ export class PhysicsEngine {
       const timeSinceShot = gameClock.now() - (ball.lastShotTime || 0)
       const hasImmunity = timeSinceShot < SHOT_IMMUNITY_MS
 
-      players.forEach((player) => {
-        if (ball.possessedBy !== '') return
+      for (const player of players.values()) {
+        if (ball.possessedBy !== '') break
 
         // Skip shooter during immunity
-        if (hasImmunity && player.id === ball.lastShooter) return
+        if (hasImmunity && player.id === ball.lastShooter) continue
 
         const dx = ball.x - player.x
         const dy = ball.y - player.y
@@ -286,12 +287,12 @@ export class PhysicsEngine {
         if (distSq < this.possessionRadiusSq) {
           // Check loss lockout
           const timeSinceLoss = gameClock.now() - (this.lastPossessionLossTime.get(player.id) || 0)
-          if (timeSinceLoss < this.config.lossLockoutMs) return
+          if (timeSinceLoss < this.config.lossLockoutMs) continue
 
           ball.possessedBy = player.id
           this.lastPossessionGainTime.set(player.id, gameClock.now())
         }
-      })
+      }
     }
   }
 
@@ -404,7 +405,7 @@ export class PhysicsEngine {
    * Reset players to formation positions
    */
   resetPlayers(players: Map<string, EnginePlayerData>, fieldWidth: number, fieldHeight: number): void {
-    players.forEach((player, playerId) => {
+    for (const [playerId, player] of players) {
       if (player.team === 'blue') {
         const forwardX = Math.round(fieldWidth * 0.36)
         const defenderX = Math.round(fieldWidth * 0.19)
@@ -442,6 +443,6 @@ export class PhysicsEngine {
       player.velocityX = 0
       player.velocityY = 0
       player.state = 'idle'
-    })
+    }
   }
 }
