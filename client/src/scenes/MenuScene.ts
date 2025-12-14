@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, Text, Rectangle } from 'pixi.js'
-import { sceneRouter } from '../utils/SceneRouter'
-import { PixiScene } from '../utils/PixiScene'
-import { PixiSceneManager } from '../utils/PixiSceneManager'
+import { sceneRouter } from '@/utils/SceneRouter'
+import { PixiScene } from '@/utils/PixiScene'
+import { PixiSceneManager } from '@/utils/PixiSceneManager'
 
 export class MenuScene extends PixiScene {
   // UI element references

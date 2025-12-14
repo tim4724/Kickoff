@@ -4,8 +4,8 @@
  */
 
 import { Container, Graphics, FederatedPointerEvent } from 'pixi.js'
-import { HapticFeedback } from '../utils/HapticFeedback'
-import { PixiScene } from '../utils/PixiScene'
+import { HapticFeedback } from '@/utils/HapticFeedback'
+import { PixiScene } from '@/utils/PixiScene'
 
 export class VirtualJoystick {
   private scene: PixiScene
