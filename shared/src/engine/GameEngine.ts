@@ -251,11 +251,11 @@ export class GameEngine {
     const team = controlledPlayer.team
 
     // Update isControlled flags for all teammates
-    this.state.players.forEach((player) => {
+    for (const player of this.state.players.values()) {
       if (player.team === team) {
         player.isControlled = (player.id === controlledPlayerId)
       }
-    })
+    }
   }
 
   /**
@@ -263,7 +263,7 @@ export class GameEngine {
    * IMPORTANT: Processes ALL players, even without queued inputs, so velocity can decay properly
    */
   private processInputs(dt: number): void {
-    this.state.players.forEach((player) => {
+    for (const player of this.state.players.values()) {
       const queue = this.inputQueues.get(player.id)
       
       // Merge all queued inputs: use latest movement, but preserve any action
@@ -305,7 +305,7 @@ export class GameEngine {
           this.onShootCallback
         )
       }
-    })
+    }
   }
 
   /**
