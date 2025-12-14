@@ -10,12 +10,12 @@
  * - Coordinating attacks toward opponent goal
  */
 
-import { Vector2D, AIGameState, PlayerRole } from '@/ai/types'
+import { Vector2D, AIGameState, PlayerRole } from '../types'
 import { GAME_CONFIG, Team } from '@shared/types'
 import { HasBallStrategy } from './HasBallStrategy'
-import { InterceptionCalculator } from '@/ai/utils/InterceptionCalculator'
+import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { SpreadPositionStrategy } from './SpreadPositionStrategy'
-import { PassEvaluator, PassOption } from '@/ai/utils/PassEvaluator'
+import { PassEvaluator, PassOption } from '../utils/PassEvaluator'
 
 export class OffensiveStrategy {
   private readonly opponentGoal: Vector2D

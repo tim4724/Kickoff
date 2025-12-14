@@ -10,9 +10,9 @@
  * 3. Ensure spacing by preferring positions not already taken
  */
 
-import { PlayerRole } from '@/ai/types'
+import { PlayerRole } from '../types'
 import { PlayerData } from '@shared/types'
-import { PassOption } from '@/ai/utils/PassEvaluator'
+import { PassOption } from '../utils/PassEvaluator'
 
 export class SpreadPositionStrategy {
   /**
