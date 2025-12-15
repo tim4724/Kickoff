@@ -26,6 +26,14 @@ export class GameEngine {
   private goalScored: boolean = false
   private inputQueues: Map<string, EnginePlayerInput[]> = new Map()
 
+  // Reusable input object to avoid allocation in game loop
+  private reusedInput: EnginePlayerInput = {
+    movement: { x: 0, y: 0 },
+    action: false,
+    actionPower: 0,
+    timestamp: 0,
+  }
+
   // Fixed timestep configuration
   private readonly FIXED_TIMESTEP_MS = 1000 / 60
   private readonly FIXED_TIMESTEP_S = this.FIXED_TIMESTEP_MS / 1000
@@ -265,19 +273,21 @@ export class GameEngine {
   private processInputs(dt: number): void {
     for (const player of this.state.players.values()) {
       const queue = this.inputQueues.get(player.id)
-      
-      // Merge all queued inputs: use latest movement, but preserve any action
-      const mergedInput: EnginePlayerInput = {
-        movement: { x: 0, y: 0 },
-        action: false,
-        actionPower: 0,
-        timestamp: this.frameCount,
-      }
+
+      // Reset reusable input object
+      this.reusedInput.movement.x = 0
+      this.reusedInput.movement.y = 0
+      this.reusedInput.action = false
+      this.reusedInput.actionPower = 0
+      this.reusedInput.timestamp = this.frameCount
+
+      const mergedInput = this.reusedInput
 
       if (queue && queue.length > 0) {
         // Use latest movement
         const latestInput = queue[queue.length - 1]
-        mergedInput.movement = latestInput.movement
+        mergedInput.movement.x = latestInput.movement.x
+        mergedInput.movement.y = latestInput.movement.y
         mergedInput.timestamp = latestInput.timestamp
 
         // Check if ANY queued input has action=true
