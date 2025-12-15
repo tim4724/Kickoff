@@ -82,7 +82,7 @@ export abstract class BaseGameScene extends PixiScene {
     }
 
     const state = this.gameEngine.getState()
-    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
+    for (const [playerId, playerData] of state.players) {
       const teamAI = this.aiManager!.getTeamAI(playerData.team)
       const aiPlayer = teamAI?.getPlayer(playerId)
       const goal = aiPlayer?.getGoal()
@@ -104,7 +104,7 @@ export abstract class BaseGameScene extends PixiScene {
           playerData.team
         )
       }
-    })
+    }
   }
 
   protected updateAIForGameEngine(): void {
@@ -202,12 +202,12 @@ export abstract class BaseGameScene extends PixiScene {
     this.ball.position.set(state.ball.x, state.ball.y)
     this.ballShadow.position.set(state.ball.x + 2, state.ball.y + 3)
 
-    state.players.forEach((playerData: EnginePlayerData, playerId: string) => {
+    for (const [playerId, playerData] of state.players) {
       const sprite = this.players.get(playerId)
       if (sprite) {
         sprite.position.set(playerData.x, playerData.y)
       }
-    })
+    }
 
     this.scoreText.text = `${state.scoreBlue} - ${state.scoreRed}`
 
