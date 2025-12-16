@@ -257,7 +257,7 @@ export class MultiplayerScene extends BaseGameScene {
           throw new Error('NetworkManager not available')
         }
 
-        const normalized = GeometryUtils.normalize({ x: dx, y: dy })
+        const normalized = GeometryUtils.normalize(dx, dy)
         const normalizedX = normalized.x
         const normalizedY = normalized.y
 

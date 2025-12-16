@@ -548,7 +548,7 @@ export abstract class BaseGameScene extends PixiScene {
       return
     }
 
-    const speed = GeometryUtils.distance({ x: 0, y: 0 }, { x: vx, y: vy })
+    const speed = GeometryUtils.magnitude(vx, vy)
     const MIN_SPEED_THRESHOLD = 15
 
     if (speed < MIN_SPEED_THRESHOLD) {
@@ -690,7 +690,7 @@ export abstract class BaseGameScene extends PixiScene {
         if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) moveY = -1
         else if (this.keys.has('ArrowDown') || this.keys.has('KeyS')) moveY = 1
 
-        const normalized = GeometryUtils.normalize({ x: moveX, y: moveY })
+        const normalized = GeometryUtils.normalize(moveX, moveY)
         moveX = normalized.x
         moveY = normalized.y
     }
