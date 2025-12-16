@@ -28,6 +28,7 @@
  */
 
 import type { EnginePlayerData, GameEngineState } from '@shared/engine/types'
+import { GeometryUtils } from '@shared/utils/geometry'
 import type { GameStateData, Team } from '@shared/types'
 
 /**
@@ -227,9 +228,10 @@ export class StateAdapter {
       const player = state.players.get(playerId)
       if (!player) continue
 
-      const dx = player.x - ballX
-      const dy = player.y - ballY
-      const distance = Math.sqrt(dx * dx + dy * dy)
+      const distance = GeometryUtils.distanceSquared(
+        { x: player.x, y: player.y },
+        { x: ballX, y: ballY }
+      )
 
       if (distance < bestDistance) {
         bestDistance = distance

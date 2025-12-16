@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, Text } from 'pixi.js'
 import { sceneRouter } from '@/utils/SceneRouter'
 import type { EnginePlayerData, EnginePlayerInput } from '@shared'
-import { GameEngine } from '@shared'
+import { GameEngine, GeometryUtils } from '@shared'
 import { VirtualJoystick } from '@/controls/VirtualJoystick'
 import { ActionButton } from '@/controls/ActionButton'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
@@ -548,7 +548,7 @@ export abstract class BaseGameScene extends PixiScene {
       return
     }
 
-    const speed = Math.sqrt(vx ** 2 + vy ** 2)
+    const speed = GeometryUtils.distance({ x: 0, y: 0 }, { x: vx, y: vy })
     const MIN_SPEED_THRESHOLD = 15
 
     if (speed < MIN_SPEED_THRESHOLD) {
@@ -690,11 +690,9 @@ export abstract class BaseGameScene extends PixiScene {
         if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) moveY = -1
         else if (this.keys.has('ArrowDown') || this.keys.has('KeyS')) moveY = 1
 
-        const length = Math.sqrt(moveX * moveX + moveY * moveY)
-        if (length > 0) {
-            moveX /= length
-            moveY /= length
-        }
+        const normalized = GeometryUtils.normalize({ x: moveX, y: moveY })
+        moveX = normalized.x
+        moveY = normalized.y
     }
 
     return { x: moveX, y: moveY }

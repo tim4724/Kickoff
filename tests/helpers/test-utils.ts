@@ -1,6 +1,7 @@
 import { Page } from '@playwright/test'
 import { waitScaled } from './time-control'
 import { GAME_CONFIG } from '../../shared/src/types'
+import { GeometryUtils } from '../../shared/src/utils/geometry'
 
 /**
  * Test Helper Utilities
@@ -210,7 +211,7 @@ export async function moveTowardBallAndCapture(
 
     const dx = state.ballX - state.playerX
     const dy = state.ballY - state.playerY
-    const distance = Math.sqrt(dx * dx + dy * dy)
+    const distance = GeometryUtils.distance({ x: 0, y: 0 }, { x: dx, y: dy })
 
     if (state.ballPossessor === state.controlledId || distance < GAME_CONFIG.POSSESSION_RADIUS) {
       return true
@@ -258,16 +259,14 @@ export function calculateDistance(
   x2: number,
   y2: number
 ): number {
-  const dx = x2 - x1
-  const dy = y2 - y1
-  return Math.sqrt(dx * dx + dy * dy)
+  return GeometryUtils.distance({ x: x1, y: y1 }, { x: x2, y: y2 })
 }
 
 /**
  * Calculate velocity magnitude
  */
 export function calculateVelocity(vx: number, vy: number): number {
-  return Math.sqrt(vx * vx + vy * vy)
+  return GeometryUtils.distance({ x: 0, y: 0 }, { x: vx, y: vy })
 }
 
 /**

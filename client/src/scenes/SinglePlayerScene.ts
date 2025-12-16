@@ -1,6 +1,6 @@
 import { Application } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
-import { GameEngine } from '@shared'
+import { GameEngine, GeometryUtils } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '@/ai'
@@ -63,9 +63,9 @@ export class SinglePlayerScene extends BaseGameScene {
         console.log(`🔄 Auto-switch ${enabled ? 'enabled' : 'disabled'}`)
       },
       directMove: async (dx: number, dy: number, gameTimeDurationMs: number) => {
-        const length = Math.sqrt(dx * dx + dy * dy)
-        const normalizedX = length > 0 ? dx / length : 0
-        const normalizedY = length > 0 ? dy / length : 0
+        const normalized = GeometryUtils.normalize({ x: dx, y: dy })
+        const normalizedX = normalized.x
+        const normalizedY = normalized.y
 
         const timeScale = GameClock.getTimeScale()
         const realTimeDurationMs = gameTimeDurationMs / timeScale

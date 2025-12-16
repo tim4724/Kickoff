@@ -5,6 +5,7 @@
  */
 
 import type { EnginePlayerData, EngineBallData, PhysicsConfig, EnginePlayerInput } from './types.js'
+import { GeometryUtils } from '../utils/geometry.js'
 import type { Team } from '../types.js'
 import { GAME_CONFIG } from '../types.js'
 import { gameClock } from './GameClock.js'
@@ -191,9 +192,7 @@ export class PhysicsEngine {
       // Optimization: Skip self and teammates early to avoid distance calculation
       if (player.id === possessor.id || player.team === possessor.team) continue
 
-      const dx = player.x - ball.x
-      const dy = player.y - ball.y
-      const distSq = dx * dx + dy * dy
+      const distSq = GeometryUtils.distanceSquared({ x: player.x, y: player.y }, { x: ball.x, y: ball.y })
 
       if (distSq < this.pressureRadiusSq) {
         opponentsNearby++
@@ -249,9 +248,7 @@ export class PhysicsEngine {
     if (ball.possessedBy !== '') {
       const possessor = players.get(ball.possessedBy)
       if (possessor) {
-        const dx = ball.x - possessor.x
-        const dy = ball.y - possessor.y
-        const distSq = dx * dx + dy * dy
+        const distSq = GeometryUtils.distanceSquared({ x: ball.x, y: ball.y }, { x: possessor.x, y: possessor.y })
 
         if (distSq > this.releaseThresholdSq) {
           ball.possessedBy = ''
@@ -280,9 +277,7 @@ export class PhysicsEngine {
         // Skip shooter during immunity
         if (hasImmunity && player.id === ball.lastShooter) continue
 
-        const dx = ball.x - player.x
-        const dy = ball.y - player.y
-        const distSq = dx * dx + dy * dy
+        const distSq = GeometryUtils.distanceSquared({ x: ball.x, y: ball.y }, { x: player.x, y: player.y })
 
         if (distSq < this.possessionRadiusSq) {
           // Check loss lockout
@@ -332,9 +327,7 @@ export class PhysicsEngine {
       }
     } else {
       // Try to gain possession
-      const dx = ball.x - player.x
-      const dy = ball.y - player.y
-      const distSq = dx * dx + dy * dy
+      const distSq = GeometryUtils.distanceSquared({ x: ball.x, y: ball.y }, { x: player.x, y: player.y })
 
       const SHOT_IMMUNITY_MS = 300
       const timeSinceShot = gameClock.now() - (ball.lastShotTime || 0)
