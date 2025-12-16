@@ -1,6 +1,7 @@
 import { Application, Text } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
 import { NetworkManager } from '@/network/NetworkManager'
+import { GeometryUtils } from '@shared/utils/geometry'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { StateAdapter, type UnifiedGameState } from '@/utils/StateAdapter'
@@ -256,9 +257,9 @@ export class MultiplayerScene extends BaseGameScene {
           throw new Error('NetworkManager not available')
         }
 
-        const length = Math.sqrt(dx * dx + dy * dy)
-        const normalizedX = length > 0 ? dx / length : 0
-        const normalizedY = length > 0 ? dy / length : 0
+        const normalized = GeometryUtils.normalize(dx, dy)
+        const normalizedX = normalized.x
+        const normalizedY = normalized.y
 
         console.log(`🎮 [Test] Direct move: (${normalizedX.toFixed(2)}, ${normalizedY.toFixed(2)}) for ${durationMs}ms game time`)
 

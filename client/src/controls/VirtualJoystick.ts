@@ -4,6 +4,7 @@
  */
 
 import { Container, Graphics, FederatedPointerEvent } from 'pixi.js'
+import { GeometryUtils } from '@shared/utils/geometry'
 import { HapticFeedback } from '@/utils/HapticFeedback'
 import { PixiScene } from '@/utils/PixiScene'
 
@@ -179,7 +180,7 @@ export class VirtualJoystick {
   private updateStickPosition(x: number, y: number) {
     const dx = x - this.baseX
     const dy = y - this.baseY
-    const distance = Math.sqrt(dx * dx + dy * dy)
+    const distance = GeometryUtils.distance(this.baseX, this.baseY, x, y)
 
     if (distance > this.maxRadius) {
       // Clamp to max radius
@@ -214,7 +215,7 @@ export class VirtualJoystick {
 
     const dx = this.stick.x - this.baseX
     const dy = this.stick.y - this.baseY
-    const distance = Math.sqrt(dx * dx + dy * dy)
+    const distance = GeometryUtils.distance(this.baseX, this.baseY, this.stick.x, this.stick.y)
 
     // Apply dead zone
     if (distance < this.maxRadius * this.deadZone) {
