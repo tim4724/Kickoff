@@ -80,39 +80,15 @@ export class StateAdapter {
    * Convert GameEngine state (SinglePlayer/AIOnly) to unified format
    */
   static fromGameEngine(state: GameEngineState): UnifiedGameState {
-    // Players are already in flat format, just copy them
-    const unifiedPlayers = new Map<string, UnifiedPlayerData>()
-    state.players.forEach((player: EnginePlayerData, id: string) => {
-      unifiedPlayers.set(id, {
-        id: player.id,
-        team: player.team,
-        isHuman: player.isHuman,
-        isControlled: player.isControlled,
-        x: player.x,
-        y: player.y,
-        velocityX: player.velocityX,
-        velocityY: player.velocityY,
-        state: player.state,
-        direction: player.direction,
-        role: player.role,
-      })
-    })
+    // Optimization: GameEngineState structure is compatible with UnifiedGameState.
+    // We can return the state directly (Zero-Copy) to avoid allocating ~20 objects per frame.
+    // Consumers (BaseGameScene) treat this state as read-only.
 
-    return {
-      players: unifiedPlayers,
-      ball: {
-        x: state.ball.x,
-        y: state.ball.y,
-        velocityX: state.ball.velocityX,
-        velocityY: state.ball.velocityY,
-        possessedBy: state.ball.possessedBy,
-        pressureLevel: state.ball.pressureLevel,
-      },
-      scoreBlue: state.scoreBlue,
-      scoreRed: state.scoreRed,
-      matchTime: state.matchTime,
-      phase: state.phase,
-    }
+    // Compile-time safety check: Ensure EnginePlayerData is compatible with UnifiedPlayerData
+    const _typeSafetyCheck = (p: EnginePlayerData): UnifiedPlayerData => p
+    void _typeSafetyCheck
+
+    return state as unknown as UnifiedGameState
   }
 
   /**
