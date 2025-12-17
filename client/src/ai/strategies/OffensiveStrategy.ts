@@ -98,7 +98,6 @@ export class OffensiveStrategy {
 
       // Calculate pass options from intercept position so teammates can move proactively
       // This makes off-ball players position themselves for passes before ball is received
-      // This makes off-ball players position themselves for passes before ball is received
       passOptions = PassEvaluator.evaluatePassOptions(
         interceptPoint,
         remainingPlayers,
