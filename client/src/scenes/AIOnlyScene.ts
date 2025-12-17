@@ -5,7 +5,6 @@ import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { AIManager } from '@/ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
-import { StateAdapter } from '@/utils/StateAdapter'
 import { PixiSceneManager } from '@/utils/PixiSceneManager'
 
 /**
@@ -141,8 +140,7 @@ export class AIOnlyScene extends BaseGameScene {
   }
 
   protected getUnifiedState() {
-    const engineState = this.gameEngine!.getState()
-    return StateAdapter.fromGameEngine(engineState)
+    return this.gameEngine!.getState()
   }
 
   private setupSpectatorControls() {

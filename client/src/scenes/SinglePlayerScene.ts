@@ -4,7 +4,6 @@ import { GameEngine, GeometryUtils } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '@/ai'
-import { StateAdapter } from '@/utils/StateAdapter'
 import { PixiSceneManager } from '@/utils/PixiSceneManager'
 
 /**
@@ -162,8 +161,7 @@ export class SinglePlayerScene extends BaseGameScene {
   }
 
   protected getUnifiedState() {
-    const engineState = this.gameEngine!.getState()
-    return StateAdapter.fromGameEngine(engineState)
+    return this.gameEngine!.getState()
   }
 
   protected onPlayerSwitched(playerId: string): void {

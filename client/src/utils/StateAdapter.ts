@@ -9,7 +9,7 @@
  * ```typescript
  * // In SinglePlayerScene
  * protected getUnifiedState() {
- *   return StateAdapter.fromGameEngine(this.gameEngine.getState())
+ *   return this.gameEngine.getState()
  * }
  *
  * // In GameScene
@@ -38,15 +38,6 @@ import type { GameStateData, Team } from '@shared/types'
  * State Adapter - converts any game state to unified format
  */
 export class StateAdapter {
-  /**
-   * Convert GameEngine state (SinglePlayer/AIOnly) to unified format
-   */
-  static fromGameEngine(state: GameEngineState): GameEngineState {
-    // Optimization: GameEngineState is the target format.
-    // Return directly (Zero-Copy).
-    return state
-  }
-
   /**
    * Convert GameEngineState to GameStateData format (for AI)
    * This is the format expected by AIManager
