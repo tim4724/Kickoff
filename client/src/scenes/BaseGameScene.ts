@@ -9,8 +9,8 @@ import { FieldRenderer } from '@/utils/FieldRenderer'
 import { BallRenderer } from '@/utils/BallRenderer'
 import { CameraManager } from '@/utils/CameraManager'
 import { AIDebugRenderer } from '@/utils/AIDebugRenderer'
-import { GameStateUtils } from '@/utils/GameStateUtils'
 import type { GameEngineState } from '@shared/engine/types'
+import type { Team } from '@shared/types'
 import { AIManager } from '@/ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { PixiScene } from '@/utils/PixiScene'
@@ -432,17 +432,6 @@ export abstract class BaseGameScene extends PixiScene {
         this.switchToNextTeammate()
       }
     })
-
-    // Add them to UI container implicitly by how they are implemented (they attach to scene container).
-    // But CameraManager has separate containers.
-    // Joystick and ActionButton attach to scene.container in their constructor currently.
-    // We should move them to UI container or ensure they are on top.
-    // PixiScene.container has gameContainer, uiContainer attached.
-    // If Joystick/Button attach to scene.container, they might be behind or in front depending on order.
-    // They append themselves. BaseGameScene calls createMobileControls AFTER creating CameraManager.
-    // So they are added after camera containers, effectively on top. Correct.
-    // However, they should probably be children of uiContainer to handle resizing/positioning cleanly if uiContainer moves (it doesn't move much).
-    // Let's leave them as siblings for now as they handle their own resize.
   }
 
   protected createBackButton() {
@@ -506,14 +495,6 @@ export abstract class BaseGameScene extends PixiScene {
 
     this.updateControlArrow()
   }
-
-  // Override createPlayerSprite to store color
-  /*
-  protected createPlayerSprite(...) { ...
-    (playerSprite as any)._fillColor = color
-    ...
-  }
-  */
 
   protected updateControlArrow(): void {
     if (!this.controlArrow) return
@@ -618,19 +599,19 @@ export abstract class BaseGameScene extends PixiScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const myTeam = GameStateUtils.getPlayerTeam(unifiedState, this.myPlayerId)
+    const myTeam = this.getPlayerTeam(unifiedState, this.myPlayerId)
     if (!myTeam) return
 
     const ballPossessor = unifiedState.ball.possessedBy
 
     if (ballPossessor && ballPossessor !== this.lastBallPossessor) {
-      const playerTeam = GameStateUtils.getPlayerTeam(unifiedState, ballPossessor)
+      const playerTeam = this.getPlayerTeam(unifiedState, ballPossessor)
       if (playerTeam === myTeam) {
         this.switchToPlayer(ballPossessor)
       }
       this.lastBallPossessor = ballPossessor
     } else if (!ballPossessor && this.lastBallPossessor) {
-      const lastPlayerTeam = GameStateUtils.getPlayerTeam(unifiedState, this.lastBallPossessor)
+      const lastPlayerTeam = this.getPlayerTeam(unifiedState, this.lastBallPossessor)
       if (lastPlayerTeam && lastPlayerTeam !== myTeam) {
         // Opponent lost possession, wait.
       } else if (lastPlayerTeam === myTeam) {
@@ -646,8 +627,8 @@ export abstract class BaseGameScene extends PixiScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const teammateIds = GameStateUtils.getTeammateIds(unifiedState, this.myPlayerId)
-    const bestPlayerId = GameStateUtils.findBestInterceptor(unifiedState, teammateIds)
+    const teammateIds = this.getTeammateIds(unifiedState, this.myPlayerId)
+    const bestPlayerId = this.findBestInterceptor(unifiedState, teammateIds)
 
     if (!bestPlayerId || bestPlayerId === this.controlledPlayerId) {
       return
@@ -660,8 +641,8 @@ export abstract class BaseGameScene extends PixiScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const myTeam = GameStateUtils.getPlayerTeam(unifiedState, this.myPlayerId)
-    const playerTeam = GameStateUtils.getPlayerTeam(unifiedState, playerId)
+    const myTeam = this.getPlayerTeam(unifiedState, this.myPlayerId)
+    const playerTeam = this.getPlayerTeam(unifiedState, playerId)
 
     if (!myTeam || !playerTeam || playerTeam !== myTeam) {
       return
@@ -702,7 +683,7 @@ export abstract class BaseGameScene extends PixiScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const teammates = GameStateUtils.getTeammateIds(unifiedState, this.myPlayerId)
+    const teammates = this.getTeammateIds(unifiedState, this.myPlayerId)
     if (teammates.length === 0) return
 
     const currentIndex = teammates.indexOf(this.controlledPlayerId)
@@ -830,23 +811,8 @@ export abstract class BaseGameScene extends PixiScene {
       this.actionButton.update()
     }
 
-    this.updateGameState(delta) // delta in Pixi is frame dependent scaler usually, or ms?
-    // Pixi ticker.deltaTime is scalar (1 = 60fps).
-    // We probably want ms for game engine update.
-    // this.app.ticker.deltaMS gives milliseconds.
+    this.updateGameState(delta)
 
-    // NOTE: Subclasses need to be aware of what delta they get.
-    // In Phaser it was (time, delta) where delta is MS.
-    // PixiScene update is passed delta (scalar).
-    // Let's assume we pass deltaMS.
-    // Wait, PixiScene.update(delta) defined in PixiSceneManager passes ticker.deltaTime (scalar).
-    // I should probably change PixiSceneManager to pass deltaMS or handle it here.
-
-    // const deltaMS = this.app.ticker.deltaMS;
-    // But `updateGameState` signature in abstract class is `(delta: number)`.
-    // I'll assume it expects MS similar to Phaser if I'm porting directly.
-
-    // Update ball color
     const state = this.getGameState()
     if (!state || !state.ball || !state.players) {
         this.updateControlArrow()
@@ -862,8 +828,6 @@ export abstract class BaseGameScene extends PixiScene {
     }
   }
 
-  // Override update to pass deltaMS? No, I can access app.ticker.
-
   protected setupTestAPI(customTestMethods?: Record<string, any>): void {
     if (typeof window === 'undefined' || !import.meta.env.DEV) return
 
@@ -876,9 +840,6 @@ export abstract class BaseGameScene extends PixiScene {
 
     testAPI.backButton = this.backButton
 
-    // Always expose test methods for controls, even if not created yet
-    // This allows tests to force creation on desktop
-    // if (this.joystick || this.actionButton) { // Removed check
       if (this.joystick) testAPI.joystick = this.joystick
       if (this.actionButton) testAPI.button = this.actionButton
 
@@ -889,7 +850,6 @@ export abstract class BaseGameScene extends PixiScene {
 
       const baseTestMethods = {
         touchJoystick: (x: number, y: number) => {
-          // Lazily create controls for tests if they don't exist (e.g. desktop tests)
           if (!this.joystick) {
               console.log('🧪 Creating mobile controls for test')
               this.createMobileControls()
@@ -927,7 +887,6 @@ export abstract class BaseGameScene extends PixiScene {
         ...baseTestMethods,
         ...customMethods,
       }
-    // } else { ... } // Removed else block since we always expose baseTestMethods
 
     ; (window as any).GameClock = GameClock
     ; (window as any).__gameControls = testAPI
@@ -959,5 +918,47 @@ export abstract class BaseGameScene extends PixiScene {
     }
 
     super.destroy()
+  }
+
+  protected getPlayerTeam(state: GameEngineState, playerId: string): Team | null {
+    const player = state.players.get(playerId)
+    return player ? player.team : null
+  }
+
+  protected getTeammateIds(state: GameEngineState, myPlayerId: string): string[] {
+    const myTeam = this.getPlayerTeam(state, myPlayerId)
+    if (!myTeam) return []
+
+    const teammates: string[] = []
+    state.players.forEach((player, playerId) => {
+      if (player.team === myTeam) {
+        teammates.push(playerId)
+      }
+    })
+    return teammates
+  }
+
+  protected findBestInterceptor(state: GameEngineState, teammateIds: string[]): string | null {
+    if (teammateIds.length === 0) return null
+
+    let bestPlayerId: string | null = null
+    let bestDistance = Number.MAX_VALUE
+
+    const ballX = state.ball.x
+    const ballY = state.ball.y
+
+    for (const playerId of teammateIds) {
+      const player = state.players.get(playerId)
+      if (!player) continue
+
+      const distance = GeometryUtils.distanceSquared(player.x, player.y, ballX, ballY)
+
+      if (distance < bestDistance) {
+        bestDistance = distance
+        bestPlayerId = playerId
+      }
+    }
+
+    return bestPlayerId
   }
 }

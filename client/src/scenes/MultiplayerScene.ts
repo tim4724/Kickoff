@@ -4,7 +4,6 @@ import { NetworkManager } from '@/network/NetworkManager'
 import { GeometryUtils } from '@shared/utils/geometry'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
-import { GameStateUtils } from '@/utils/GameStateUtils'
 import type { GameEngineState, EnginePlayerData } from '@shared/engine/types'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '@/ai'
@@ -695,8 +694,8 @@ export class MultiplayerScene extends BaseGameScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
     
-    const myTeam = GameStateUtils.getPlayerTeam(unifiedState, this.myPlayerId)
-    const playerTeam = GameStateUtils.getPlayerTeam(unifiedState, playerId)
+    const myTeam = this.getPlayerTeam(unifiedState, this.myPlayerId)
+    const playerTeam = this.getPlayerTeam(unifiedState, playerId)
     
     if (!myTeam || !playerTeam || playerTeam !== myTeam) return
 
