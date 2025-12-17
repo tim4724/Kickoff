@@ -8,7 +8,8 @@
  */
 
 import { Vector2D } from '../types'
-import { PlayerData, GAME_CONFIG } from '@shared/types'
+import { GAME_CONFIG } from '@shared/types'
+import { EnginePlayerData } from '@shared/engine/types'
 import { PhysicsEngine } from '@shared/engine/PhysicsEngine'
 import { GeometryUtils } from '@shared/utils/geometry'
 
@@ -26,10 +27,10 @@ export class InterceptionCalculator {
    * @returns Interception data with time (Infinity if no interception within lookahead)
    */
   static calculateInterception(
-    players: PlayerData[],
+    players: EnginePlayerData[],
     predictPosition: (timeSeconds: number) => Vector2D,
     interceptionRadius: number
-  ): { interceptor: PlayerData; interceptPoint: Vector2D; time: number } {
+  ): { interceptor: EnginePlayerData; interceptPoint: Vector2D; time: number } {
     const playerSpeed = GAME_CONFIG.PLAYER_SPEED
     const maxLookAhead = 4.0 // seconds
     const timeStep = 0.1 // check every 0.1 seconds
@@ -43,11 +44,11 @@ export class InterceptionCalculator {
       const maxPlayerTravel = playerSpeed * t
 
       // Find ALL players who can intercept at this time, then pick the closest
-      let closestInterceptor: PlayerData | null = null
+      let closestInterceptor: EnginePlayerData | null = null
       let closestDistance = Infinity
 
       for (const player of players) {
-        const distanceToBall = GeometryUtils.distance(player.position, futurePos)
+        const distanceToBall = GeometryUtils.distance(player, futurePos)
 
         // Can this player reach the ball (within interception radius) in time t?
         if (distanceToBall - interceptionRadius <= maxPlayerTravel) {
@@ -73,7 +74,7 @@ export class InterceptionCalculator {
     }
 
     const closestPlayer = players.reduce((best, p) =>
-      GeometryUtils.distanceSquared(p.position, finalPos) < GeometryUtils.distanceSquared(best.position, finalPos) ? p : best
+      GeometryUtils.distanceSquared(p, finalPos) < GeometryUtils.distanceSquared(best, finalPos) ? p : best
     , players[0])
 
     return { interceptor: closestPlayer, interceptPoint: finalPos, time: Infinity }

@@ -9,7 +9,7 @@ import { FieldRenderer } from '@/utils/FieldRenderer'
 import { BallRenderer } from '@/utils/BallRenderer'
 import { CameraManager } from '@/utils/CameraManager'
 import { AIDebugRenderer } from '@/utils/AIDebugRenderer'
-import { StateAdapter } from '@/utils/StateAdapter'
+import { GameStateUtils } from '@/utils/GameStateUtils'
 import type { GameEngineState } from '@shared/engine/types'
 import { AIManager } from '@/ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
@@ -118,8 +118,7 @@ export abstract class BaseGameScene extends PixiScene {
       return
     }
 
-    const gameStateData = StateAdapter.toGameStateData(unifiedState)
-    this.aiManager.update(gameStateData)
+    this.aiManager.update(unifiedState)
   }
 
   protected applyAIDecisionForGameEngine(
@@ -619,19 +618,19 @@ export abstract class BaseGameScene extends PixiScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const myTeam = StateAdapter.getPlayerTeam(unifiedState, this.myPlayerId)
+    const myTeam = GameStateUtils.getPlayerTeam(unifiedState, this.myPlayerId)
     if (!myTeam) return
 
     const ballPossessor = unifiedState.ball.possessedBy
 
     if (ballPossessor && ballPossessor !== this.lastBallPossessor) {
-      const playerTeam = StateAdapter.getPlayerTeam(unifiedState, ballPossessor)
+      const playerTeam = GameStateUtils.getPlayerTeam(unifiedState, ballPossessor)
       if (playerTeam === myTeam) {
         this.switchToPlayer(ballPossessor)
       }
       this.lastBallPossessor = ballPossessor
     } else if (!ballPossessor && this.lastBallPossessor) {
-      const lastPlayerTeam = StateAdapter.getPlayerTeam(unifiedState, this.lastBallPossessor)
+      const lastPlayerTeam = GameStateUtils.getPlayerTeam(unifiedState, this.lastBallPossessor)
       if (lastPlayerTeam && lastPlayerTeam !== myTeam) {
         // Opponent lost possession, wait.
       } else if (lastPlayerTeam === myTeam) {
@@ -647,8 +646,8 @@ export abstract class BaseGameScene extends PixiScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const teammateIds = StateAdapter.getTeammateIds(unifiedState, this.myPlayerId)
-    const bestPlayerId = StateAdapter.findBestInterceptor(unifiedState, teammateIds)
+    const teammateIds = GameStateUtils.getTeammateIds(unifiedState, this.myPlayerId)
+    const bestPlayerId = GameStateUtils.findBestInterceptor(unifiedState, teammateIds)
 
     if (!bestPlayerId || bestPlayerId === this.controlledPlayerId) {
       return
@@ -661,8 +660,8 @@ export abstract class BaseGameScene extends PixiScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const myTeam = StateAdapter.getPlayerTeam(unifiedState, this.myPlayerId)
-    const playerTeam = StateAdapter.getPlayerTeam(unifiedState, playerId)
+    const myTeam = GameStateUtils.getPlayerTeam(unifiedState, this.myPlayerId)
+    const playerTeam = GameStateUtils.getPlayerTeam(unifiedState, playerId)
 
     if (!myTeam || !playerTeam || playerTeam !== myTeam) {
       return
@@ -703,7 +702,7 @@ export abstract class BaseGameScene extends PixiScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const teammates = StateAdapter.getTeammateIds(unifiedState, this.myPlayerId)
+    const teammates = GameStateUtils.getTeammateIds(unifiedState, this.myPlayerId)
     if (teammates.length === 0) return
 
     const currentIndex = teammates.indexOf(this.controlledPlayerId)

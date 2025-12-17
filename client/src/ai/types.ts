@@ -4,7 +4,7 @@
  * Defines the structure for AI decision-making and state management
  */
 
-import { PlayerData, BallData } from '@shared/types'
+import { EnginePlayerData, EngineBallData } from '@shared/engine/types'
 import { Point } from '@shared/utils/geometry'
 
 // Re-export Point as Vector2D for semantic clarity in AI code
@@ -15,11 +15,11 @@ export type Vector2D = Point
  */
 export interface AIGameState {
   // Players separated by team
-  bluePlayers: PlayerData[]
-  redPlayers: PlayerData[]
+  bluePlayers: EnginePlayerData[]
+  redPlayers: EnginePlayerData[]
 
   // Ball state
-  ball: BallData
+  ball: EngineBallData
 
   // Match time
   matchTime: number

@@ -6,7 +6,8 @@
  */
 
 import { Vector2D, PlayerRole } from '../types'
-import { PlayerData, GAME_CONFIG } from '@shared/types'
+import { GAME_CONFIG } from '@shared/types'
+import { EnginePlayerData } from '@shared/engine/types'
 import { InterceptionCalculator } from '../utils/InterceptionCalculator'
 import { PassOption } from '../utils/PassEvaluator'
 import { GeometryUtils } from '@shared/utils/geometry'
@@ -43,13 +44,13 @@ export class HasBallStrategy {
    * @returns Role assignment for the ball carrier
    */
   static decideBallCarrierAction(
-    carrier: PlayerData,
-    opponents: PlayerData[],
+    carrier: EnginePlayerData,
+    opponents: EnginePlayerData[],
     opponentGoal: Vector2D,
     targetBehindGoal: Vector2D,
     passOptions: PassOption[]
   ): PlayerRole {
-    const distToGoal = GeometryUtils.distance(carrier.position, opponentGoal)
+    const distToGoal = GeometryUtils.distance(carrier, opponentGoal)
 
     if (distToGoal < this.SHOOTING_RANGE) {
       // Evaluate shot angles using interception logic
@@ -99,14 +100,14 @@ export class HasBallStrategy {
    * Returns the closest intercept point and distance
    */
   private static evaluateOpponentIntercept(
-    carrier: PlayerData,
-    opponents: PlayerData[],
+    carrier: EnginePlayerData,
+    opponents: EnginePlayerData[],
     targetBehindGoal: Vector2D
   ): { interceptPoint: Vector2D; interceptDistance: number } {
     // Direction vector from carrier to target behind goal
-    const dx = targetBehindGoal.x - carrier.position.x
-    const dy = targetBehindGoal.y - carrier.position.y
-    const dist = GeometryUtils.distance(carrier.position, targetBehindGoal)
+    const dx = targetBehindGoal.x - carrier.x
+    const dy = targetBehindGoal.y - carrier.y
+    const dist = GeometryUtils.distance(carrier, targetBehindGoal)
 
     if (dist < 1) {
       // Already at target
@@ -119,7 +120,7 @@ export class HasBallStrategy {
     // Predict carrier's path to target behind goal (moving at player speed)
     const predictCarrierPosition = (t: number): Vector2D => {
       return InterceptionCalculator.predictPlayerBallPosition(
-        carrier.position,
+        carrier,
         { x: dirX, y: dirY },
         t
       )
@@ -133,7 +134,7 @@ export class HasBallStrategy {
     )
 
     // Calculate distance from intercept point to carrier's current position
-    const interceptDistance = GeometryUtils.distance(carrier.position, interceptPoint)
+    const interceptDistance = GeometryUtils.distance(carrier, interceptPoint)
 
     return { interceptPoint, interceptDistance }
   }
@@ -149,8 +150,8 @@ export class HasBallStrategy {
    * @returns Best shot target and score, or null if all shots blocked
    */
   private static findBestShotTarget(
-    carrier: PlayerData,
-    opponents: PlayerData[],
+    carrier: EnginePlayerData,
+    opponents: EnginePlayerData[],
     opponentGoal: Vector2D
   ): { target: Vector2D; interceptDistance: number } | null {
     // Generate candidate shot targets across the goal
@@ -174,9 +175,9 @@ export class HasBallStrategy {
       const shotTarget: Vector2D = { x: goalX, y: targetY }
 
       // Calculate shot trajectory direction
-      const dx = shotTarget.x - carrier.position.x
-      const dy = shotTarget.y - carrier.position.y
-      const dist = GeometryUtils.distance(carrier.position, shotTarget)
+      const dx = shotTarget.x - carrier.x
+      const dy = shotTarget.y - carrier.y
+      const dist = GeometryUtils.distance(carrier, shotTarget)
 
       if (dist < 1) continue // Skip if already at target
 
@@ -186,7 +187,7 @@ export class HasBallStrategy {
       // Predict ball position along shot trajectory
       const predictBallPosition = (t: number): Vector2D => {
         return InterceptionCalculator.simulateBallPosition(
-          carrier.position,
+          carrier,
           { x: dirX * GAME_CONFIG.SHOOT_SPEED, y: dirY * GAME_CONFIG.SHOOT_SPEED },
           t
         )
@@ -200,7 +201,7 @@ export class HasBallStrategy {
       )
 
       // Calculate how far the intercept point is from carrier (further = better)
-      const interceptDistance = GeometryUtils.distance(carrier.position, interceptPoint)
+      const interceptDistance = GeometryUtils.distance(carrier, interceptPoint)
 
       shotOptions.push({ target: shotTarget, interceptDistance })
     }
@@ -232,8 +233,8 @@ export class HasBallStrategy {
    * @returns Best dribble target position with score, or null if no good space found
    */
   private static findBestDribbleSpace(
-    carrier: PlayerData,
-    opponents: PlayerData[],
+    carrier: EnginePlayerData,
+    opponents: EnginePlayerData[],
     opponentGoal: Vector2D,
     targetBehindGoal: Vector2D
   ): { position: Vector2D; score: number } {
@@ -248,8 +249,8 @@ export class HasBallStrategy {
       const angle = i * angleIncrement
 
       for (const distance of this.DRIBBLE_DISTANCES) {
-        const x = carrier.position.x + Math.cos(angle) * distance
-        const y = carrier.position.y + Math.sin(angle) * distance
+        const x = carrier.x + Math.cos(angle) * distance
+        const y = carrier.y + Math.sin(angle) * distance
 
         // Skip if out of bounds
         if (x < 0 || x > GAME_CONFIG.FIELD_WIDTH || y < 0 || y > GAME_CONFIG.FIELD_HEIGHT) {
@@ -279,20 +280,20 @@ export class HasBallStrategy {
    * @returns Score (higher = better)
    */
   private static evaluatePositionScore(
-    carrier: PlayerData,
+    carrier: EnginePlayerData,
     targetPosition: Vector2D,
     opponentGoal: Vector2D,
-    opponents: PlayerData[]
+    opponents: EnginePlayerData[]
   ): number {
     // Space from opponents (higher = better)
     const space =
       opponents.length > 0
-        ? Math.min(...opponents.map(opp => GeometryUtils.distance(targetPosition, opp.position)))
+        ? Math.min(...opponents.map(opp => GeometryUtils.distance(targetPosition, opp)))
         : Infinity
 
     // Forward progress toward goal (positive = forward, negative = backward)
     const forwardProgress =
-      GeometryUtils.distance(carrier.position, opponentGoal) -
+      GeometryUtils.distance(carrier, opponentGoal) -
       GeometryUtils.distance(targetPosition, opponentGoal)
 
     // Simplified scoring: prioritize space and forward progress
@@ -310,10 +311,10 @@ export class HasBallStrategy {
    * @returns Score for pass option (higher = better)
    */
   private static evaluatePassScore(
-    carrier: PlayerData,
+    carrier: EnginePlayerData,
     passOption: PassOption,
     opponentGoal: Vector2D,
-    opponents: PlayerData[]
+    opponents: EnginePlayerData[]
   ): number {
     return this.evaluatePositionScore(carrier, passOption.position, opponentGoal, opponents)
   }

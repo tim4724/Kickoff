@@ -64,7 +64,7 @@ export class OffensiveStrategy {
 
       // Calculate pass options once for both ball carrier and off-ball positioning
       passOptions = PassEvaluator.evaluatePassOptions(
-        ball.position,
+        ball,
         remainingPlayers,
         opponents,
         this.opponentGoal
@@ -82,7 +82,7 @@ export class OffensiveStrategy {
     } else {
       // Ball is loose - find best interceptor
       const predictBallPosition = (t: number): Vector2D => {
-        return InterceptionCalculator.simulateBallPosition(ball.position, ball.velocity, t)
+        return InterceptionCalculator.simulateBallPosition(ball, { x: ball.velocityX, y: ball.velocityY }, t)
       }
 
       const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
@@ -97,6 +97,7 @@ export class OffensiveStrategy {
       remainingPlayers = remainingPlayers.filter(p => p.id !== interceptor.id)
 
       // Calculate pass options from intercept position so teammates can move proactively
+      // This makes off-ball players position themselves for passes before ball is received
       // This makes off-ball players position themselves for passes before ball is received
       passOptions = PassEvaluator.evaluatePassOptions(
         interceptPoint,
