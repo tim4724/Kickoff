@@ -27,50 +27,12 @@
  * @module StateAdapter
  */
 
-import type { EnginePlayerData, GameEngineState } from '@shared/engine/types'
+import type {
+  EnginePlayerData,
+  GameEngineState,
+} from '@shared/engine/types'
 import { GeometryUtils } from '@shared/utils/geometry'
 import type { GameStateData, Team } from '@shared/types'
-
-/**
- * Unified player interface with normalized position/velocity access
- */
-export interface UnifiedPlayerData {
-  id: string
-  team: Team
-  isHuman: boolean
-  isControlled: boolean
-  x: number
-  y: number
-  velocityX: number
-  velocityY: number
-  state: 'idle' | 'running' | 'kicking'
-  direction: number
-  role?: 'defender' | 'forward'
-}
-
-/**
- * Unified ball interface with normalized position/velocity access
- */
-export interface UnifiedBallData {
-  x: number
-  y: number
-  velocityX: number
-  velocityY: number
-  possessedBy: string
-  pressureLevel?: number
-}
-
-/**
- * Unified game state interface
- */
-export interface UnifiedGameState {
-  players: Map<string, UnifiedPlayerData>
-  ball: UnifiedBallData
-  scoreBlue: number
-  scoreRed: number
-  matchTime: number
-  phase: 'waiting' | 'kickoff' | 'playing' | 'goal' | 'ended'
-}
 
 /**
  * State Adapter - converts any game state to unified format
@@ -79,25 +41,19 @@ export class StateAdapter {
   /**
    * Convert GameEngine state (SinglePlayer/AIOnly) to unified format
    */
-  static fromGameEngine(state: GameEngineState): UnifiedGameState {
-    // Optimization: GameEngineState structure is compatible with UnifiedGameState.
-    // We can return the state directly (Zero-Copy) to avoid allocating ~20 objects per frame.
-    // Consumers (BaseGameScene) treat this state as read-only.
-
-    // Compile-time safety check: Ensure EnginePlayerData is compatible with UnifiedPlayerData
-    const _typeSafetyCheck = (p: EnginePlayerData): UnifiedPlayerData => p
-    void _typeSafetyCheck
-
-    return state as unknown as UnifiedGameState
+  static fromGameEngine(state: GameEngineState): GameEngineState {
+    // Optimization: GameEngineState is the target format.
+    // Return directly (Zero-Copy).
+    return state
   }
 
   /**
-   * Convert UnifiedGameState to GameStateData format (for AI)
+   * Convert GameEngineState to GameStateData format (for AI)
    * This is the format expected by AIManager
    */
-  static toGameStateData(state: UnifiedGameState): any {
+  static toGameStateData(state: GameEngineState): any {
     const playersMap = new Map()
-    state.players.forEach((player: any, id: string) => {
+    state.players.forEach((player: EnginePlayerData, id: string) => {
       playersMap.set(id, {
         id: player.id,
         team: player.team,
@@ -127,9 +83,9 @@ export class StateAdapter {
   /**
    * Convert NetworkManager state (Multiplayer) to unified format
    */
-  static fromNetwork(state: GameStateData): UnifiedGameState {
+  static fromNetwork(state: GameStateData): GameEngineState {
     // Players use nested position/velocity, need to flatten
-    const unifiedPlayers = new Map<string, UnifiedPlayerData>()
+    const unifiedPlayers = new Map<string, EnginePlayerData>()
     state.players.forEach((player, id) => {
       unifiedPlayers.set(id, {
         id: player.id,
@@ -153,6 +109,7 @@ export class StateAdapter {
         velocityX: state.ball.velocity?.x ?? 0,
         velocityY: state.ball.velocity?.y ?? 0,
         possessedBy: state.ball.possessedBy,
+        pressureLevel: 0, // Not synced from network yet
       },
       scoreBlue: state.scoreBlue,
       scoreRed: state.scoreRed,
@@ -164,7 +121,7 @@ export class StateAdapter {
   /**
    * Get player team by ID
    */
-  static getPlayerTeam(state: UnifiedGameState, playerId: string): Team | null {
+  static getPlayerTeam(state: GameEngineState, playerId: string): Team | null {
     const player = state.players.get(playerId)
     return player ? player.team : null
   }
@@ -172,7 +129,7 @@ export class StateAdapter {
   /**
    * Get all teammate IDs for a given player
    */
-  static getTeammateIds(state: UnifiedGameState, myPlayerId: string): string[] {
+  static getTeammateIds(state: GameEngineState, myPlayerId: string): string[] {
     const myTeam = this.getPlayerTeam(state, myPlayerId)
     if (!myTeam) return []
 
@@ -189,7 +146,7 @@ export class StateAdapter {
    * Find the teammate closest to the ball
    */
   static findBestInterceptor(
-    state: UnifiedGameState,
+    state: GameEngineState,
     teammateIds: string[]
   ): string | null {
     if (teammateIds.length === 0) return null

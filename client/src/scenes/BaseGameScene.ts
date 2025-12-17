@@ -9,7 +9,8 @@ import { FieldRenderer } from '@/utils/FieldRenderer'
 import { BallRenderer } from '@/utils/BallRenderer'
 import { CameraManager } from '@/utils/CameraManager'
 import { AIDebugRenderer } from '@/utils/AIDebugRenderer'
-import { StateAdapter, type UnifiedGameState } from '@/utils/StateAdapter'
+import { StateAdapter } from '@/utils/StateAdapter'
+import type { GameEngineState } from '@shared/engine/types'
 import { AIManager } from '@/ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { PixiScene } from '@/utils/PixiScene'
@@ -69,7 +70,7 @@ export abstract class BaseGameScene extends PixiScene {
   protected abstract updateGameState(delta: number): void
   protected abstract handleShootAction(power: number): void
   protected abstract cleanupGameState(): void
-  protected abstract getUnifiedState(): UnifiedGameState | null
+  protected abstract getUnifiedState(): GameEngineState | null
 
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)

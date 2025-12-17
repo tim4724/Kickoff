@@ -4,7 +4,8 @@ import { NetworkManager } from '@/network/NetworkManager'
 import { GeometryUtils } from '@shared/utils/geometry'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
-import { StateAdapter, type UnifiedGameState } from '@/utils/StateAdapter'
+import { StateAdapter } from '@/utils/StateAdapter'
+import type { GameEngineState } from '@shared/engine/types'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '@/ai'
 import { sceneRouter } from '@/utils/SceneRouter'
@@ -170,7 +171,7 @@ export class MultiplayerScene extends BaseGameScene {
     console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
   }
 
-  protected getUnifiedState() {
+  protected getUnifiedState(): GameEngineState | null {
     const rawState = this.networkManager?.getState()
     if (!rawState) return null
 
@@ -706,41 +707,12 @@ export class MultiplayerScene extends BaseGameScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const gameStateData = this.convertUnifiedStateToGameStateData(unifiedState)
+    const gameStateData = StateAdapter.toGameStateData(unifiedState)
 
     try {
       this.aiManager.update(gameStateData)
     } catch (error) {
       console.error('[MultiplayerScene] Error during AI update:', error)
-    }
-  }
-  
-  private convertUnifiedStateToGameStateData(unifiedState: UnifiedGameState): any {
-    const playersMap = new Map()
-    unifiedState.players.forEach((player: any, playerId: string) => {
-      playersMap.set(playerId, {
-        id: player.id,
-        team: player.team,
-        isHuman: player.isHuman,
-        isControlled: player.isControlled,
-        position: { x: player.x, y: player.y },
-        velocity: { x: player.velocityX, y: player.velocityY },
-        state: player.state,
-        direction: player.direction,
-      })
-    })
-
-    return {
-      players: playersMap,
-      ball: {
-        position: { x: unifiedState.ball.x, y: unifiedState.ball.y },
-        velocity: { x: unifiedState.ball.velocityX, y: unifiedState.ball.velocityY },
-        possessedBy: unifiedState.ball.possessedBy,
-      },
-      scoreBlue: unifiedState.scoreBlue,
-      scoreRed: unifiedState.scoreRed,
-      matchTime: unifiedState.matchTime,
-      phase: unifiedState.phase,
     }
   }
 
