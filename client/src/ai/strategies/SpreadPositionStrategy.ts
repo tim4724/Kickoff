@@ -29,7 +29,7 @@ export class SpreadPositionStrategy {
       if (assignedPlayers.has(option.teammate.id)) continue
 
       roles.set(option.teammate.id, {
-        goal: 'receive-pass',
+        goal: 'receivePass-spread',
         target: option.position
       })
       assignedPlayers.add(option.teammate.id)
@@ -40,7 +40,7 @@ export class SpreadPositionStrategy {
     for (const player of players) {
       if (!assignedPlayers.has(player.id)) {
         roles.set(player.id, {
-          goal: 'receive-pass',
+          goal: 'stay',
           target: { x: player.x, y: player.y } // Stay put
         })
       }
