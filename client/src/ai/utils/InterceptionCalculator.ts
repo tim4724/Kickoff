@@ -86,7 +86,8 @@ export class InterceptionCalculator {
    */
   static simulateBallPosition(
     startPos: Vector2D,
-    startVel: Vector2D,
+    startVelX: number,
+    startVelY: number,
     timeSeconds: number
   ): Vector2D {
     // IMPORTANT: Use 60Hz physics timestep to match GameEngine's FIXED_TIMESTEP
@@ -107,8 +108,8 @@ export class InterceptionCalculator {
 
     let x = startPos.x
     let y = startPos.y
-    let vx = startVel.x
-    let vy = startVel.y
+    let vx = startVelX
+    let vy = startVelY
 
     // Simulate step-by-step using actual PhysicsEngine logic
     for (let i = 0; i < steps; i++) {

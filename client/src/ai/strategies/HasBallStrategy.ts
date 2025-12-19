@@ -188,7 +188,8 @@ export class HasBallStrategy {
       const predictBallPosition = (t: number): Vector2D => {
         return InterceptionCalculator.simulateBallPosition(
           carrier,
-          { x: dirX * GAME_CONFIG.SHOOT_SPEED, y: dirY * GAME_CONFIG.SHOOT_SPEED },
+          dirX * GAME_CONFIG.SHOOT_SPEED,
+          dirY * GAME_CONFIG.SHOOT_SPEED,
           t
         )
       }

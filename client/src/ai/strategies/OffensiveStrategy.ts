@@ -82,7 +82,7 @@ export class OffensiveStrategy {
     } else {
       // Ball is loose - find best interceptor
       const predictBallPosition = (t: number): Vector2D => {
-        return InterceptionCalculator.simulateBallPosition(ball, { x: ball.velocityX, y: ball.velocityY }, t)
+        return InterceptionCalculator.simulateBallPosition(ball, ball.velocityX, ball.velocityY, t)
       }
 
       const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(

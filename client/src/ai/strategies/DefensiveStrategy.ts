@@ -63,7 +63,8 @@ export class DefensiveStrategy {
       const result = this.selectBestChaser(
         [...remainingPlayers, ...remainingOpponents],
         ball,
-        { x: ball.velocityX, y: ball.velocityY }
+        ball.velocityX,
+        ball.velocityY
       )
       ballInterceptor = result.interceptor
       ballInterceptPoint = result.interceptPoint
@@ -135,14 +136,15 @@ export class DefensiveStrategy {
   private selectBestChaser(
     players: EnginePlayerData[],
     ballPosition: Vector2D,
-    ballVelocity: Vector2D,
+    ballVx: number,
+    ballVy: number,
   ): { interceptor: EnginePlayerData; interceptPoint: Vector2D } {
-    const ballSpeedSquared = ballVelocity.x ** 2 + ballVelocity.y ** 2
+    const ballSpeedSquared = ballVx * ballVx + ballVy * ballVy
     const isBallMoving = ballSpeedSquared >= 1
 
     // Determine ball prediction function
     const predictBallPosition = isBallMoving
-      ? (t: number) => InterceptionCalculator.simulateBallPosition(ballPosition, ballVelocity, t)
+      ? (t: number) => InterceptionCalculator.simulateBallPosition(ballPosition, ballVx, ballVy, t)
       : () => ballPosition
 
     // Find best interceptor among ALL players (ours + opponents)
