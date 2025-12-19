@@ -7,7 +7,8 @@
 
 import { TeamAI } from './TeamAI'
 import { AIGameState, AIDecision } from './types'
-import { GameStateData, Team } from '@shared/types'
+import { Team } from '@shared/types'
+import { GameEngineState } from '@shared/engine/types'
 
 export class AIManager {
   private teamAIs: Map<Team, TeamAI>
@@ -48,9 +49,9 @@ export class AIManager {
    * Update all AI instances
    * Should be called each frame with the current game state
    *
-   * @param gameState - Current Colyseus game state
+   * @param gameState - Current Game Engine state
    */
-  public update(gameState: GameStateData): void {
+  public update(gameState: GameEngineState): void {
     if (!this.enabled) return
 
     const aiGameState = this.convertGameState(gameState)
@@ -86,9 +87,9 @@ export class AIManager {
   }
 
   /**
-   * Convert Colyseus GameState to AIGameState format
+   * Convert GameEngineState to AIGameState format
    */
-  private convertGameState(gameState: GameStateData): AIGameState {
+  private convertGameState(gameState: GameEngineState): AIGameState {
     const allPlayers = Array.from(gameState.players.values())
     return {
       bluePlayers: allPlayers.filter(p => p.team === 'blue'),

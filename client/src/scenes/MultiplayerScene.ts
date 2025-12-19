@@ -4,7 +4,7 @@ import { NetworkManager } from '@/network/NetworkManager'
 import { GeometryUtils } from '@shared/utils/geometry'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
-import { StateAdapter, type UnifiedGameState } from '@/utils/StateAdapter'
+import type { GameEngineState, EnginePlayerData } from '@shared/engine/types'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '@/ai'
 import { sceneRouter } from '@/utils/SceneRouter'
@@ -57,14 +57,8 @@ export class MultiplayerScene extends BaseGameScene {
       return
     }
 
-    // Check if scene is active via manager? PixiScene doesn't have isActive().
-    // We check if it is current scene or similar.
-    // If updateGameState is called, it means update() is called, which means scene is likely active.
-
     try {
       const dt = delta / 1000 // Convert to seconds assuming delta is MS.
-      // Wait, we need to clarify what delta BaseGameScene passes.
-      // If BaseGameScene passes app.ticker.deltaMS, then / 1000 is correct.
 
       const movement = this.collectMovementInput()
 
@@ -170,51 +164,57 @@ export class MultiplayerScene extends BaseGameScene {
     console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
   }
 
-  protected getUnifiedState() {
+  protected getUnifiedState(): GameEngineState | null {
     const rawState = this.networkManager?.getState()
     if (!rawState) return null
+    return this.fromNetwork(rawState)
+  }
 
-    const convertedState: any = {
-      matchTime: rawState.matchTime || 0,
-      scoreBlue: rawState.scoreBlue || 0,
-      scoreRed: rawState.scoreRed || 0,
-      phase: rawState.phase || 'waiting',
-      players: new Map(),
-      ball: {
-        position: {
-          x: rawState.ball?.x ?? 0,
-          y: rawState.ball?.y ?? 0,
-        },
-        velocity: {
-          x: rawState.ball?.velocityX ?? 0,
-          y: rawState.ball?.velocityY ?? 0,
-        },
-        possessedBy: rawState.ball?.possessedBy || '',
-      },
-    }
+  /**
+   * Convert NetworkManager state (Multiplayer) to GameEngineState format
+   */
+  private fromNetwork(state: any): GameEngineState {
+    const unifiedPlayers = new Map<string, EnginePlayerData>()
 
-    if (rawState.players) {
-      rawState.players.forEach((player: any, playerId: string) => {
-        convertedState.players.set(playerId, {
-          id: player.id || playerId,
-          team: player.team || 'blue',
-          isHuman: player.isHuman ?? false,
-          isControlled: player.isControlled ?? false,
-          position: {
-            x: player.x ?? 0,
-            y: player.y ?? 0,
-          },
-          velocity: {
-            x: player.velocityX ?? 0,
-            y: player.velocityY ?? 0,
-          },
-          state: player.state || 'idle',
-          direction: player.direction || 0,
+    // Handle both flat (NetworkManager) and nested (Shared Types) formats
+    // The server schema uses flat x/y, but shared types define nested position
+    if (state.players) {
+        state.players.forEach((player: any, id: string) => {
+          unifiedPlayers.set(id, {
+            id: player.id,
+            team: player.team,
+            isHuman: player.isHuman,
+            isControlled: player.isControlled,
+            x: player.x ?? player.position?.x ?? 0,
+            y: player.y ?? player.position?.y ?? 0,
+            velocityX: player.velocityX ?? player.velocity?.x ?? 0,
+            velocityY: player.velocityY ?? player.velocity?.y ?? 0,
+            state: player.state,
+            direction: player.direction,
+          })
         })
-      })
     }
 
-    return StateAdapter.fromNetwork(convertedState)
+    const ballX = state.ball?.x ?? state.ball?.position?.x ?? 0
+    const ballY = state.ball?.y ?? state.ball?.position?.y ?? 0
+    const ballVx = state.ball?.velocityX ?? state.ball?.velocity?.x ?? 0
+    const ballVy = state.ball?.velocityY ?? state.ball?.velocity?.y ?? 0
+
+    return {
+      players: unifiedPlayers,
+      ball: {
+        x: ballX,
+        y: ballY,
+        velocityX: ballVx,
+        velocityY: ballVy,
+        possessedBy: state.ball?.possessedBy || '',
+        pressureLevel: state.ball?.pressureLevel ?? 0,
+      },
+      scoreBlue: state.scoreBlue,
+      scoreRed: state.scoreRed,
+      matchTime: state.matchTime,
+      phase: state.phase,
+    }
   }
 
   async create() {
@@ -488,17 +488,9 @@ export class MultiplayerScene extends BaseGameScene {
       this.networkManager.disconnect()
     }
     
-    // Create popup overlay
-    // Use container in UI
-
-    // ... Simplified to direct navigation for now or simple timeout since we don't have complex UI setup in Pixi yet easily
-    // We'll mimic what was there
-
     setTimeout(() => {
         sceneRouter.navigateTo('MenuScene')
     }, 2000)
-
-    // For now, let's just log and navigate soon, the overlay logic requires more graphics code
   }
 
   private removeRemotePlayer(sessionId: string) {
@@ -589,12 +581,6 @@ export class MultiplayerScene extends BaseGameScene {
     const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
     sprite.x += (playerState.x - sprite.x) * lerpFactor
     sprite.y += (playerState.y - sprite.y) * lerpFactor
-
-    // Update color
-    // We need to access fill color to update it if it changed.
-    // Simplified: we set it on creation and assume it doesn't change often.
-    // If we need dynamic updates, we'd need to redraw.
-    // Let's assume lazy creation handles most cases.
   }
 
   private updateLocalPlayerColor() {
@@ -612,13 +598,6 @@ export class MultiplayerScene extends BaseGameScene {
 
       this.playerTeamColor = teamColor
       
-      const myPlayerSprite = this.players.get(this.myPlayerId)
-      if (myPlayerSprite) {
-        // Redraw with new color
-        // myPlayerSprite.clear() ...
-        // We'll skip for now as updateRemotePlayer handles lazy creation which sets color
-      }
-
       if (this.joystick) {
         this.joystick.setTeamColor(this.playerTeamColor)
       }
@@ -706,41 +685,10 @@ export class MultiplayerScene extends BaseGameScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
 
-    const gameStateData = this.convertUnifiedStateToGameStateData(unifiedState)
-
     try {
-      this.aiManager.update(gameStateData)
+      this.aiManager.update(unifiedState)
     } catch (error) {
       console.error('[MultiplayerScene] Error during AI update:', error)
-    }
-  }
-  
-  private convertUnifiedStateToGameStateData(unifiedState: UnifiedGameState): any {
-    const playersMap = new Map()
-    unifiedState.players.forEach((player: any, playerId: string) => {
-      playersMap.set(playerId, {
-        id: player.id,
-        team: player.team,
-        isHuman: player.isHuman,
-        isControlled: player.isControlled,
-        position: { x: player.x, y: player.y },
-        velocity: { x: player.velocityX, y: player.velocityY },
-        state: player.state,
-        direction: player.direction,
-      })
-    })
-
-    return {
-      players: playersMap,
-      ball: {
-        position: { x: unifiedState.ball.x, y: unifiedState.ball.y },
-        velocity: { x: unifiedState.ball.velocityX, y: unifiedState.ball.velocityY },
-        possessedBy: unifiedState.ball.possessedBy,
-      },
-      scoreBlue: unifiedState.scoreBlue,
-      scoreRed: unifiedState.scoreRed,
-      matchTime: unifiedState.matchTime,
-      phase: unifiedState.phase,
     }
   }
 
@@ -756,8 +704,8 @@ export class MultiplayerScene extends BaseGameScene {
     const unifiedState = this.getUnifiedState()
     if (!unifiedState) return
     
-    const myTeam = StateAdapter.getPlayerTeam(unifiedState, this.myPlayerId)
-    const playerTeam = StateAdapter.getPlayerTeam(unifiedState, playerId)
+    const myTeam = this.getPlayerTeam(unifiedState, this.myPlayerId)
+    const playerTeam = this.getPlayerTeam(unifiedState, playerId)
     
     if (!myTeam || !playerTeam || playerTeam !== myTeam) return
 

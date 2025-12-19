@@ -6,12 +6,13 @@
  */
 
 import { Vector2D } from '../types'
-import { PlayerData, GAME_CONFIG } from '@shared/types'
+import { GAME_CONFIG } from '@shared/types'
+import { EnginePlayerData } from '@shared/engine/types'
 import { GeometryUtils } from '@shared/utils/geometry'
 import { InterceptionCalculator } from './InterceptionCalculator'
 
 export interface PassOption {
-  teammate: PlayerData
+  teammate: EnginePlayerData
   position: Vector2D
   score: number
 }
@@ -56,7 +57,7 @@ export class PassEvaluator {
     const dist = GeometryUtils.distance(from, to)
     const vx = dist > 0 ? ((to.x - from.x) / dist) * speed : 0
     const vy = dist > 0 ? ((to.y - from.y) / dist) * speed : 0
-    return (t: number) => InterceptionCalculator.simulateBallPosition(from, { x: vx, y: vy }, t)
+    return (t: number) => InterceptionCalculator.simulateBallPosition(from, vx, vy, t)
   }
 
   /**
@@ -64,8 +65,8 @@ export class PassEvaluator {
    */
   static evaluatePassOptions(
     ballPos: Vector2D,
-    teammates: PlayerData[],
-    opponents: PlayerData[],
+    teammates: EnginePlayerData[],
+    opponents: EnginePlayerData[],
     opponentGoal: Vector2D
   ): PassOption[] {
     if (teammates.length === 0) return []
@@ -94,7 +95,7 @@ export class PassEvaluator {
           GAME_CONFIG.PRESSURE_RADIUS
         )
         earliestOpponentTime = time
-        spaceAtTarget = GeometryUtils.distance(pos, interceptor.position)
+        spaceAtTarget = GeometryUtils.distance(pos, interceptor)
       } else {
         spaceAtTarget = this.SPACE_CAP
       }
@@ -117,7 +118,7 @@ export class PassEvaluator {
         if (!options) continue
 
         // Score: forward progress + space - movement distance
-        const movement = GeometryUtils.distance(teammate.position, pos)
+        const movement = GeometryUtils.distance(teammate, pos)
         const score =
           forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS +
           Math.min(this.SPACE_CAP, spaceAtTarget) * this.SCORE_WEIGHT_SPACE -

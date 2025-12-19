@@ -102,7 +102,7 @@ export class AIPlayer {
   private getMyPosition(gameState: AIGameState): { x: number; y: number } | null {
     const allPlayers = [...gameState.bluePlayers, ...gameState.redPlayers]
     const player = allPlayers.find(p => p.id === this.playerId)
-    return player ? { x: player.position.x, y: player.position.y } : null
+    return player ? { x: player.x, y: player.y } : null
   }
 
   /**
@@ -120,8 +120,8 @@ export class AIPlayer {
     if (!player) return true
 
     // Calculate target direction
-    const dx = this.targetX - player.position.x
-    const dy = this.targetY - player.position.y
+    const dx = this.targetX - player.x
+    const dy = this.targetY - player.y
     const targetDirection = Math.atan2(dy, dx)
 
     // Calculate angular difference
