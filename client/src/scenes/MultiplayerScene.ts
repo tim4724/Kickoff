@@ -1,5 +1,5 @@
 import { Application, Text } from 'pixi.js'
-import { GAME_CONFIG, type GameStateData } from '@shared/types'
+import { GAME_CONFIG } from '@shared/types'
 import { NetworkManager } from '@/network/NetworkManager'
 import { GeometryUtils } from '@shared/utils/geometry'
 import { BaseGameScene } from './BaseGameScene'
@@ -173,32 +173,42 @@ export class MultiplayerScene extends BaseGameScene {
   /**
    * Convert NetworkManager state (Multiplayer) to GameEngineState format
    */
-  private fromNetwork(state: GameStateData): GameEngineState {
+  private fromNetwork(state: any): GameEngineState {
     const unifiedPlayers = new Map<string, EnginePlayerData>()
-    state.players.forEach((player, id) => {
-      unifiedPlayers.set(id, {
-        id: player.id,
-        team: player.team,
-        isHuman: player.isHuman,
-        isControlled: player.isControlled,
-        x: player.position?.x ?? 0,
-        y: player.position?.y ?? 0,
-        velocityX: player.velocity?.x ?? 0,
-        velocityY: player.velocity?.y ?? 0,
-        state: player.state,
-        direction: player.direction,
-      })
-    })
+
+    // Handle both flat (NetworkManager) and nested (Shared Types) formats
+    // The server schema uses flat x/y, but shared types define nested position
+    if (state.players) {
+        state.players.forEach((player: any, id: string) => {
+          unifiedPlayers.set(id, {
+            id: player.id,
+            team: player.team,
+            isHuman: player.isHuman,
+            isControlled: player.isControlled,
+            x: player.x ?? player.position?.x ?? 0,
+            y: player.y ?? player.position?.y ?? 0,
+            velocityX: player.velocityX ?? player.velocity?.x ?? 0,
+            velocityY: player.velocityY ?? player.velocity?.y ?? 0,
+            state: player.state,
+            direction: player.direction,
+          })
+        })
+    }
+
+    const ballX = state.ball?.x ?? state.ball?.position?.x ?? 0
+    const ballY = state.ball?.y ?? state.ball?.position?.y ?? 0
+    const ballVx = state.ball?.velocityX ?? state.ball?.velocity?.x ?? 0
+    const ballVy = state.ball?.velocityY ?? state.ball?.velocity?.y ?? 0
 
     return {
       players: unifiedPlayers,
       ball: {
-        x: state.ball.position?.x ?? 0,
-        y: state.ball.position?.y ?? 0,
-        velocityX: state.ball.velocity?.x ?? 0,
-        velocityY: state.ball.velocity?.y ?? 0,
-        possessedBy: state.ball.possessedBy,
-        pressureLevel: 0, // Not synced from network yet
+        x: ballX,
+        y: ballY,
+        velocityX: ballVx,
+        velocityY: ballVy,
+        possessedBy: state.ball?.possessedBy || '',
+        pressureLevel: state.ball?.pressureLevel ?? 0,
       },
       scoreBlue: state.scoreBlue,
       scoreRed: state.scoreRed,
