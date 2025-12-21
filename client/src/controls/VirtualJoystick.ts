@@ -180,7 +180,7 @@ export class VirtualJoystick {
   private updateStickPosition(x: number, y: number) {
     const dx = x - this.baseX
     const dy = y - this.baseY
-    const distance = GeometryUtils.distance(this.baseX, this.baseY, x, y)
+    const distance = GeometryUtils.distanceScalar(this.baseX, this.baseY, x, y)
 
     if (distance > this.maxRadius) {
       // Clamp to max radius
@@ -215,7 +215,7 @@ export class VirtualJoystick {
 
     const dx = this.stick.x - this.baseX
     const dy = this.stick.y - this.baseY
-    const distance = GeometryUtils.distance(this.baseX, this.baseY, this.stick.x, this.stick.y)
+    const distance = GeometryUtils.distanceScalar(this.baseX, this.baseY, this.stick.x, this.stick.y)
 
     // Apply dead zone
     if (distance < this.maxRadius * this.deadZone) {

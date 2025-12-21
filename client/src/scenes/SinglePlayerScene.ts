@@ -62,7 +62,7 @@ export class SinglePlayerScene extends BaseGameScene {
         console.log(`🔄 Auto-switch ${enabled ? 'enabled' : 'disabled'}`)
       },
       directMove: async (dx: number, dy: number, gameTimeDurationMs: number) => {
-        const normalized = GeometryUtils.normalize(dx, dy)
+        const normalized = GeometryUtils.normalizeScalar(dx, dy)
         const normalizedX = normalized.x
         const normalizedY = normalized.y
 

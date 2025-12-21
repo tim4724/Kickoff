@@ -54,7 +54,7 @@ export class PassEvaluator {
    * Create ball trajectory predictor for interception calculation
    */
   private static ballPredictor(from: Vector2D, to: Vector2D, speed: number) {
-    const dist = GeometryUtils.distance(from, to)
+    const dist = GeometryUtils.distancePoint(from, to)
     const vx = dist > 0 ? ((to.x - from.x) / dist) * speed : 0
     const vy = dist > 0 ? ((to.y - from.y) / dist) * speed : 0
     return (t: number) => InterceptionCalculator.simulateBallPosition(from, vx, vy, t)
@@ -81,7 +81,7 @@ export class PassEvaluator {
     // Evaluate each grid position
     for (const pos of this.getGrid()) {
       // Use squared distance for comparison (no sqrt needed)
-      if (GeometryUtils.distanceSquared(ballPos, pos) < this.MIN_SPACING_SQUARED) continue
+      if (GeometryUtils.distanceSquaredPoint(ballPos, pos) < this.MIN_SPACING_SQUARED) continue
 
       const predictor = this.ballPredictor(ballPos, pos, passSpeed)
 
@@ -95,13 +95,13 @@ export class PassEvaluator {
           GAME_CONFIG.PRESSURE_RADIUS
         )
         earliestOpponentTime = time
-        spaceAtTarget = GeometryUtils.distance(pos, interceptor)
+        spaceAtTarget = GeometryUtils.distancePoint(pos, interceptor)
       } else {
         spaceAtTarget = this.SPACE_CAP
       }
 
       // Forward progress is same for all teammates at this position
-      const forwardProgress = GeometryUtils.distance(ballPos, opponentGoal) - GeometryUtils.distance(pos, opponentGoal)
+      const forwardProgress = GeometryUtils.distancePoint(ballPos, opponentGoal) - GeometryUtils.distancePoint(pos, opponentGoal)
 
       // Check each teammate's interception time
       for (const teammate of teammates) {
@@ -118,7 +118,7 @@ export class PassEvaluator {
         if (!options) continue
 
         // Score: forward progress + space - movement distance
-        const movement = GeometryUtils.distance(teammate, pos)
+        const movement = GeometryUtils.distancePoint(teammate, pos)
         const score =
           forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS +
           Math.min(this.SPACE_CAP, spaceAtTarget) * this.SCORE_WEIGHT_SPACE -
@@ -152,7 +152,7 @@ export class PassEvaluator {
     for (const { options } of teammatesByBestOption) {
       // Find first option with minimum spacing, or fallback to best option
       const option = options.find(candidate =>
-        usedPositions.every(p => GeometryUtils.distanceSquared(candidate.position, p) >= this.MIN_SPACING_SQUARED)
+        usedPositions.every(p => GeometryUtils.distanceSquaredPoint(candidate.position, p) >= this.MIN_SPACING_SQUARED)
       ) || options[0]
 
       if (option) {
