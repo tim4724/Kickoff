@@ -70,7 +70,7 @@ export class AIPlayer {
 
     const dx = this.targetX - currentPos.x
     const dy = this.targetY - currentPos.y
-    const distance = GeometryUtils.distanceScalar(currentPos.x, currentPos.y, this.targetX, this.targetY)
+    const distance = GeometryUtils.magnitudeScalar(dx, dy)
 
     // For shooting/passing, always return direction even if close (to rotate player)
     if (this.shootPower !== null) {
