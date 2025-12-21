@@ -529,7 +529,7 @@ export abstract class BaseGameScene extends PixiScene {
       return
     }
 
-    const speed = GeometryUtils.magnitude(vx, vy)
+    const speed = GeometryUtils.magnitudeScalar(vx, vy)
     const MIN_SPEED_THRESHOLD = 15
 
     if (speed < MIN_SPEED_THRESHOLD) {
@@ -671,7 +671,7 @@ export abstract class BaseGameScene extends PixiScene {
         if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) moveY = -1
         else if (this.keys.has('ArrowDown') || this.keys.has('KeyS')) moveY = 1
 
-        const normalized = GeometryUtils.normalize(moveX, moveY)
+        const normalized = GeometryUtils.normalizeScalar(moveX, moveY)
         moveX = normalized.x
         moveY = normalized.y
     }
@@ -951,7 +951,7 @@ export abstract class BaseGameScene extends PixiScene {
       const player = state.players.get(playerId)
       if (!player) continue
 
-      const distance = GeometryUtils.distanceSquared(player.x, player.y, ballX, ballY)
+      const distance = GeometryUtils.distanceSquaredScalar(player.x, player.y, ballX, ballY)
 
       if (distance < bestDistance) {
         bestDistance = distance

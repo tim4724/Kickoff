@@ -211,7 +211,7 @@ export async function moveTowardBallAndCapture(
 
     const dx = state.ballX - state.playerX
     const dy = state.ballY - state.playerY
-    const distance = GeometryUtils.magnitude(dx, dy)
+    const distance = GeometryUtils.magnitudeScalar(dx, dy)
 
     if (state.ballPossessor === state.controlledId || distance < GAME_CONFIG.POSSESSION_RADIUS) {
       return true
@@ -259,14 +259,14 @@ export function calculateDistance(
   x2: number,
   y2: number
 ): number {
-  return GeometryUtils.distance(x1, y1, x2, y2)
+  return GeometryUtils.distanceScalar(x1, y1, x2, y2)
 }
 
 /**
  * Calculate velocity magnitude
  */
 export function calculateVelocity(vx: number, vy: number): number {
-  return GeometryUtils.magnitude(vx, vy)
+  return GeometryUtils.magnitudeScalar(vx, vy)
 }
 
 /**

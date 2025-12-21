@@ -192,7 +192,7 @@ export class PhysicsEngine {
       // Optimization: Skip self and teammates early to avoid distance calculation
       if (player.id === possessor.id || player.team === possessor.team) continue
 
-      const distSq = GeometryUtils.distanceSquared(player.x, player.y, ball.x, ball.y)
+      const distSq = GeometryUtils.distanceSquaredScalar(player.x, player.y, ball.x, ball.y)
 
       if (distSq < this.pressureRadiusSq) {
         opponentsNearby++
@@ -248,7 +248,7 @@ export class PhysicsEngine {
     if (ball.possessedBy !== '') {
       const possessor = players.get(ball.possessedBy)
       if (possessor) {
-        const distSq = GeometryUtils.distanceSquared(ball.x, ball.y, possessor.x, possessor.y)
+        const distSq = GeometryUtils.distanceSquaredScalar(ball.x, ball.y, possessor.x, possessor.y)
 
         if (distSq > this.releaseThresholdSq) {
           ball.possessedBy = ''
@@ -277,7 +277,7 @@ export class PhysicsEngine {
         // Skip shooter during immunity
         if (hasImmunity && player.id === ball.lastShooter) continue
 
-        const distSq = GeometryUtils.distanceSquared(ball.x, ball.y, player.x, player.y)
+        const distSq = GeometryUtils.distanceSquaredScalar(ball.x, ball.y, player.x, player.y)
 
         if (distSq < this.possessionRadiusSq) {
           // Check loss lockout
@@ -327,7 +327,7 @@ export class PhysicsEngine {
       }
     } else {
       // Try to gain possession
-      const distSq = GeometryUtils.distanceSquared(ball.x, ball.y, player.x, player.y)
+      const distSq = GeometryUtils.distanceSquaredScalar(ball.x, ball.y, player.x, player.y)
 
       const SHOT_IMMUNITY_MS = 300
       const timeSinceShot = gameClock.now() - (ball.lastShotTime || 0)

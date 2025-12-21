@@ -48,7 +48,7 @@ export class InterceptionCalculator {
       let closestDistance = Infinity
 
       for (const player of players) {
-        const distanceToBall = GeometryUtils.distance(player, futurePos)
+        const distanceToBall = GeometryUtils.distancePoint(player, futurePos)
 
         // Can this player reach the ball (within interception radius) in time t?
         if (distanceToBall - interceptionRadius <= maxPlayerTravel) {
@@ -74,7 +74,7 @@ export class InterceptionCalculator {
     }
 
     const closestPlayer = players.reduce((best, p) =>
-      GeometryUtils.distanceSquared(p, finalPos) < GeometryUtils.distanceSquared(best, finalPos) ? p : best
+      GeometryUtils.distanceSquaredPoint(p, finalPos) < GeometryUtils.distanceSquaredPoint(best, finalPos) ? p : best
     , players[0])
 
     return { interceptor: closestPlayer, interceptPoint: finalPos, time: Infinity }

@@ -50,7 +50,7 @@ export class HasBallStrategy {
     targetBehindGoal: Vector2D,
     passOptions: PassOption[]
   ): PlayerRole {
-    const distToGoal = GeometryUtils.distance(carrier, opponentGoal)
+    const distToGoal = GeometryUtils.distancePoint(carrier, opponentGoal)
 
     if (distToGoal < this.SHOOTING_RANGE) {
       // Evaluate shot angles using interception logic
@@ -107,7 +107,7 @@ export class HasBallStrategy {
     // Direction vector from carrier to target behind goal
     const dx = targetBehindGoal.x - carrier.x
     const dy = targetBehindGoal.y - carrier.y
-    const dist = GeometryUtils.distance(carrier, targetBehindGoal)
+    const dist = GeometryUtils.distancePoint(carrier, targetBehindGoal)
 
     if (dist < 1) {
       // Already at target
@@ -134,7 +134,7 @@ export class HasBallStrategy {
     )
 
     // Calculate distance from intercept point to carrier's current position
-    const interceptDistance = GeometryUtils.distance(carrier, interceptPoint)
+    const interceptDistance = GeometryUtils.distancePoint(carrier, interceptPoint)
 
     return { interceptPoint, interceptDistance }
   }
@@ -177,7 +177,7 @@ export class HasBallStrategy {
       // Calculate shot trajectory direction
       const dx = shotTarget.x - carrier.x
       const dy = shotTarget.y - carrier.y
-      const dist = GeometryUtils.distance(carrier, shotTarget)
+      const dist = GeometryUtils.distancePoint(carrier, shotTarget)
 
       if (dist < 1) continue // Skip if already at target
 
@@ -202,7 +202,7 @@ export class HasBallStrategy {
       )
 
       // Calculate how far the intercept point is from carrier (further = better)
-      const interceptDistance = GeometryUtils.distance(carrier, interceptPoint)
+      const interceptDistance = GeometryUtils.distancePoint(carrier, interceptPoint)
 
       shotOptions.push({ target: shotTarget, interceptDistance })
     }
@@ -289,13 +289,13 @@ export class HasBallStrategy {
     // Space from opponents (higher = better)
     const space =
       opponents.length > 0
-        ? Math.min(...opponents.map(opp => GeometryUtils.distance(targetPosition, opp)))
+        ? Math.min(...opponents.map(opp => GeometryUtils.distancePoint(targetPosition, opp)))
         : Infinity
 
     // Forward progress toward goal (positive = forward, negative = backward)
     const forwardProgress =
-      GeometryUtils.distance(carrier, opponentGoal) -
-      GeometryUtils.distance(targetPosition, opponentGoal)
+      GeometryUtils.distancePoint(carrier, opponentGoal) -
+      GeometryUtils.distancePoint(targetPosition, opponentGoal)
 
     // Simplified scoring: prioritize space and forward progress
     return Math.min(this.MAX_SPACE_CAP, space) * this.SCORE_WEIGHT_SPACE + forwardProgress * this.SCORE_WEIGHT_FORWARD_PROGRESS
