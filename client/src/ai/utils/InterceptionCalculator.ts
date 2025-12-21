@@ -111,14 +111,17 @@ export class InterceptionCalculator {
     let vx = startVelX
     let vy = startVelY
 
+    // Reusable object to avoid allocation in tight loop (can run 100s of times)
+    const stepResult = { x: 0, y: 0, vx: 0, vy: 0 }
+
     // Simulate step-by-step using actual PhysicsEngine logic
     for (let i = 0; i < steps; i++) {
-      const result = PhysicsEngine.simulateBallStep(x, y, vx, vy, dt, physicsConfig)
+      PhysicsEngine.simulateBallStep(x, y, vx, vy, dt, physicsConfig, stepResult)
 
-      x = result.x
-      y = result.y
-      vx = result.vx
-      vy = result.vy
+      x = stepResult.x
+      y = stepResult.y
+      vx = stepResult.vx
+      vy = stepResult.vy
 
       // Stop if ball stopped
       if (vx === 0 && vy === 0) break

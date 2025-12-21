@@ -44,7 +44,8 @@ export class PhysicsEngine {
       fieldMargin: number
       goalYMin: number
       goalYMax: number
-    }
+    },
+    out?: { x: number; y: number; vx: number; vy: number }
   ): { x: number; y: number; vx: number; vy: number } {
     const bounceCoef = -0.8
 
@@ -54,6 +55,13 @@ export class PhysicsEngine {
 
     // Stop if too slow
     if (Math.abs(vx) < 1 && Math.abs(vy) < 1) {
+      if (out) {
+        out.x = x
+        out.y = y
+        out.vx = 0
+        out.vy = 0
+        return out
+      }
       return { x, y, vx: 0, vy: 0 }
     }
 
@@ -84,6 +92,13 @@ export class PhysicsEngine {
       y = config.fieldHeight - config.fieldMargin
     }
 
+    if (out) {
+      out.x = x
+      out.y = y
+      out.vx = vx
+      out.vy = vy
+      return out
+    }
     return { x, y, vx, vy }
   }
 
