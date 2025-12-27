@@ -1,9 +1,96 @@
 import { Client, Room } from 'colyseus.js'
 import { gameClock } from '@shared/engine/GameClock'
+import type { MapSchema } from '@colyseus/schema'
+import type { Team, PlayerState, GamePhase } from '@shared/types'
 
 export interface NetworkConfig {
   serverUrl: string
   roomName: string
+}
+
+// Colyseus schema types for the client
+/**
+ * Client-side representation of Colyseus Player schema
+ * Mirrors the schema defined in server/src/schema/GameState.ts
+ *
+ * This interface represents a player entity as synchronized from the server
+ * via Colyseus WebSocket state synchronization.
+ */
+interface ColyseusPlayer {
+  id: string
+  team: Team
+  isHuman: boolean
+  isControlled: boolean
+  x: number
+  y: number
+  velocityX: number
+  velocityY: number
+  state: PlayerState
+  direction: number
+}
+
+/**
+ * Client-side representation of Colyseus Ball schema
+ * Mirrors the schema defined in server/src/schema/GameState.ts
+ *
+ * This interface represents the ball entity as synchronized from the server
+ * via Colyseus WebSocket state synchronization.
+ */
+interface ColyseusBall {
+  x: number
+  y: number
+  velocityX: number
+  velocityY: number
+  possessedBy: string
+  pressureLevel: number
+}
+
+/**
+ * Extended MapSchema to include runtime methods added by Colyseus
+ *
+ * Colyseus adds these callback methods at runtime to MapSchema instances
+ * for tracking changes to collections. These methods may not be present
+ * immediately after connection, so they're marked as optional.
+ *
+ * Always check for their existence before use:
+ * ```typescript
+ * if (players && typeof players.onAdd === 'function') {
+ *   players.onAdd((player, key) => { ... })
+ * }
+ * ```
+ */
+interface ColyseusMapSchema<V> extends MapSchema<V> {
+  onAdd?: (callback: (value: V, key: string) => void) => void
+  onRemove?: (callback: (value: V, key: string) => void) => void
+  onChange?: (callback: (value: V, key: string) => void) => void
+}
+
+/**
+ * Client-side representation of Colyseus GameState schema
+ * Mirrors the schema defined in server/src/schema/GameState.ts
+ *
+ * This interface represents the complete game state as synchronized from
+ * the server via Colyseus WebSocket state synchronization. It's received
+ * through `room.state` and `room.onStateChange()` callbacks.
+ *
+ * **Relationship to other state types:**
+ * - Has the same scalar fields as `UnifiedGameState`/`GameEngineState`
+ * - Uses Colyseus-specific types: `ColyseusMapSchema` instead of `Map`,
+ *   `ColyseusPlayer` instead of `EnginePlayerData`, `ColyseusBall` instead
+ *   of `EngineBallData`
+ * - Gets converted to `GameStateData` for local client use (see setupStateListeners)
+ *
+ * **Why separate from UnifiedGameState?**
+ * Must exactly mirror the Colyseus schema structure for proper WebSocket
+ * state synchronization. Cannot use engine types directly.
+ */
+interface ColyseusGameState {
+  matchTime: number
+  scoreBlue: number
+  scoreRed: number
+  phase: GamePhase
+  players: ColyseusMapSchema<ColyseusPlayer>
+  ball: ColyseusBall
 }
 
 export interface PlayerInput {
@@ -13,9 +100,22 @@ export interface PlayerInput {
   playerId: string
 }
 
+// Extended input with isHuman flag for internal buffering
+interface BufferedPlayerInput extends PlayerInput {
+  isHuman: boolean
+}
+
+// Network message format for sending multiple player inputs to server
+// Uses plain object (not Map) for JSON serialization over WebSocket
 export interface MultiPlayerInput {
-  inputs: Map<string, PlayerInput>
+  inputs: Record<string, PlayerInput>
   timestamp: number
+}
+
+// Room join/create options
+interface JoinRoomOptions {
+  roomName: string
+  timeScale?: string
 }
 
 export interface RemotePlayer {
@@ -48,7 +148,7 @@ export interface GameStateData {
 export class NetworkManager {
   private static instance: NetworkManager
   private client: Client
-  private room?: Room
+  private room?: Room<ColyseusGameState>
   private config: NetworkConfig
 
   private connected: boolean = false
@@ -57,7 +157,7 @@ export class NetworkManager {
   private roomClosedListeners: Array<(reason: string) => void> = []
   public roomName: string = 'Unknown'
 
-  private inputBuffer: Map<string, PlayerInput> = new Map()
+  private inputBuffer: Map<string, BufferedPlayerInput> = new Map()
 
   private onStateChange?: (state: GameStateData) => void
   private onPlayerJoin?: (player: RemotePlayer) => void
@@ -90,7 +190,7 @@ export class NetworkManager {
           return url
         }
 
-        const winUrl = (window as any).__SERVER_URL__ as string | undefined
+        const winUrl = window.__SERVER_URL__
         if (winUrl) return normalizeToWs(winUrl)
 
         const portHint = import.meta.env.VITE_SERVER_PORT as string | undefined
@@ -196,7 +296,7 @@ export class NetworkManager {
     }
 
     // 3. Check Test ID
-    const testRoomId = (window as any).__testRoomId
+    const testRoomId = window.__testRoomId
     if (testRoomId) return testRoomId
 
     return this.config.roomName
@@ -223,9 +323,9 @@ export class NetworkManager {
 
       // Priority 2: Join or Create by Name (Lobby / Test)
       const roomName = this.getRoomName()
-      const options: any = { roomName }
+      const options: JoinRoomOptions = { roomName }
 
-      const testTimeScale = (window as any).__testTimeScale
+      const testTimeScale = window.__testTimeScale
       if (testTimeScale) {
         options.timeScale = testTimeScale
       }
@@ -265,17 +365,17 @@ export class NetworkManager {
   sendInput(movement: { x: number; y: number }, action: boolean, playerId: string, isHuman: boolean = false): void {
     if (!this.connected || !this.room) return
 
-    const input: PlayerInput = {
+    const input: BufferedPlayerInput = {
       movement,
       action,
       timestamp: gameClock.now(),
       playerId,
+      isHuman,
     }
 
     const existingInput = this.inputBuffer.get(playerId)
     if (existingInput) {
-      const existingIsHuman = (existingInput as any).isHuman ?? false
-      if (existingIsHuman && !isHuman) return
+      if (existingInput.isHuman && !isHuman) return
 
       if (action) {
         input.movement = existingInput.movement
@@ -284,7 +384,6 @@ export class NetworkManager {
       }
     }
 
-    ;(input as any).isHuman = isHuman
     this.inputBuffer.set(playerId, input)
 
     if (isHuman && !action && (Math.abs(movement.x) > 0.01 || Math.abs(movement.y) > 0.01)) {
@@ -302,11 +401,13 @@ export class NetworkManager {
 
     const inputsMap: { [key: string]: PlayerInput } = {}
     this.inputBuffer.forEach((input, playerId) => {
-      inputsMap[playerId] = input
+      // Remove isHuman flag before sending to server (it's for local buffering only)
+      const { isHuman, ...playerInput } = input
+      inputsMap[playerId] = playerInput
     })
 
     const multiInput: MultiPlayerInput = {
-      inputs: inputsMap as any,
+      inputs: inputsMap,
       timestamp: gameClock.now(),
     }
 
@@ -318,13 +419,13 @@ export class NetworkManager {
     if (!this.room) return
 
     let playersHooksRegistered = false
-    const tryHookPlayers = (state: any) => {
-      if (playersHooksRegistered) return
-      const players = state?.players
+    const tryHookPlayers = (state?: ColyseusGameState) => {
+      if (playersHooksRegistered || !state) return
+      const players = state.players
       if (players && typeof players.onAdd === 'function' && typeof players.onRemove === 'function') {
         playersHooksRegistered = true
 
-        players.onAdd((player: any, key: string) => {
+        players.onAdd((player: ColyseusPlayer, key: string) => {
           if (key === this.sessionId) return
           this.onPlayerJoin?.({
             id: player.id || key,
@@ -338,15 +439,17 @@ export class NetworkManager {
           })
         })
 
-        players.onRemove((_player: any, key: string) => {
+        players.onRemove((_player: ColyseusPlayer, key: string) => {
           this.onPlayerLeave?.(key)
         })
       }
     }
 
-    tryHookPlayers(this.room.state)
+    if (this.room.state) {
+      tryHookPlayers(this.room.state)
+    }
 
-    this.room.onStateChange((state) => {
+    this.room.onStateChange((state: ColyseusGameState) => {
       tryHookPlayers(state)
       if (!state || !state.ball || !state.players) return
 
@@ -366,7 +469,7 @@ export class NetworkManager {
         },
       }
 
-      state.players.forEach((player: any, key: string) => {
+      state.players.forEach((player: ColyseusPlayer, key: string) => {
         gameState.players.set(key, {
           id: player.id || key,
           team: player.team || 'blue',
@@ -433,9 +536,9 @@ export class NetworkManager {
 
   isConnected(): boolean { return this.connected }
   getSessionId(): string { return this.sessionId }
-  getRoom(): Room | undefined { return this.room }
+  getRoom(): Room<ColyseusGameState> | undefined { return this.room }
   getMySessionId(): string { return this.sessionId }
-  getState(): any { return this.room?.state }
+  getState(): ColyseusGameState | undefined { return this.room?.state }
 
   private emitRoomClosed(reason: string) {
     const listeners = [...this.roomClosedListeners]
@@ -446,7 +549,8 @@ export class NetworkManager {
 
   checkExistingPlayers(): void {
     if (!this.room || !this.room.state || !this.room.state.players) return
-    this.room.state.players.forEach((player: any, key: string) => {
+    const state = this.room.state
+    state.players.forEach((player: ColyseusPlayer, key: string) => {
       if (key !== this.sessionId) {
         this.onPlayerJoin?.({
           id: player.id || key,

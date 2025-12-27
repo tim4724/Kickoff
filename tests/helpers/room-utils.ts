@@ -33,7 +33,7 @@ export function generateTestRoomId(workerIndex: number): string {
  */
 export async function setTestRoomId(page: Page, roomId: string): Promise<void> {
   await page.addInitScript((id) => {
-    ;(window as any).__testRoomId = id
+    window.__testRoomId = id
   }, roomId)
 }
 
@@ -192,7 +192,7 @@ export async function waitForPlayerReady(
   timeoutMs: number = 30000
 ): Promise<void> {
   await page.waitForFunction(() => {
-    const scene = (window as any).__gameControls?.scene
+    const scene = window.__gameControls?.scene
     // Player is ready when we have myPlayerId and it exists in the players map
     // myPlayerId format: "sessionId-p1" (includes the -p1 suffix)
     return scene?.myPlayerId && scene?.networkManager?.getState()?.players?.has(scene.myPlayerId)
