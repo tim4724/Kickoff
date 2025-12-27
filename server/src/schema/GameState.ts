@@ -1,19 +1,8 @@
 import { Schema, type, MapSchema } from '@colyseus/schema'
 import { GAME_CONFIG } from '@kickoff/shared/types'
 import { GameEngine } from '@kickoff/shared/engine/GameEngine'
-import type { GameEngineState, EnginePlayerData } from '@kickoff/shared/engine/types'
-
-// Shared types
-type Team = 'blue' | 'red'
-type PlayerState = 'idle' | 'running' | 'kicking'
-type GamePhase = 'waiting' | 'playing' | 'ended'
-
-interface PlayerInput {
-  movement: { x: number; y: number }
-  action: boolean
-  timestamp: number
-  playerId: string // Player ID this input is for (always required)
-}
+import type { GameEngineState, EnginePlayerData, EnginePlayerInput } from '@kickoff/shared/engine/types'
+import type { Team, PlayerState, GamePhase } from '@kickoff/shared/types'
 
 export class Player extends Schema {
   @type('string') id: string = ''
@@ -118,7 +107,10 @@ export class GameState extends Schema {
         console.warn(`⚠️ Player ${sessionId} already exists (found ${firstPlayerId}), skipping add`)
         // Find the team from any of the session's players
         const existingPlayer = this.players.get(firstPlayerId)
-        return { team: existingPlayer!.team }
+        if (!existingPlayer) {
+          throw new Error(`Player ${firstPlayerId} not found despite has() check`)
+        }
+        return { team: existingPlayer.team }
       }
 
       // Count only human players to determine team assignment
@@ -145,7 +137,9 @@ export class GameState extends Schema {
       return { team }
     } finally {
       // Release the lock
-      resolveLock!()
+      if (resolveLock!) {
+        resolveLock()
+      }
     }
   }
 
@@ -160,7 +154,7 @@ export class GameState extends Schema {
     console.log(`Removed player ${sessionId} and their teammates (remaining players: ${this.players.size})`)
   }
 
-  queueInput(playerId: string, input: PlayerInput) {
+  queueInput(playerId: string, input: EnginePlayerInput) {
     // Simplified: Just queue the input for the specified player
     // No knowledge of human/AI, no control switching logic
     this.gameEngine.queueInput(playerId, {

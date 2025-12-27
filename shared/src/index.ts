@@ -1,4 +1,5 @@
 export * from './types.js'
+export * from './types/game-state.js'
 export * from './utils/geometry.js'
 export * from './engine/types.js'
 export * from './engine/PhysicsEngine.js'

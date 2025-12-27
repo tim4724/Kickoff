@@ -11,6 +11,8 @@ import { CameraManager } from '@/utils/CameraManager'
 import { AIDebugRenderer } from '@/utils/AIDebugRenderer'
 import type { GameEngineState } from '@shared/engine/types'
 import type { Team } from '@shared/types'
+import type { UnifiedGameState } from '@shared/types/game-state'
+import type { GameControlsTestAPI } from '@/types/global'
 import { AIManager } from '@/ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { PixiScene } from '@/utils/PixiScene'
@@ -23,6 +25,7 @@ import { PixiSceneManager } from '@/utils/PixiSceneManager'
 export abstract class BaseGameScene extends PixiScene {
   // Visual objects
   protected players: Map<string, Graphics> = new Map()
+  protected playerFillColors: Map<string, number> = new Map()
   protected ball!: Graphics
   protected ballShadow!: Graphics
   protected controlArrow?: Graphics
@@ -71,7 +74,7 @@ export abstract class BaseGameScene extends PixiScene {
 
   // Abstract methods
   protected abstract initializeGameState(): void
-  protected abstract getGameState(): any
+  protected abstract getGameState(): UnifiedGameState | null
   protected abstract updateGameState(delta: number): void
   protected abstract handleShootAction(): void
   protected abstract cleanupGameState(): void
@@ -266,8 +269,8 @@ export abstract class BaseGameScene extends PixiScene {
   async create() {
     console.log(`🎮 ${this.sceneKey} - Creating...`)
 
-    if (typeof window !== 'undefined' && (window as any).__menuLoaded) {
-      ; (window as any).__menuLoaded = false
+    if (typeof window !== 'undefined' && window.__menuLoaded) {
+      window.__menuLoaded = false
       console.log('🧹 Cleared __menuLoaded flag from previous menu scene')
     }
 
@@ -300,7 +303,7 @@ export abstract class BaseGameScene extends PixiScene {
     window.addEventListener('orientationchange', this.handleOrientationChange)
 
     if (typeof window !== 'undefined' && import.meta.env.DEV) {
-      ; (window as any).__gameControls = {
+      window.__gameControls = {
         scene: this,
         game: this.app,
       }
@@ -323,10 +326,9 @@ export abstract class BaseGameScene extends PixiScene {
     playerSprite.position.set(x, y)
     playerSprite.zIndex = 10
 
-    ;(playerSprite as any)._fillColor = color
-
     this.cameraManager.getGameContainer().addChild(playerSprite)
     this.players.set(playerId, playerSprite)
+    this.playerFillColors.set(playerId, color)
 
     return playerSprite
   }
@@ -542,9 +544,7 @@ export abstract class BaseGameScene extends PixiScene {
 
       const strokeColor = 0xffffff // White border for everyone
 
-      // I need the fill color.
-      // I will update `createPlayerSprite` to store `_fillColor`.
-      const fillColor = (playerSprite as any)._fillColor || 0xffffff
+      const fillColor = this.playerFillColors.get(playerId) || 0xffffff
 
       playerSprite.clear()
       playerSprite.circle(0, 0, GAME_CONFIG.PLAYER_RADIUS)
@@ -768,6 +768,7 @@ export abstract class BaseGameScene extends PixiScene {
   public onMatchEnd() {
     this.matchEnded = true
     const state = this.getGameState()
+    if (!state) return
     const winner =
       state.scoreBlue > state.scoreRed ? 'Blue' : state.scoreRed > state.scoreBlue ? 'Red' : 'Draw'
     this.showMatchEndScreen(winner, state.scoreBlue, state.scoreRed)
@@ -940,68 +941,64 @@ export abstract class BaseGameScene extends PixiScene {
     }
   }
 
-  protected setupTestAPI(customTestMethods?: Record<string, any>): void {
+  protected setupTestAPI(customTestMethods?: Partial<GameControlsTestAPI>): void {
     if (typeof window === 'undefined' || !import.meta.env.DEV) return
 
-    const existingControls = (window as any).__gameControls || {}
+    const existingControls = window.__gameControls || {}
 
-    const testAPI: any = {
-      ...existingControls,
-      scene: this,
+    const baseGetState = () => ({
+      joystick: this.joystick ? this.joystick.__test_getState() : null,
+      button: this.actionButton ? this.actionButton.__test_getState() : null,
+    })
+
+    const baseTestMethods: GameControlsTestAPI = {
+      touchJoystick: (x: number, y: number) => {
+        if (!this.joystick) {
+          console.log('🧪 Creating mobile controls for test')
+          this.createMobileControls()
+        }
+        this.joystick?.__test_simulateTouch(x, y)
+      },
+      dragJoystick: (x: number, y: number) => {
+        this.joystick?.__test_simulateDrag(x, y)
+      },
+      releaseJoystick: () => {
+        this.joystick?.__test_simulateRelease()
+      },
+      pressButton: () => {
+        if (!this.actionButton) {
+          this.createMobileControls()
+        }
+        this.actionButton?.__test_simulatePress()
+      },
+      releaseButton: () => {
+        this.actionButton?.__test_simulateRelease()
+      },
+      getState: baseGetState,
     }
 
-    testAPI.backButton = this.backButton
-
-      if (this.joystick) testAPI.joystick = this.joystick
-      if (this.actionButton) testAPI.button = this.actionButton
-
-      const baseGetState = () => ({
-        joystick: this.joystick ? this.joystick.__test_getState() : null,
-        button: this.actionButton ? this.actionButton.__test_getState() : null,
+    const customMethods = { ...(customTestMethods || {}) }
+    if (customMethods.getState) {
+      const customGetState = customMethods.getState
+      customMethods.getState = () => ({
+        ...baseGetState(),
+        ...customGetState(),
       })
+    }
 
-      const baseTestMethods = {
-        touchJoystick: (x: number, y: number) => {
-          if (!this.joystick) {
-              console.log('🧪 Creating mobile controls for test')
-              this.createMobileControls()
-          }
-          this.joystick?.__test_simulateTouch(x, y)
-        },
-        dragJoystick: (x: number, y: number) => {
-          this.joystick?.__test_simulateDrag(x, y)
-        },
-        releaseJoystick: () => {
-          this.joystick?.__test_simulateRelease()
-        },
-        pressButton: () => {
-          if (!this.actionButton) {
-              this.createMobileControls()
-          }
-          this.actionButton?.__test_simulatePress()
-        },
-        releaseButton: () => {
-          this.actionButton?.__test_simulateRelease()
-        },
-        getState: baseGetState,
-      }
-
-      const customMethods = { ...(customTestMethods || {}) }
-      if (customMethods.getState) {
-        const customGetState = customMethods.getState
-        customMethods.getState = () => ({
-          ...baseGetState(),
-          ...customGetState(),
-        })
-      }
-
-      testAPI.test = {
+    window.GameClock = GameClock
+    window.__gameControls = {
+      ...existingControls,
+      scene: this,
+      game: this.app,
+      joystick: this.joystick || undefined,
+      button: this.actionButton || undefined,
+      backButton: this.backButton,
+      test: {
         ...baseTestMethods,
         ...customMethods,
-      }
-
-    ; (window as any).GameClock = GameClock
-    ; (window as any).__gameControls = testAPI
+      },
+    }
   }
 
   protected shouldAllowAIControl(playerId: string): boolean {
@@ -1015,6 +1012,7 @@ export abstract class BaseGameScene extends PixiScene {
     this.cleanupInput()
 
     this.players.clear()
+    this.playerFillColors.clear()
 
     if (this.joystick) this.joystick.destroy()
     if (this.actionButton) this.actionButton.destroy()
@@ -1025,8 +1023,8 @@ export abstract class BaseGameScene extends PixiScene {
 
     this.matchEnded = false
 
-    if (typeof window !== 'undefined' && (window as any).__gameControls?.scene === this) {
-      delete (window as any).__gameControls
+    if (typeof window !== 'undefined' && window.__gameControls?.scene === this) {
+      delete window.__gameControls
     }
 
     super.destroy()

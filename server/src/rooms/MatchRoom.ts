@@ -1,6 +1,7 @@
 import { Room, Client } from 'colyseus'
 import { GameState } from '../schema/GameState.js'
 import { gameClock } from '@kickoff/shared/engine/GameClock'
+import type { MatchRoomOptions, PlayerReadyEvent, MatchStartEvent, MatchEndEvent, RoomClosedEvent } from '../types/room.js'
 
 const GAME_CONFIG = {
   TICK_RATE: 60, // Increased from 30 for lower latency
@@ -21,7 +22,7 @@ export class MatchRoom extends Room<GameState> {
   // Time scale for test acceleration (default 1.0 = real-time)
   private timeScale: number = 1.0
 
-  async onCreate(options: any) {
+  async onCreate(options: MatchRoomOptions) {
     console.log('🏗️  Match room created:', this.roomId, 'with options:', options)
     console.log('📋 Room metadata will be set to:', { roomName: options.roomName || 'match' })
 
@@ -30,7 +31,7 @@ export class MatchRoom extends Room<GameState> {
     const optionsTimeScale = options.timeScale
 
     if (optionsTimeScale) {
-      this.timeScale = parseFloat(optionsTimeScale)
+      this.timeScale = typeof optionsTimeScale === 'string' ? parseFloat(optionsTimeScale) : optionsTimeScale
       console.log(`⏱️  Time scale set to ${this.timeScale}x (from room options)`)
     } else if (envTimeScale) {
       this.timeScale = parseFloat(envTimeScale)
@@ -73,7 +74,7 @@ export class MatchRoom extends Room<GameState> {
     console.log('✅ Match room initialized')
   }
 
-  async onJoin(client: Client, options: any) {
+  async onJoin(client: Client, options: MatchRoomOptions) {
     console.log(`👋 Player joining: ${client.sessionId} (room: ${this.roomId}, clients: ${this.clients.length}/${this.maxClients})`)
 
     // Add player to game state (wait for completion to ensure atomic team assignment)
@@ -81,11 +82,12 @@ export class MatchRoom extends Room<GameState> {
 
     // Send player_ready message with sessionId and team
     // This signals to the client that initialization is complete
-    client.send('player_ready', {
+    const readyEvent: PlayerReadyEvent = {
       sessionId: client.sessionId,
       team: playerInfo.team,
       roomName: this.metadata.roomName,
-    })
+    }
+    client.send('player_ready', readyEvent)
 
     console.log(`🎮 Player ${client.sessionId} ready on ${playerInfo.team} team (${this.clients.length}/${this.maxClients} players)`)
 
@@ -119,7 +121,8 @@ export class MatchRoom extends Room<GameState> {
 
     // Immediate cleanup on any disconnect in multiplayer context to prevent stale rooms
     console.log('Player left, notifying remaining clients and closing room')
-    this.broadcast('room_closed', { reason: 'opponent_left' })
+    const closedEvent: RoomClosedEvent = { reason: 'opponent_left' }
+    this.broadcast('room_closed', closedEvent)
     // Disconnect immediately to dispose the room
     this.disconnect()
   }
@@ -158,7 +161,8 @@ export class MatchRoom extends Room<GameState> {
     // Reset physics accumulator for clean deterministic start
     this.physicsAccumulator = 0
 
-    this.broadcast('match_start', { duration: GAME_CONFIG.MATCH_DURATION })
+    const startEvent: MatchStartEvent = { duration: GAME_CONFIG.MATCH_DURATION }
+    this.broadcast('match_start', startEvent)
   }
 
   private update(deltaTime: number) {
@@ -203,11 +207,12 @@ export class MatchRoom extends Room<GameState> {
     console.log('Match ended! Final score:', this.state.scoreBlue, '-', this.state.scoreRed)
     this.state.phase = 'ended'
 
-    this.broadcast('match_end', {
+    const endEvent: MatchEndEvent = {
       scoreBlue: this.state.scoreBlue,
       scoreRed: this.state.scoreRed,
       winner: this.state.scoreBlue > this.state.scoreRed ? 'blue' : 'red',
-    })
+    }
+    this.broadcast('match_end', endEvent)
 
     // Auto-close room after 10 seconds
     setTimeout(() => {
