@@ -1,7 +1,7 @@
 import { Schema, type, MapSchema } from '@colyseus/schema'
 import { GAME_CONFIG } from '@kickoff/shared/types'
 import { GameEngine } from '@kickoff/shared/engine/GameEngine'
-import type { GameEngineState, EnginePlayerData, EnginePlayerInput } from '@kickoff/shared/engine/types'
+import type { GameEngineState, EnginePlayerData, EnginePlayerInput, GoalEvent } from '@kickoff/shared/engine/types'
 import type { Team, PlayerState, GamePhase } from '@kickoff/shared/types'
 
 export class Player extends Schema {
@@ -75,7 +75,7 @@ export class GameState extends Schema {
     })
 
     // Register callbacks
-    this.gameEngine.onGoal((event) => {
+    this.gameEngine.onGoal((event: GoalEvent) => {
       console.log(`⚽ GOAL! Team ${event.team} scores!`)
       // Sync score from engine
       this.syncScoresFromEngine()
