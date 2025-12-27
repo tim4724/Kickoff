@@ -1,15 +1,16 @@
 import { Container } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
 import { PixiScene } from './PixiScene'
+import { FieldRenderer } from './FieldRenderer'
 
 /**
  * Camera Manager Utility for PixiJS
  * Simulates a dual-camera system using Containers.
- * 
+ *
  * The visual field includes a margin around the logical field:
  * - Logical field (physics): 0 to FIELD_WIDTH, 0 to FIELD_HEIGHT
- * - Visual field (rendered): -VISUAL_MARGIN to FIELD_WIDTH+VISUAL_MARGIN, etc.
- * 
+ * - Visual field (rendered): -FIELD_LINE_MARGIN to FIELD_WIDTH+FIELD_LINE_MARGIN, etc.
+ *
  * The camera scales to fit the entire visual field while maintaining aspect ratio.
  */
 export class CameraManager {
@@ -19,9 +20,6 @@ export class CameraManager {
 
   // Mobile zoom factor - makes field smaller to leave more room for touch controls
   private static readonly MOBILE_ZOOM_FACTOR = 0.85
-
-  // Visual margin around the logical field (matches FieldRenderer.FIELD_LINE_MARGIN)
-  private static readonly VISUAL_MARGIN = 40
 
   constructor(scene: PixiScene, isMobile: boolean = false) {
     this.gameContainer = new Container()
@@ -51,7 +49,7 @@ export class CameraManager {
     this.uiContainer.scale.set(1)
 
     // 2. Resize Game Container to fit the VISUAL field (including margins)
-    const margin = CameraManager.VISUAL_MARGIN
+    const margin = FieldRenderer.FIELD_LINE_MARGIN
     const visualWidth = GAME_CONFIG.FIELD_WIDTH + margin * 2   // 1680
     const visualHeight = GAME_CONFIG.FIELD_HEIGHT + margin * 2  // 1080
     const visualAspect = visualWidth / visualHeight

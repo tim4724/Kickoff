@@ -1,6 +1,6 @@
 # Kickoff Roadmap (concise)
 
-Current state: 3v3 multiplayer with AI bots, authoritative Colyseus server, client prediction, unified 1600×1000 coordinates, and a passing Playwright suite (40 tests).
+Current state: 3v3 multiplayer with AI bots, authoritative Colyseus server, client prediction, unified 1700×1000 coordinates, and a passing Playwright suite (40 tests).
 
 ## Done
 - Core gameplay loop: movement, possession with pressure/lockouts, variable-power shooting.

@@ -7,7 +7,7 @@ import { GAME_CONFIG } from '@shared/types'
  */
 export class FieldRenderer {
   // Visual constants (UI only, do not affect physics)
-  private static readonly FIELD_LINE_MARGIN = 40
+  public static readonly FIELD_LINE_MARGIN = 40
   private static readonly GOAL_DEPTH = 40 // How far goal extends visually outside field
 
   /**
