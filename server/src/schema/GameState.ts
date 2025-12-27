@@ -94,7 +94,7 @@ export class GameState extends Schema {
     await this.playerAdditionLock
 
     // Create new lock for this addition
-    let resolveLock: () => void
+    let resolveLock: (() => void) | undefined
     this.playerAdditionLock = new Promise((resolve) => {
       resolveLock = resolve
     })
@@ -137,7 +137,7 @@ export class GameState extends Schema {
       return { team }
     } finally {
       // Release the lock
-      if (resolveLock!) {
+      if (resolveLock) {
         resolveLock()
       }
     }

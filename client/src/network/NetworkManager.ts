@@ -59,8 +59,10 @@ interface BufferedPlayerInput extends PlayerInput {
   isHuman: boolean
 }
 
+// Network message format for sending multiple player inputs to server
+// Uses plain object (not Map) for JSON serialization over WebSocket
 export interface MultiPlayerInput {
-  inputs: Map<string, PlayerInput> | { [key: string]: PlayerInput }
+  inputs: { [key: string]: PlayerInput }
   timestamp: number
 }
 
@@ -365,9 +367,9 @@ export class NetworkManager {
     if (!this.room) return
 
     let playersHooksRegistered = false
-    const tryHookPlayers = (state: ColyseusGameState) => {
-      if (playersHooksRegistered) return
-      const players = state?.players
+    const tryHookPlayers = (state?: ColyseusGameState) => {
+      if (playersHooksRegistered || !state) return
+      const players = state.players
       if (players && typeof players.onAdd === 'function' && typeof players.onRemove === 'function') {
         playersHooksRegistered = true
 
@@ -391,7 +393,9 @@ export class NetworkManager {
       }
     }
 
-    tryHookPlayers(this.room.state as ColyseusGameState)
+    if (this.room.state) {
+      tryHookPlayers(this.room.state as ColyseusGameState)
+    }
 
     this.room.onStateChange((state: ColyseusGameState) => {
       tryHookPlayers(state)

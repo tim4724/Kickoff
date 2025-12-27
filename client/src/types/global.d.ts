@@ -4,10 +4,11 @@
  */
 
 import type { GameEngine } from '@shared/engine/GameEngine'
-import type { Application } from 'pixi.js'
+import type { Application, Container } from 'pixi.js'
 import type { VirtualJoystick } from '@/controls/VirtualJoystick'
 import type { ActionButton } from '@/controls/ActionButton'
 import type { gameClock } from '@shared/engine/GameClock'
+import type { PixiScene } from '@/utils/PixiScene'
 
 declare global {
   interface Window {
@@ -22,11 +23,11 @@ declare global {
 
     // Game controls for testing
     __gameControls?: {
-      scene: any // Scene type varies by game mode
+      scene: PixiScene
       game: Application
       joystick?: VirtualJoystick
       button?: ActionButton
-      backButton?: any
+      backButton?: Container
       test?: GameControlsTestAPI
     }
 
