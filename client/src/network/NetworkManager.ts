@@ -538,7 +538,7 @@ export class NetworkManager {
   getSessionId(): string { return this.sessionId }
   getRoom(): Room | undefined { return this.room }
   getMySessionId(): string { return this.sessionId }
-  getState(): any { return this.room?.state }
+  getState(): ColyseusGameState | undefined { return this.room?.state }
 
   private emitRoomClosed(reason: string) {
     const listeners = [...this.roomClosedListeners]
