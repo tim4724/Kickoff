@@ -194,12 +194,8 @@ export class AIOnlyScene extends BaseGameScene {
 
   protected updatePlayerBorders(): void {
     // In AI-only mode, ALL players should have uncontrolled borders
-    this.players.forEach((playerSprite) => {
-        // Redraw
-        // Assuming we stored fill color or can infer it.
-        // If we don't have it, we might lose color.
-        // Let's assume we implement the _fillColor hack in BaseGameScene.
-        const fillColor = (playerSprite as any)._fillColor || 0xffffff
+    this.players.forEach((playerSprite, playerId) => {
+        const fillColor = this.playerFillColors.get(playerId) || 0xffffff
 
         playerSprite.clear()
         playerSprite.circle(0, 0, GAME_CONFIG.PLAYER_RADIUS)
