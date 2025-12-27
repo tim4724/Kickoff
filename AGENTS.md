@@ -5,7 +5,7 @@ Guidance for coding agents working on Kickoff (replaces CLAUDE.md). Keep it curr
 ## Snapshot
 - Fast-paced 3v3 arcade soccer (1 human + 2 AI bots per team) for mobile web.
 - Authoritative Colyseus server, client prediction + reconciliation.
-- Unified 1600×1000 coordinate system; GAME_CONFIG lives in `shared/src/types.ts`.
+- Unified 1700×1000 coordinate system; GAME_CONFIG lives in `shared/src/types.ts`.
 - Tick rate: 30 Hz server; measured input lag ~55 ms.
 - Playwright E2E suite (40 tests) with auto-started test servers.
 
@@ -45,7 +45,7 @@ npm run build:server
 - Testing: Playwright uses isolated rooms and auto-start servers; ports 3001/5174 are reserved for tests, 3000/5173 for dev.
 
 ## Key Gameplay Constants (`shared/src/types.ts`)
-- `FIELD_WIDTH: 1600`, `FIELD_HEIGHT: 1000`
+- `FIELD_WIDTH: 1700`, `FIELD_HEIGHT: 1000`
 - `PLAYER_SPEED: 284`
 - `SHOOT_SPEED: 1440`, `MIN_SHOOT_SPEED: 720`
 - `POSSESSION_RADIUS: 45`, `PRESSURE_RADIUS: 45`

@@ -50,7 +50,7 @@ export interface GameStateData {
 }
 
 // Base field dimensions
-const FIELD_WIDTH = 1600
+const FIELD_WIDTH = 1700
 const FIELD_HEIGHT = 1000
 
 // Goal configuration
