@@ -268,6 +268,11 @@ export class PhysicsEngine {
           // Apply magnetism - ball sticks in front of player
           ball.x = possessor.x + Math.cos(possessor.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET
           ball.y = possessor.y + Math.sin(possessor.direction) * GAME_CONFIG.POSSESSION_BALL_OFFSET
+
+          // Clamp ball to field boundaries (same as bounce behavior)
+          ball.x = Math.max(0, Math.min(this.config.fieldWidth, ball.x))
+          ball.y = Math.max(0, Math.min(this.config.fieldHeight, ball.y))
+
           ball.velocityX = 0
           ball.velocityY = 0
         }
