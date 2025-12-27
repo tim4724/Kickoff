@@ -17,10 +17,11 @@ test.describe('Goal Scoring (Single Player)', () => {
     expect(initialState.scoreBlue).toBe(0)
 
     // Teleport ball near RED goal (Right side)
+    // Field is 1700×1000, so right goal is at x=1700, center y=500
     await page.evaluate(() => {
         const controls = (window as any).__gameControls;
-        controls.test.teleportBall(1800, 540);
-        controls.test.teleportPlayer(1750, 540);
+        controls.test.teleportBall(1600, 500);
+        controls.test.teleportPlayer(1550, 500);
     })
 
     // Move to capture
@@ -41,9 +42,9 @@ test.describe('Goal Scoring (Single Player)', () => {
     await waitScaled(page, 3000)
 
     const resetState = await getServerState(page)
-    // Ball should be at center (960, 540)
+    // Ball should be at center (850, 500) for 1700×1000 field
     // Allow some variance as it might drift slightly if not perfectly reset or physics active
-    expect(resetState.ball.x).toBeCloseTo(960, 10)
-    expect(resetState.ball.y).toBeCloseTo(540, 10)
+    expect(resetState.ball.x).toBeCloseTo(850, 10)
+    expect(resetState.ball.y).toBeCloseTo(500, 10)
   })
 })
