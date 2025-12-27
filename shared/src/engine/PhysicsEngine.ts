@@ -20,6 +20,9 @@ export class PhysicsEngine {
   private challengeRadiusSq: number
   private releaseThresholdSq: number
 
+  // Reusable object for ball physics simulation to avoid allocation
+  private reusedBallStepResult = { x: 0, y: 0, vx: 0, vy: 0 }
+
   constructor(config: PhysicsConfig) {
     this.config = config
     this.challengeRadiusSq = config.challengeRadius * config.challengeRadius
@@ -153,13 +156,15 @@ export class PhysicsEngine {
     // Only update if not possessed
     if (ball.possessedBy === '') {
       // Use static helper for physics simulation
-      const result = PhysicsEngine.simulateBallStep(
+      const result = this.reusedBallStepResult // Reuse object
+      PhysicsEngine.simulateBallStep(
         ball.x,
         ball.y,
         ball.velocityX,
         ball.velocityY,
         dt,
-        this.config
+        this.config,
+        result // Pass it here
       )
 
       ball.x = result.x
