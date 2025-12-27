@@ -296,7 +296,7 @@ export class NetworkManager {
     }
 
     // 3. Check Test ID
-    const testRoomId = window.__testRoomId
+    const testRoomId = typeof window !== 'undefined' ? window.__testRoomId : undefined
     if (testRoomId) return testRoomId
 
     return this.config.roomName
@@ -325,7 +325,7 @@ export class NetworkManager {
       const roomName = this.getRoomName()
       const options: JoinRoomOptions = { roomName }
 
-      const testTimeScale = window.__testTimeScale
+      const testTimeScale = typeof window !== 'undefined' ? window.__testTimeScale : undefined
       if (testTimeScale) {
         options.timeScale = testTimeScale
       }

@@ -45,6 +45,18 @@ export interface GameEngineState {
   phase: GamePhase
 }
 
+/**
+ * Player input for the game engine
+ *
+ * **Note on playerId**: The `playerId` field is optional because the engine's
+ * `queueInput(playerId, input)` method takes the player ID as a separate parameter.
+ * The field exists for compatibility with network transmission where inputs are
+ * serialized with their associated player ID embedded (see client PlayerInput).
+ *
+ * Usage patterns:
+ * - Engine: `engine.queueInput(playerId, { movement, action, timestamp })`
+ * - Network: `{ playerId, movement, action, timestamp }` sent over WebSocket
+ */
 export interface EnginePlayerInput {
   movement: { x: number; y: number }
   action: boolean

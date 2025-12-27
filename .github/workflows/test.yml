@@ -21,6 +21,12 @@ jobs:
         cache: 'npm'
     - name: Install dependencies
       run: npm ci
+    - name: TypeScript type check (client)
+      run: npx tsc --noEmit --project client/tsconfig.json
+    - name: TypeScript type check (server)
+      run: npx tsc --noEmit --project server/tsconfig.json
+    - name: TypeScript type check (shared)
+      run: npx tsc --noEmit --project shared/tsconfig.json
     - name: Run Playwright tests
       run: npm run test:e2e -- --workers=1
     - uses: actions/upload-artifact@v4

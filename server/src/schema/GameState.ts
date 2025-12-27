@@ -108,7 +108,12 @@ export class GameState extends Schema {
         // Find the team from any of the session's players
         const existingPlayer = this.players.get(firstPlayerId)
         if (!existingPlayer) {
-          throw new Error(`Player ${firstPlayerId} not found despite has() check`)
+          // Race condition: player was removed between has() and get()
+          // Recalculate team assignment instead of throwing
+          console.warn(`⚠️ Player ${firstPlayerId} removed during lookup, reassigning team`)
+          const redCount = Array.from(this.players.values()).filter(p => p.isHuman && p.team === 'red').length
+          const blueCount = Array.from(this.players.values()).filter(p => p.isHuman && p.team === 'blue').length
+          return { team: redCount <= blueCount ? 'red' : 'blue' }
         }
         return { team: existingPlayer.team }
       }
