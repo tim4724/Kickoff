@@ -9,6 +9,13 @@ export interface NetworkConfig {
 }
 
 // Colyseus schema types for the client
+/**
+ * Client-side representation of Colyseus Player schema
+ * Mirrors the schema defined in server/src/schema/GameState.ts
+ *
+ * This interface represents a player entity as synchronized from the server
+ * via Colyseus WebSocket state synchronization.
+ */
 interface ColyseusPlayer {
   id: string
   team: Team
@@ -22,6 +29,13 @@ interface ColyseusPlayer {
   direction: number
 }
 
+/**
+ * Client-side representation of Colyseus Ball schema
+ * Mirrors the schema defined in server/src/schema/GameState.ts
+ *
+ * This interface represents the ball entity as synchronized from the server
+ * via Colyseus WebSocket state synchronization.
+ */
 interface ColyseusBall {
   x: number
   y: number
@@ -31,13 +45,34 @@ interface ColyseusBall {
   pressureLevel: number
 }
 
-// Extend MapSchema to include runtime methods added by Colyseus
+/**
+ * Extended MapSchema to include runtime methods added by Colyseus
+ *
+ * Colyseus adds these callback methods at runtime to MapSchema instances
+ * for tracking changes to collections. These methods may not be present
+ * immediately after connection, so they're marked as optional.
+ *
+ * Always check for their existence before use:
+ * ```typescript
+ * if (players && typeof players.onAdd === 'function') {
+ *   players.onAdd((player, key) => { ... })
+ * }
+ * ```
+ */
 interface ColyseusMapSchema<V> extends MapSchema<V> {
   onAdd?: (callback: (value: V, key: string) => void) => void
   onRemove?: (callback: (value: V, key: string) => void) => void
   onChange?: (callback: (value: V, key: string) => void) => void
 }
 
+/**
+ * Client-side representation of Colyseus GameState schema
+ * Mirrors the schema defined in server/src/schema/GameState.ts
+ *
+ * This interface represents the complete game state as synchronized from
+ * the server via Colyseus WebSocket state synchronization. It's received
+ * through `room.state` and `room.onStateChange()` callbacks.
+ */
 interface ColyseusGameState {
   matchTime: number
   scoreBlue: number
@@ -64,6 +99,12 @@ interface BufferedPlayerInput extends PlayerInput {
 export interface MultiPlayerInput {
   inputs: { [key: string]: PlayerInput }
   timestamp: number
+}
+
+// Room join/create options
+interface JoinRoomOptions {
+  roomName: string
+  timeScale?: string
 }
 
 export interface RemotePlayer {
@@ -271,7 +312,7 @@ export class NetworkManager {
 
       // Priority 2: Join or Create by Name (Lobby / Test)
       const roomName = this.getRoomName()
-      const options: any = { roomName }
+      const options: JoinRoomOptions = { roomName }
 
       const testTimeScale = window.__testTimeScale
       if (testTimeScale) {
