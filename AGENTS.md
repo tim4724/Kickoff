@@ -46,8 +46,8 @@ npm run build:server
 
 ## Key Gameplay Constants (`shared/src/types.ts`)
 - `FIELD_WIDTH: 1700`, `FIELD_HEIGHT: 1000`
-- `PLAYER_SPEED: 284`
-- `SHOOT_SPEED: 1440`, `MIN_SHOOT_SPEED: 720`
+- `PLAYER_SPEED: 350`
+- `SHOOT_SPEED: 1440`
 - `CHALLENGE_RADIUS: 70`
 - `MATCH_DURATION: 120`
 
