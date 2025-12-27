@@ -72,6 +72,17 @@ interface ColyseusMapSchema<V> extends MapSchema<V> {
  * This interface represents the complete game state as synchronized from
  * the server via Colyseus WebSocket state synchronization. It's received
  * through `room.state` and `room.onStateChange()` callbacks.
+ *
+ * **Relationship to other state types:**
+ * - Has the same scalar fields as `UnifiedGameState`/`GameEngineState`
+ * - Uses Colyseus-specific types: `ColyseusMapSchema` instead of `Map`,
+ *   `ColyseusPlayer` instead of `EnginePlayerData`, `ColyseusBall` instead
+ *   of `EngineBallData`
+ * - Gets converted to `GameStateData` for local client use (see setupStateListeners)
+ *
+ * **Why separate from UnifiedGameState?**
+ * Must exactly mirror the Colyseus schema structure for proper WebSocket
+ * state synchronization. Cannot use engine types directly.
  */
 interface ColyseusGameState {
   matchTime: number
