@@ -108,7 +108,7 @@ interface BufferedPlayerInput extends PlayerInput {
 // Network message format for sending multiple player inputs to server
 // Uses plain object (not Map) for JSON serialization over WebSocket
 export interface MultiPlayerInput {
-  inputs: { [key: string]: PlayerInput }
+  inputs: Record<string, PlayerInput>
   timestamp: number
 }
 
@@ -148,7 +148,7 @@ export interface GameStateData {
 export class NetworkManager {
   private static instance: NetworkManager
   private client: Client
-  private room?: Room
+  private room?: Room<ColyseusGameState>
   private config: NetworkConfig
 
   private connected: boolean = false
@@ -296,7 +296,7 @@ export class NetworkManager {
     }
 
     // 3. Check Test ID
-    const testRoomId = typeof window !== 'undefined' ? window.__testRoomId : undefined
+    const testRoomId = window.__testRoomId
     if (testRoomId) return testRoomId
 
     return this.config.roomName
@@ -325,7 +325,7 @@ export class NetworkManager {
       const roomName = this.getRoomName()
       const options: JoinRoomOptions = { roomName }
 
-      const testTimeScale = typeof window !== 'undefined' ? window.__testTimeScale : undefined
+      const testTimeScale = window.__testTimeScale
       if (testTimeScale) {
         options.timeScale = testTimeScale
       }
@@ -446,7 +446,7 @@ export class NetworkManager {
     }
 
     if (this.room.state) {
-      tryHookPlayers(this.room.state as ColyseusGameState)
+      tryHookPlayers(this.room.state)
     }
 
     this.room.onStateChange((state: ColyseusGameState) => {
@@ -536,7 +536,7 @@ export class NetworkManager {
 
   isConnected(): boolean { return this.connected }
   getSessionId(): string { return this.sessionId }
-  getRoom(): Room | undefined { return this.room }
+  getRoom(): Room<ColyseusGameState> | undefined { return this.room }
   getMySessionId(): string { return this.sessionId }
   getState(): ColyseusGameState | undefined { return this.room?.state }
 
@@ -549,7 +549,7 @@ export class NetworkManager {
 
   checkExistingPlayers(): void {
     if (!this.room || !this.room.state || !this.room.state.players) return
-    const state = this.room.state as ColyseusGameState
+    const state = this.room.state
     state.players.forEach((player: ColyseusPlayer, key: string) => {
       if (key !== this.sessionId) {
         this.onPlayerJoin?.({
