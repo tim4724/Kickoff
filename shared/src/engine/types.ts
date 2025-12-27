@@ -48,7 +48,6 @@ export interface GameEngineState {
 export interface EnginePlayerInput {
   movement: { x: number; y: number }
   action: boolean
-  actionPower?: number
   timestamp: number
   playerId?: string
 }
@@ -56,23 +55,23 @@ export interface EnginePlayerInput {
 export interface PhysicsConfig {
   fieldWidth: number
   fieldHeight: number
-  fieldMargin: number
-  playerMargin: number
   playerSpeed: number
   ballRadius: number
   ballFriction: number
   shootSpeed: number
-  minShootSpeed: number
-  possessionRadius: number
-  pressureRadius: number
-  pressureBuildup: number
-  pressureDecay: number
-  pressureThreshold: number
-  captureLockoutMs: number
-  lossLockoutMs: number
+  challengeRadius: number
   goalYMin: number
   goalYMax: number
 }
+
+// Physics-only constants (not needed outside physics engine)
+export const PHYSICS_DEFAULTS = {
+  PRESSURE_BUILDUP_RATE: 2,
+  PRESSURE_DECAY_RATE: 3,
+  PRESSURE_RELEASE_THRESHOLD: 1.0,
+  CAPTURE_LOCKOUT_MS: 300,
+  LOSS_LOCKOUT_MS: 300,
+} as const
 
 export interface GoalEvent {
   team: Team

@@ -213,7 +213,7 @@ export async function moveTowardBallAndCapture(
     const dy = state.ballY - state.playerY
     const distance = GeometryUtils.magnitudeScalar(dx, dy)
 
-    if (state.ballPossessor === state.controlledId || distance < GAME_CONFIG.POSSESSION_RADIUS) {
+    if (state.ballPossessor === state.controlledId || distance < GAME_CONFIG.CHALLENGE_RADIUS) {
       return true
     }
 
@@ -330,7 +330,8 @@ export async function assertDifferentColors(client1: Page, client2: Page) {
  */
 export async function assertBallAtCenter(client: Page, variance: number = 100) {
   const state = await getServerState(client)
-  const distanceFromCenter = calculateDistance(state.ball.x, state.ball.y, 960, 540)
+  // Field is 1700×1000, center is (850, 500)
+  const distanceFromCenter = calculateDistance(state.ball.x, state.ball.y, 850, 500)
 
   if (distanceFromCenter > variance) {
     throw new Error(

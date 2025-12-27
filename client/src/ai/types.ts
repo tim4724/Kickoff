@@ -33,8 +33,8 @@ export interface AIDecision {
   moveX: number
   moveY: number
 
-  // Shooting power (null = no shoot, 0.0-1.0 = power level)
-  shootPower: number | null
+  // Whether to shoot/pass
+  shoot: boolean
 }
 
 /**
@@ -48,6 +48,6 @@ export type PlayerGoal = string
 export interface PlayerRole {
   goal: PlayerGoal
   target: Vector2D
-  shootPower?: number | null // 0.0-1.0 shooting power, or null for no shoot
+  shoot?: boolean // Whether to shoot when in position
 }
 

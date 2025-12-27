@@ -25,7 +25,7 @@
 
 -   **Format:** 1 human + 2 AI bots vs. 1 human + 2 AI bots.
 -   **Duration:** Matches are designed for short mobile sessions, typically lasting around 2 minutes.
--   **Field:** The game is played on a standard 1920x1080 pitch.
+-   **Field:** The game is played on a standard 1700x1000 pitch.
 -   **Scoring:** The team with the most goals at the end of the match wins.
 
 ### AI Teammate Behavior

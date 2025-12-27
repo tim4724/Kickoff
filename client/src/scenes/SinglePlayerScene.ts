@@ -143,11 +143,10 @@ export class SinglePlayerScene extends BaseGameScene {
     this.syncVisualsFromEngine()
   }
 
-  protected handleShootAction(power: number): void {
+  protected handleShootAction(): void {
     this.gameEngine!.queueInput(this.controlledPlayerId, {
       movement: { x: 0, y: 0 },
       action: true,
-      actionPower: power,
       timestamp: this.gameEngine!.frameCount,
     })
   }

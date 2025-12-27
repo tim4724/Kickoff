@@ -13,17 +13,19 @@ export class BallRenderer {
     const width = GAME_CONFIG.FIELD_WIDTH
     const height = GAME_CONFIG.FIELD_HEIGHT
 
+    const ballRadius = GAME_CONFIG.BALL_RADIUS
+
     // Ball shadow
     const ballShadow = new Graphics()
-    ballShadow.ellipse(0, 0, 15, 12) // Radius is half of width/height
+    ballShadow.ellipse(0, 0, ballRadius, ballRadius * 0.8)
     ballShadow.fill({ color: 0x000000, alpha: 0.3 })
     ballShadow.position.set(width / 2 + 2, height / 2 + 3)
-    ballShadow.zIndex = 15 // PixiJS uses zIndex if sortableChildren is true
+    ballShadow.zIndex = 15
     container.addChild(ballShadow)
 
     // Ball
     const ball = new Graphics()
-    ball.circle(0, 0, 15) // Radius 15 (width 30)
+    ball.circle(0, 0, ballRadius)
     ball.fill(0xffffff)
     ball.position.set(width / 2, height / 2)
     ball.zIndex = 15

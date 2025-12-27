@@ -1,6 +1,6 @@
 # 🚀 Kickoff Quick Start
 
-Fast-paced 3v3 arcade soccer (1 human + 2 AI bots per team) with unified 1920×1080 coordinates and authoritative Colyseus server.
+Fast-paced 3v3 arcade soccer (1 human + 2 AI bots per team) with unified 1700×1000 coordinates and authoritative Colyseus server.
 
 ## Run the Game
 
@@ -57,12 +57,11 @@ npm run clean:test         # Clean test artifacts
 
 ## Key Game Constants (`shared/src/types.ts`)
 
-- `FIELD_WIDTH: 1920`, `FIELD_HEIGHT: 1080`
-- `PLAYER_SPEED: 284`
-- `SHOOT_SPEED: 1440`, `MIN_SHOOT_SPEED: 720`
-- `POSSESSION_RADIUS: 45`, `PRESSURE_RADIUS: 45`
-- `CAPTURE_LOCKOUT_MS: 300`, `LOSS_LOCKOUT_MS: 300`
-- `TICK_RATE: 30`, `MATCH_DURATION: 120`
+- `FIELD_WIDTH: 1700`, `FIELD_HEIGHT: 1000`
+- `PLAYER_SPEED: 350`
+- `SHOOT_SPEED: 1440`
+- `CHALLENGE_RADIUS: 70`
+- `MATCH_DURATION: 120`
 
 ## Troubleshooting
 

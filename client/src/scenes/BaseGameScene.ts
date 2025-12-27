@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, Text } from 'pixi.js'
 import { sceneRouter } from '@/utils/SceneRouter'
 import type { EnginePlayerData, EnginePlayerInput } from '@shared'
-import { GameEngine, GeometryUtils } from '@shared'
+import { GameEngine, GeometryUtils, GAME_CONFIG } from '@shared'
 import { VirtualJoystick } from '@/controls/VirtualJoystick'
 import { ActionButton } from '@/controls/ActionButton'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
@@ -28,8 +28,13 @@ export abstract class BaseGameScene extends PixiScene {
   protected controlArrow?: Graphics
 
   // UI elements
+  protected scoreboardContainer!: Container
+  protected scoreboardBg!: Graphics
+  protected blueScoreText!: Text
+  protected redScoreText!: Text
   protected scoreText!: Text
   protected timerText!: Text
+  protected timerBg!: Graphics
   protected controlsHint!: Text
   protected backButton!: Container
 
@@ -68,7 +73,7 @@ export abstract class BaseGameScene extends PixiScene {
   protected abstract initializeGameState(): void
   protected abstract getGameState(): any
   protected abstract updateGameState(delta: number): void
-  protected abstract handleShootAction(power: number): void
+  protected abstract handleShootAction(): void
   protected abstract cleanupGameState(): void
   protected abstract getUnifiedState(): GameEngineState | null
 
@@ -143,8 +148,7 @@ export abstract class BaseGameScene extends PixiScene {
         x: decision.moveX,
         y: decision.moveY,
       },
-      action: decision.shootPower !== null,
-      actionPower: decision.shootPower ?? 0,
+      action: decision.shoot,
       timestamp: this.gameEngine.frameCount,
       playerId: playerId,
     }
@@ -209,16 +213,27 @@ export abstract class BaseGameScene extends PixiScene {
       }
     }
 
-    this.scoreText.text = `${state.scoreBlue} - ${state.scoreRed}`
+    // Update broadcast-style scoreboard
+    if (this.blueScoreText) this.blueScoreText.text = `${state.scoreBlue}`
+    if (this.redScoreText) this.redScoreText.text = `${state.scoreRed}`
 
     const minutes = Math.floor(state.matchTime / 60)
     const seconds = Math.floor(state.matchTime % 60)
     this.timerText.text = `${minutes}:${seconds.toString().padStart(2, '0')}`
 
+    // Timer urgency effect in last 30 seconds
     if (state.matchTime <= 30 && state.matchTime > 0) {
-      this.timerText.style.fill = '#ff4444'
+      this.timerText.style.fill = '#ff5252'
+      if (this.timerBg) {
+        this.timerBg.tint = 0xff5252
+        this.timerBg.alpha = 0.15 + Math.sin(Date.now() / 200) * 0.05 // Subtle pulse
+      }
     } else {
       this.timerText.style.fill = '#ffffff'
+      if (this.timerBg) {
+        this.timerBg.tint = 0xffffff
+        this.timerBg.alpha = 1
+      }
     }
   }
 
@@ -242,8 +257,8 @@ export abstract class BaseGameScene extends PixiScene {
     })
 
     if (includeShoot) {
-      this.gameEngine.onShoot((playerId: string, power: number) => {
-        console.log(`🎯 Player ${playerId} shot with power ${power.toFixed(2)}`)
+      this.gameEngine.onShoot((playerId: string) => {
+        console.log(`🎯 Player ${playerId} shot`)
       })
     }
   }
@@ -262,7 +277,7 @@ export abstract class BaseGameScene extends PixiScene {
     // Enhanced detection for tests running on desktop browsers
     this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-    this.cameraManager = new CameraManager(this)
+    this.cameraManager = new CameraManager(this, this.isMobile)
     this.aiDebugRenderer = new AIDebugRenderer(this, this.cameraManager)
 
     // Setup Game Container (Field, Ball, Players)
@@ -301,7 +316,7 @@ export abstract class BaseGameScene extends PixiScene {
     const playerSprite = new Graphics()
 
     // Draw player
-    playerSprite.circle(0, 0, 36)
+    playerSprite.circle(0, 0, GAME_CONFIG.PLAYER_RADIUS)
     playerSprite.fill(color)
     playerSprite.stroke({ width: 3, color: 0xffffff }) // White border
 
@@ -328,39 +343,83 @@ export abstract class BaseGameScene extends PixiScene {
   protected createUI() {
     const uiContainer = this.cameraManager.getUIContainer()
 
-    this.scoreText = new Text({
-        text: '0 - 0',
+    // ===== BROADCAST-STYLE SCOREBOARD =====
+    this.scoreboardContainer = new Container()
+    uiContainer.addChild(this.scoreboardContainer)
+
+    // Scoreboard background (dark semi-transparent bar)
+    this.scoreboardBg = new Graphics()
+    this.scoreboardContainer.addChild(this.scoreboardBg)
+
+    // Blue team score (left side) - colored blue
+    this.blueScoreText = new Text({
+        text: '0',
         style: {
-            fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
-            fontSize: 24, // Will be resized
-            fill: '#f4f7fb',
-            fontWeight: 'bold',
+            fontFamily: '"SF Pro Display", "Helvetica Neue", -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: 28,
+            fill: '#60a5fa', // Bright blue
+            fontWeight: '700',
         }
     })
-    this.scoreText.anchor.set(0.5, 0)
-    uiContainer.addChild(this.scoreText)
+    this.blueScoreText.anchor.set(0.5, 0.5)
+    this.scoreboardContainer.addChild(this.blueScoreText)
 
+    // Red team score (right side) - colored red
+    this.redScoreText = new Text({
+        text: '0',
+        style: {
+            fontFamily: '"SF Pro Display", "Helvetica Neue", -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: 28,
+            fill: '#f87171', // Bright red
+            fontWeight: '700',
+        }
+    })
+    this.redScoreText.anchor.set(0.5, 0.5)
+    this.scoreboardContainer.addChild(this.redScoreText)
+
+    // Score divider (dash between scores)
+    this.scoreText = new Text({
+        text: ':',
+        style: {
+            fontFamily: '"SF Pro Display", "Helvetica Neue", -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: 20,
+            fill: 'rgba(255, 255, 255, 0.5)',
+            fontWeight: '400',
+        }
+    })
+    this.scoreText.anchor.set(0.5, 0.5)
+    this.scoreboardContainer.addChild(this.scoreText)
+
+    // Timer background (separate pill)
+    this.timerBg = new Graphics()
+    this.scoreboardContainer.addChild(this.timerBg)
+
+    // Timer text
     this.timerText = new Text({
         text: '2:00',
         style: {
-            fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
-            fontSize: 18,
-            fill: '#cfd6e3',
+            fontFamily: '"JetBrains Mono", "SF Mono", Consolas, monospace',
+            fontSize: 16,
+            fill: '#ffffff',
+            fontWeight: '600',
+            letterSpacing: 1,
         }
     })
-    this.timerText.anchor.set(0.5, 0)
-    uiContainer.addChild(this.timerText)
+    this.timerText.anchor.set(0.5, 0.5)
+    this.scoreboardContainer.addChild(this.timerText)
 
+    // ===== CONTROLS HINT =====
     const controlsText = this.isMobile
-      ? 'Touch Joystick to Move • Tap Button to Shoot/Switch'
-      : 'WASD/Arrows to Move • Space to Shoot/Switch'
+      ? 'Touch to Move · Tap to Shoot'
+      : 'WASD to Move · Space to Shoot'
 
     this.controlsHint = new Text({
         text: controlsText,
         style: {
-            fontFamily: 'JetBrains Mono, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
-            fontSize: 12,
-            fill: '#9aa2b3',
+            fontFamily: '"SF Pro Display", "Helvetica Neue", -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: 13,
+            fill: 'rgba(255, 255, 255, 0.4)',
+            fontWeight: '400',
         }
     })
     this.controlsHint.anchor.set(0.5, 1)
@@ -379,7 +438,7 @@ export abstract class BaseGameScene extends PixiScene {
             const hasBall = state.ball.possessedBy === this.controlledPlayerId
 
             if (hasBall) {
-              this.handleShootAction(0.8)
+              this.handleShootAction()
             } else {
               this.switchToNextTeammate()
             }
@@ -411,8 +470,8 @@ export abstract class BaseGameScene extends PixiScene {
     this.joystick = new VirtualJoystick(this)
     this.actionButton = new ActionButton(
       this,
-      this.app.screen.width - 100,
-      this.app.screen.height - 100
+      Math.max(this.app.screen.width * 0.90, this.app.screen.width / 2 + 70),
+      this.app.screen.height * 0.7
     )
 
     this.joystick.setTeamColor(this.playerTeamColor)
@@ -420,14 +479,14 @@ export abstract class BaseGameScene extends PixiScene {
       this.actionButton.setTeamColor(this.playerTeamColor)
     }
 
-    this.actionButton.setOnReleaseCallback((power) => {
+    this.actionButton.setOnActionCallback(() => {
       const state = this.getGameState()
       if (!state) return
 
       const hasBall = state.ball.possessedBy === this.controlledPlayerId
 
       if (hasBall) {
-        this.handleShootAction(power)
+        this.handleShootAction()
       } else {
         this.switchToNextTeammate()
       }
@@ -488,7 +547,7 @@ export abstract class BaseGameScene extends PixiScene {
       const fillColor = (playerSprite as any)._fillColor || 0xffffff
 
       playerSprite.clear()
-      playerSprite.circle(0, 0, 36)
+      playerSprite.circle(0, 0, GAME_CONFIG.PLAYER_RADIUS)
       playerSprite.fill(fillColor)
       playerSprite.stroke({ width: borderWidth, color: strokeColor, alpha: 1 })
     })
@@ -545,7 +604,7 @@ export abstract class BaseGameScene extends PixiScene {
       return
     }
 
-    const radius = 36
+    const radius = GAME_CONFIG.PLAYER_RADIUS
     const baseDistance = radius + 12
     const tipDistance = baseDistance + 24
     const baseHalfWidth = 18
@@ -771,21 +830,74 @@ export abstract class BaseGameScene extends PixiScene {
       this.cameraManager.handleResize(width, height)
     }
 
-    const scoreFontSize = Math.max(24, Math.min(width * 0.035, 48))
-    const timerFontSize = Math.max(18, Math.min(width * 0.022, 32))
-    const hintFontSize = Math.max(12, Math.min(width * 0.016, 20))
+    // Responsive sizing
+    const scale = Math.min(width / 1200, height / 800)
+    const scoreFontSize = Math.max(20, Math.min(28 * scale, 32))
+    const timerFontSize = Math.max(14, Math.min(16 * scale, 20))
+    const hintFontSize = Math.max(11, Math.min(width * 0.012, 14))
 
-    const topMargin = 40
-    const bottomMargin = 40
+    const topMargin = Math.max(12, 20 * scale)
+    const bottomMargin = 16
 
-    if (this.scoreText) {
-      this.scoreText.position.set(width / 2, topMargin)
-      this.scoreText.style.fontSize = scoreFontSize
+    // ===== BROADCAST SCOREBOARD LAYOUT =====
+    if (this.scoreboardContainer) {
+      const bannerHeight = Math.max(32, 40 * scale)
+      const bannerWidth = Math.max(100, 130 * scale)
+      const timerWidth = Math.max(56, 64 * scale)
+      const cornerRadius = bannerHeight / 2
+
+      // Position scoreboard at top center
+      const bannerX = (width - bannerWidth) / 2
+      const bannerY = topMargin
+
+      // Draw main scoreboard background
+      if (this.scoreboardBg) {
+        this.scoreboardBg.clear()
+        
+        // Main dark background (neutral dark gray)
+        this.scoreboardBg.roundRect(0, 0, bannerWidth, bannerHeight, cornerRadius)
+        this.scoreboardBg.fill({ color: 0x111111, alpha: 0.85 })
+
+        this.scoreboardBg.position.set(bannerX, bannerY)
+      }
+
+      // Blue score (left side)
+      if (this.blueScoreText) {
+        this.blueScoreText.style.fontSize = scoreFontSize
+        this.blueScoreText.position.set(bannerX + bannerWidth * 0.28, bannerY + bannerHeight / 2)
+      }
+
+      // Score divider
+      if (this.scoreText) {
+        this.scoreText.style.fontSize = scoreFontSize * 0.6
+        this.scoreText.position.set(bannerX + bannerWidth / 2, bannerY + bannerHeight / 2)
+      }
+
+      // Red score (right side)
+      if (this.redScoreText) {
+        this.redScoreText.style.fontSize = scoreFontSize
+        this.redScoreText.position.set(bannerX + bannerWidth * 0.72, bannerY + bannerHeight / 2)
+      }
+
+      // Timer pill (positioned to the right of scoreboard)
+      const timerX = bannerX + bannerWidth + 8
+      const timerHeight = bannerHeight * 0.75
+      const timerY = bannerY + (bannerHeight - timerHeight) / 2
+
+      if (this.timerBg) {
+        this.timerBg.clear()
+        this.timerBg.roundRect(0, 0, timerWidth, timerHeight, timerHeight / 2)
+        this.timerBg.fill({ color: 0x111111, alpha: 0.85 })
+        this.timerBg.position.set(timerX, timerY)
+      }
+
+      if (this.timerText) {
+        this.timerText.style.fontSize = timerFontSize
+        this.timerText.position.set(timerX + timerWidth / 2, timerY + timerHeight / 2)
+      }
     }
-    if (this.timerText) {
-      this.timerText.position.set(width / 2, topMargin + scoreFontSize + 10)
-      this.timerText.style.fontSize = timerFontSize
-    }
+
+    // Controls hint at bottom
     if (this.controlsHint) {
       this.controlsHint.position.set(width / 2, height - bottomMargin)
       this.controlsHint.style.fontSize = hintFontSize
@@ -868,8 +980,8 @@ export abstract class BaseGameScene extends PixiScene {
           }
           this.actionButton?.__test_simulatePress()
         },
-        releaseButton: (holdMs: number = 500) => {
-          this.actionButton?.__test_simulateRelease(holdMs)
+        releaseButton: () => {
+          this.actionButton?.__test_simulateRelease()
         },
         getState: baseGetState,
       }

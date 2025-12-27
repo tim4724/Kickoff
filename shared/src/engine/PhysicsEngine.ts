@@ -5,6 +5,7 @@
  */
 
 import type { EnginePlayerData, EngineBallData, PhysicsConfig, EnginePlayerInput } from './types.js'
+import { PHYSICS_DEFAULTS } from './types.js'
 import { GeometryUtils } from '../utils/geometry.js'
 import type { Team } from '../types.js'
 import { GAME_CONFIG } from '../types.js'
@@ -16,20 +17,19 @@ export class PhysicsEngine {
   private lastPossessionLossTime = new Map<string, number>()
 
   // Pre-calculated squared values for performance
-  private pressureRadiusSq: number
-  private possessionRadiusSq: number
+  private challengeRadiusSq: number
   private releaseThresholdSq: number
 
   constructor(config: PhysicsConfig) {
     this.config = config
-    this.pressureRadiusSq = config.pressureRadius * config.pressureRadius
-    this.possessionRadiusSq = config.possessionRadius * config.possessionRadius
-    this.releaseThresholdSq = (config.possessionRadius + 10) * (config.possessionRadius + 10)
+    this.challengeRadiusSq = config.challengeRadius * config.challengeRadius
+    this.releaseThresholdSq = (config.challengeRadius + 10) * (config.challengeRadius + 10)
   }
 
   /**
    * Simulate one physics step for the ball (static helper for AI)
    * Returns new position and velocity after applying friction and bounces
+   * Ball uses full field bounds (0 to fieldWidth/fieldHeight)
    */
   static simulateBallStep(
     x: number,
@@ -41,7 +41,6 @@ export class PhysicsEngine {
       ballFriction: number
       fieldWidth: number
       fieldHeight: number
-      fieldMargin: number
       goalYMin: number
       goalYMax: number
     },
@@ -69,27 +68,25 @@ export class PhysicsEngine {
     x += vx * dt
     y += vy * dt
 
-    // Bounce off left/right boundaries (exclude goal zones)
-    if (x <= config.fieldMargin && (y < config.goalYMin || y > config.goalYMax)) {
+    // Bounce off left boundary (exclude goal zone)
+    if (x <= 0 && (y < config.goalYMin || y > config.goalYMax)) {
       vx *= bounceCoef
-      x = config.fieldMargin
+      x = 0
     }
-    if (
-      x >= config.fieldWidth - config.fieldMargin &&
-      (y < config.goalYMin || y > config.goalYMax)
-    ) {
+    // Bounce off right boundary (exclude goal zone)
+    if (x >= config.fieldWidth && (y < config.goalYMin || y > config.goalYMax)) {
       vx *= bounceCoef
-      x = config.fieldWidth - config.fieldMargin
+      x = config.fieldWidth
     }
 
     // Bounce off top/bottom boundaries
-    if (y <= config.fieldMargin) {
+    if (y <= 0) {
       vy *= bounceCoef
-      y = config.fieldMargin
+      y = 0
     }
-    if (y >= config.fieldHeight - config.fieldMargin) {
+    if (y >= config.fieldHeight) {
       vy *= bounceCoef
-      y = config.fieldHeight - config.fieldMargin
+      y = config.fieldHeight
     }
 
     if (out) {
@@ -119,15 +116,9 @@ export class PhysicsEngine {
     player.x += player.velocityX * dt
     player.y += player.velocityY * dt
 
-    // Clamp to field bounds
-    player.x = Math.max(
-      this.config.playerMargin,
-      Math.min(this.config.fieldWidth - this.config.playerMargin, player.x)
-    )
-    player.y = Math.max(
-      this.config.playerMargin,
-      Math.min(this.config.fieldHeight - this.config.playerMargin, player.y)
-    )
+    // Clamp to field bounds (players can go to edges)
+    player.x = Math.max(0, Math.min(this.config.fieldWidth, player.x))
+    player.y = Math.max(0, Math.min(this.config.fieldHeight, player.y))
 
     // Update state (preserve 'kicking' if still active)
     const now = gameClock.now()
@@ -209,7 +200,7 @@ export class PhysicsEngine {
 
       const distSq = GeometryUtils.distanceSquaredScalar(player.x, player.y, ball.x, ball.y)
 
-      if (distSq < this.pressureRadiusSq) {
+      if (distSq < this.challengeRadiusSq) {
         opponentsNearby++
         if (distSq < nearestOpponentDist) {
           nearestOpponent = player
@@ -220,22 +211,22 @@ export class PhysicsEngine {
 
     // Update pressure level
     if (opponentsNearby > 0) {
-      const pressureIncrease = this.config.pressureBuildup * dt * opponentsNearby
+      const pressureIncrease = PHYSICS_DEFAULTS.PRESSURE_BUILDUP_RATE * dt * opponentsNearby
       ball.pressureLevel = Math.min(
-        this.config.pressureThreshold,
+        PHYSICS_DEFAULTS.PRESSURE_RELEASE_THRESHOLD,
         ball.pressureLevel + pressureIncrease
       )
     } else {
-      const pressureDecrease = this.config.pressureDecay * dt
+      const pressureDecrease = PHYSICS_DEFAULTS.PRESSURE_DECAY_RATE * dt
       ball.pressureLevel = Math.max(0, ball.pressureLevel - pressureDecrease)
     }
 
     // Check if pressure threshold reached - transfer possession
-    if (ball.pressureLevel >= this.config.pressureThreshold) {
+    if (ball.pressureLevel >= PHYSICS_DEFAULTS.PRESSURE_RELEASE_THRESHOLD) {
       // Check capture lockout
       const timeSinceCapture =
         gameClock.now() - (this.lastPossessionGainTime.get(possessor.id) || 0)
-      if (timeSinceCapture < this.config.captureLockoutMs) {
+      if (timeSinceCapture < PHYSICS_DEFAULTS.CAPTURE_LOCKOUT_MS) {
         return
       }
 
@@ -294,10 +285,10 @@ export class PhysicsEngine {
 
         const distSq = GeometryUtils.distanceSquaredScalar(ball.x, ball.y, player.x, player.y)
 
-        if (distSq < this.possessionRadiusSq) {
+        if (distSq < this.challengeRadiusSq) {
           // Check loss lockout
           const timeSinceLoss = gameClock.now() - (this.lastPossessionLossTime.get(player.id) || 0)
-          if (timeSinceLoss < this.config.lossLockoutMs) continue
+          if (timeSinceLoss < PHYSICS_DEFAULTS.LOSS_LOCKOUT_MS) continue
 
           ball.possessedBy = player.id
           this.lastPossessionGainTime.set(player.id, gameClock.now())
@@ -312,20 +303,15 @@ export class PhysicsEngine {
   handlePlayerAction(
     player: EnginePlayerData,
     ball: EngineBallData,
-    actionPower: number = 0.8,
-    onShootCallback?: (playerId: string, power: number) => void
+    onShootCallback?: (playerId: string) => void
   ): void {
     if (ball.possessedBy === player.id) {
-      // Shoot in direction player is facing
+      // Shoot in direction player is facing at full speed
       const dx = Math.cos(player.direction)
       const dy = Math.sin(player.direction)
 
-      const speed =
-        this.config.minShootSpeed +
-        (this.config.shootSpeed - this.config.minShootSpeed) * actionPower
-
-      ball.velocityX = dx * speed
-      ball.velocityY = dy * speed
+      ball.velocityX = dx * this.config.shootSpeed
+      ball.velocityY = dy * this.config.shootSpeed
       ball.possessedBy = ''
 
       ball.lastShotTime = gameClock.now()
@@ -338,7 +324,7 @@ export class PhysicsEngine {
 
       // Trigger shoot callback
       if (onShootCallback) {
-        onShootCallback(player.id, actionPower)
+        onShootCallback(player.id)
       }
     } else {
       // Try to gain possession
@@ -350,12 +336,12 @@ export class PhysicsEngine {
       const isShooter = player.id === ball.lastShooter
 
       if (
-        distSq < this.possessionRadiusSq &&
+        distSq < this.challengeRadiusSq &&
         ball.possessedBy === '' &&
         !(hasImmunity && isShooter)
       ) {
         const timeSinceLoss = gameClock.now() - (this.lastPossessionLossTime.get(player.id) || 0)
-        if (timeSinceLoss < this.config.lossLockoutMs) return
+        if (timeSinceLoss < PHYSICS_DEFAULTS.LOSS_LOCKOUT_MS) return
 
         ball.possessedBy = player.id
         this.lastPossessionGainTime.set(player.id, gameClock.now())
@@ -365,11 +351,12 @@ export class PhysicsEngine {
 
   /**
    * Check for goals
+   * Goals are at x < 0 (left/red scores) and x > fieldWidth (right/blue scores)
    */
   checkGoals(ball: EngineBallData): Team | null {
-    // Left goal (red scores)
+    // Left goal (red scores) - ball fully past left edge
     if (
-      ball.x + this.config.ballRadius < this.config.fieldMargin &&
+      ball.x + this.config.ballRadius < 0 &&
       ball.y >= this.config.goalYMin &&
       ball.y <= this.config.goalYMax
     ) {
@@ -377,9 +364,9 @@ export class PhysicsEngine {
       return 'red'
     }
 
-    // Right goal (blue scores)
+    // Right goal (blue scores) - ball fully past right edge
     if (
-      ball.x - this.config.ballRadius > this.config.fieldWidth - this.config.fieldMargin &&
+      ball.x - this.config.ballRadius > this.config.fieldWidth &&
       ball.y >= this.config.goalYMin &&
       ball.y <= this.config.goalYMax
     ) {

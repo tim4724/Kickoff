@@ -35,8 +35,8 @@ export class VirtualJoystick {
 
     // Scale joystick based on screen size (5% of screen height)
     this.maxRadius = Math.max(50, Math.min(this.screenHeight * 0.05, 80))
-    // Default starting position (left/bottom quadrant)
-    this.baseX = Math.max(60, this.screenWidth * 0.18)
+    // Default starting position (left/bottom quadrant) - closer to left edge
+    this.baseX = Math.max(60, this.screenWidth * 0.10)
     this.baseY = Math.max(120, this.screenHeight * 0.7)
 
     this.createJoystick()
@@ -271,8 +271,8 @@ export class VirtualJoystick {
       const currentDy = this.stick.y - this.base.y
       this.stick.position.set(this.baseX + currentDx, this.baseY + currentDy)
     } else {
-      // Inactive: re-anchor to a safe default within bounds
-      this.baseX = Math.max(margin, Math.min(newWidth * 0.18, newWidth / 2 - margin))
+      // Inactive: re-anchor to a safe default within bounds - closer to left edge
+      this.baseX = Math.max(margin, Math.min(newWidth * 0.10, newWidth / 2 - margin))
       this.baseY = Math.max(margin, Math.min(this.screenHeight * 0.7, this.screenHeight - margin))
       this.base.position.set(this.baseX, this.baseY)
       this.stick.position.set(this.baseX, this.baseY)

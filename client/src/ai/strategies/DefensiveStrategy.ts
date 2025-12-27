@@ -151,7 +151,7 @@ export class DefensiveStrategy {
     const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
       players,
       predictBallPosition,
-      GAME_CONFIG.POSSESSION_RADIUS
+      GAME_CONFIG.CHALLENGE_RADIUS
     )
 
     return { interceptor, interceptPoint }

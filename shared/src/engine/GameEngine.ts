@@ -30,7 +30,6 @@ export class GameEngine {
   private reusedInput: EnginePlayerInput = {
     movement: { x: 0, y: 0 },
     action: false,
-    actionPower: 0,
     timestamp: 0,
   }
 
@@ -45,7 +44,7 @@ export class GameEngine {
   // Event callbacks
   private onGoalCallback?: (event: GoalEvent) => void
   private onMatchEndCallback?: () => void
-  private onShootCallback?: (playerId: string, power: number) => void
+  private onShootCallback?: (playerId: string) => void
 
   // Goal reset timer
   private goalResetTimerId?: number
@@ -55,20 +54,11 @@ export class GameEngine {
     const physicsConfig: PhysicsConfig = {
       fieldWidth: GAME_CONFIG.FIELD_WIDTH,
       fieldHeight: GAME_CONFIG.FIELD_HEIGHT,
-      fieldMargin: GAME_CONFIG.FIELD_MARGIN,
-      playerMargin: GAME_CONFIG.PLAYER_MARGIN,
       playerSpeed: GAME_CONFIG.PLAYER_SPEED,
       ballRadius: GAME_CONFIG.BALL_RADIUS,
       ballFriction: GAME_CONFIG.BALL_FRICTION,
       shootSpeed: GAME_CONFIG.SHOOT_SPEED,
-      minShootSpeed: GAME_CONFIG.MIN_SHOOT_SPEED,
-      possessionRadius: GAME_CONFIG.POSSESSION_RADIUS,
-      pressureRadius: GAME_CONFIG.PRESSURE_RADIUS,
-      pressureBuildup: GAME_CONFIG.PRESSURE_BUILDUP_RATE,
-      pressureDecay: GAME_CONFIG.PRESSURE_DECAY_RATE,
-      pressureThreshold: GAME_CONFIG.PRESSURE_RELEASE_THRESHOLD,
-      captureLockoutMs: GAME_CONFIG.CAPTURE_LOCKOUT_MS,
-      lossLockoutMs: GAME_CONFIG.LOSS_LOCKOUT_MS,
+      challengeRadius: GAME_CONFIG.CHALLENGE_RADIUS,
       goalYMin: GAME_CONFIG.GOAL_Y_MIN,
       goalYMax: GAME_CONFIG.GOAL_Y_MAX,
     }
@@ -278,7 +268,6 @@ export class GameEngine {
       this.reusedInput.movement.x = 0
       this.reusedInput.movement.y = 0
       this.reusedInput.action = false
-      this.reusedInput.actionPower = 0
       this.reusedInput.timestamp = this.frameCount
 
       const mergedInput = this.reusedInput
@@ -294,7 +283,6 @@ export class GameEngine {
         for (const input of queue) {
           if (input.action) {
             mergedInput.action = true
-            mergedInput.actionPower = input.actionPower
             break // First action wins
           }
         }
@@ -311,7 +299,6 @@ export class GameEngine {
         this.physics.handlePlayerAction(
           player,
           this.state.ball,
-          mergedInput.actionPower,
           this.onShootCallback
         )
       }
@@ -475,7 +462,7 @@ export class GameEngine {
   /**
    * Set shoot callback
    */
-  onShoot(callback: (playerId: string, power: number) => void): void {
+  onShoot(callback: (playerId: string) => void): void {
     this.onShootCallback = callback
   }
 }

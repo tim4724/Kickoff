@@ -131,8 +131,8 @@ export class AIOnlyScene extends BaseGameScene {
     this.syncVisualsFromEngine()
   }
 
-  protected handleShootAction(_power: number): void {
-    // No-op
+  protected handleShootAction(): void {
+    // No-op - AI only scene
   }
 
   protected cleanupGameState(): void {
@@ -202,7 +202,7 @@ export class AIOnlyScene extends BaseGameScene {
         const fillColor = (playerSprite as any)._fillColor || 0xffffff
 
         playerSprite.clear()
-        playerSprite.circle(0, 0, 36)
+        playerSprite.circle(0, 0, GAME_CONFIG.PLAYER_RADIUS)
         playerSprite.fill(fillColor)
         playerSprite.stroke({ width: 3, color: VISUAL_CONSTANTS.BORDER_COLOR, alpha: 1 })
     })
