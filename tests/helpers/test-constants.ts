@@ -13,12 +13,11 @@ export const TEST_TOLERANCES = {
 } as const
 
 // Physics constants (from shared/src/types.ts)
+// Note: These are reference values. Tests should import GAME_CONFIG directly.
 export const PHYSICS_CONSTANTS = {
-  POSSESSION_RADIUS: 70,
-  PRESSURE_RADIUS: 70,
-  PLAYER_SPEED: 450,
-  SHOOT_SPEED: 2000,
-  MIN_SHOOT_SPEED: 800,
+  CHALLENGE_RADIUS: 70,
+  PLAYER_SPEED: 350,
+  SHOOT_SPEED: 1440,
   FIELD_WIDTH: 1700,
   FIELD_HEIGHT: 1000,
 } as const
