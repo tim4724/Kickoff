@@ -9,7 +9,6 @@ export interface NetworkConfig {
 export interface PlayerInput {
   movement: { x: number; y: number }
   action: boolean
-  actionPower?: number
   timestamp: number
   playerId: string
 }
@@ -263,13 +262,12 @@ export class NetworkManager {
     this.roomClosedListeners = []
   }
 
-  sendInput(movement: { x: number; y: number }, action: boolean, actionPower: number | undefined, playerId: string, isHuman: boolean = false): void {
+  sendInput(movement: { x: number; y: number }, action: boolean, playerId: string, isHuman: boolean = false): void {
     if (!this.connected || !this.room) return
 
     const input: PlayerInput = {
       movement,
       action,
-      actionPower,
       timestamp: gameClock.now(),
       playerId,
     }
@@ -278,18 +276,17 @@ export class NetworkManager {
     if (existingInput) {
       const existingIsHuman = (existingInput as any).isHuman ?? false
       if (existingIsHuman && !isHuman) return
-      
+
       if (action) {
         input.movement = existingInput.movement
       } else if (existingInput.action) {
         input.action = existingInput.action
-        input.actionPower = existingInput.actionPower
       }
     }
 
     ;(input as any).isHuman = isHuman
     this.inputBuffer.set(playerId, input)
-    
+
     if (isHuman && !action && (Math.abs(movement.x) > 0.01 || Math.abs(movement.y) > 0.01)) {
       this.flushInputBuffer()
     }

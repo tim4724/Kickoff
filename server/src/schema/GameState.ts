@@ -11,7 +11,6 @@ type GamePhase = 'waiting' | 'playing' | 'ended'
 interface PlayerInput {
   movement: { x: number; y: number }
   action: boolean
-  actionPower?: number // 0.0-1.0, power for shooting (optional, defaults to 0.8)
   timestamp: number
   playerId: string // Player ID this input is for (always required)
 }
@@ -167,7 +166,6 @@ export class GameState extends Schema {
     this.gameEngine.queueInput(playerId, {
       movement: input.movement,
       action: input.action,
-      actionPower: input.actionPower,
       timestamp: input.timestamp,
     })
   }

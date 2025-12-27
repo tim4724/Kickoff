@@ -89,7 +89,6 @@ export class MultiplayerScene extends BaseGameScene {
           this.networkManager.sendInput(
             movement,
             false,
-            undefined,
             this.controlledPlayerId,
             true
           )
@@ -113,10 +112,10 @@ export class MultiplayerScene extends BaseGameScene {
     }
   }
 
-  protected handleShootAction(power: number): void {
+  protected handleShootAction(): void {
     if (this.isMultiplayer && this.networkManager && this.controlledPlayerId) {
-      this.networkManager.sendInput({ x: 0, y: 0 }, true, power, this.controlledPlayerId, true)
-      console.log('📤 Shoot action sent to server, power:', power.toFixed(2), 'player:', this.controlledPlayerId)
+      this.networkManager.sendInput({ x: 0, y: 0 }, true, this.controlledPlayerId, true)
+      console.log('📤 Shoot action sent to server, player:', this.controlledPlayerId)
     }
   }
 
@@ -267,7 +266,6 @@ export class MultiplayerScene extends BaseGameScene {
             this.networkManager.sendInput(
               { x: normalizedX, y: normalizedY },
               false,
-              undefined,
               this.controlledPlayerId
             )
 
@@ -726,8 +724,7 @@ export class MultiplayerScene extends BaseGameScene {
 
     this.networkManager.sendInput(
       { x: decision.moveX, y: decision.moveY },
-      decision.shootPower !== null,
-      decision.shootPower ?? undefined,
+      decision.shoot,
       playerId,
       false
     )

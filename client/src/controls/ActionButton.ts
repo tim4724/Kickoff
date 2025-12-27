@@ -6,7 +6,6 @@
 
 import { Container, Graphics, Text, FederatedPointerEvent } from 'pixi.js'
 import { HapticFeedback } from '@/utils/HapticFeedback'
-import { gameClock } from '@shared/engine/GameClock'
 import { PixiScene } from '@/utils/PixiScene'
 
 export class ActionButton {
@@ -21,15 +20,13 @@ export class ActionButton {
   private radius: number = 50
 
   private isPressed: boolean = false
-  private pressStartTime: number = 0
 
   // Team color for button styling
   private teamColor: number = 0xff4444 // Default red, updated via setTeamColor()
   private teamColorLight: number = 0xff6666 // Lighter variant
 
-  // Callbacks
-  private onPressCallback?: () => void
-  private onReleaseCallback?: (power: number) => void
+  // Callback - fires immediately on press
+  private onActionCallback?: () => void
 
   public container: Container
 
@@ -133,67 +130,35 @@ export class ActionButton {
 
   private onPress() {
     this.isPressed = true
-    this.pressStartTime = gameClock.now()
 
     // Visual feedback - use lighter team color when pressed
     this.drawButton(this.teamColorLight, 0.7)
     this.container.scale.set(0.9)
 
-    // Haptic feedback on press
-    HapticFeedback.light()
+    // Haptic feedback
+    HapticFeedback.medium()
 
-    // Callback
-    if (this.onPressCallback) {
-      this.onPressCallback()
+    // Fire action immediately on press
+    if (this.onActionCallback) {
+      this.onActionCallback()
     }
   }
 
   private onRelease() {
     this.isPressed = false
-    const holdDurationMs = gameClock.now() - this.pressStartTime
-    const holdDuration = holdDurationMs / 1000 // Convert to seconds
 
     // Reset visual
     this.drawButton(this.teamColor, 0.6)
     this.container.scale.set(1)
 
-    // Calculate power based on hold duration
-    const power = Math.min(holdDuration / 1.0, 1)
-
-    // Haptic feedback on release
-    HapticFeedback.medium()
-
-    // Trigger release callback with power
-    if (this.onReleaseCallback) {
-      this.onReleaseCallback(power)
-    }
-
     this.pointerId = -1
   }
 
   /**
-   * Set callback for when button is pressed
+   * Set callback for when button is pressed (fires immediately)
    */
-  public setOnPressCallback(callback: () => void) {
-    this.onPressCallback = callback
-  }
-
-  /**
-   * Set callback for when button is released
-   * @param callback - Receives power value (0-1) based on hold duration
-   */
-  public setOnReleaseCallback(callback: (power: number) => void) {
-    this.onReleaseCallback = callback
-  }
-
-  /**
-   * Get current power level if button is being held
-   */
-  public getPower(): number {
-    if (!this.isPressed) return 0
-
-    const duration = (gameClock.now() - this.pressStartTime) / 1000
-    return Math.min(duration / 1.0, 1)
+  public setOnActionCallback(callback: () => void) {
+    this.onActionCallback = callback
   }
 
   /**
@@ -235,36 +200,10 @@ export class ActionButton {
   }
 
   /**
-   * Update power indicator visual (called every frame)
+   * Update (no-op, kept for interface compatibility)
    */
   public update() {
-    if (this.isPressed) {
-      const power = this.getPower()
-      // Enhanced pulse effect based on power (more pronounced scaling)
-      const scale = 0.85 + power * 0.3
-      this.container.scale.set(scale)
-
-      // Change color intensity based on power
-      const alpha = 0.6 + power * 0.4
-      this.button.alpha = alpha; // directly set alpha on graphics
-
-      // Add outer glow ring for charging effect
-      const glowSize = 3 + power * 5 // Stroke width grows from 3 to 8
-      const glowAlpha = 0.4 + power * 0.6 // Glow becomes more visible
-
-      this.button.stroke({ width: glowSize, color: this.teamColorLight, alpha: glowAlpha })
-    } else {
-      // Reset to base state should be handled by onRelease/drawButton mostly,
-      // but if we are manually tweening properties here:
-      if (this.container.scale.x !== 1) this.container.scale.set(1)
-      if (this.button.alpha !== 1) this.button.alpha = 1 // alpha relative to container? wait, createButton sets fill alpha
-      // Actually drawButton sets fill alpha. button.alpha is container level? No, button is Graphics.
-      // Let's re-draw to be safe or just reset properties if we modified them.
-      // Re-calling drawButton every frame is expensive.
-      // Modifying stroke via property is better if possible in v8? GraphicsContext?
-      // For now, let's just leave it unless we need complex animation.
-      // The original code re-set stroke style every frame if pressed.
-    }
+    // No power charging animation needed
   }
 
   /**
@@ -284,21 +223,9 @@ export class ActionButton {
     this.onPress()
   }
 
-  public __test_simulateRelease(holdDurationMs: number = 0) {
+  public __test_simulateRelease() {
     if (!this.isPressed) return
-
-    const holdDuration = holdDurationMs / 1000
-    const power = Math.min(holdDuration / 1.0, 1)
-
-    this.drawButton(this.teamColor, 0.6)
-    this.container.scale.set(1)
-
-    if (this.onReleaseCallback) {
-      this.onReleaseCallback(power)
-    }
-
-    this.isPressed = false
-    this.pointerId = -1
+    this.onRelease()
   }
 
   public __test_getState() {
@@ -307,7 +234,6 @@ export class ActionButton {
       x: this.x,
       y: this.y,
       radius: this.radius,
-      currentPower: this.getPower(),
     }
   }
 }

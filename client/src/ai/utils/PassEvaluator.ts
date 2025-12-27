@@ -20,7 +20,6 @@ export interface PassOption {
 export class PassEvaluator {
   private static readonly GRID_COLS = 15
   private static readonly GRID_ROWS = 8
-  private static readonly PASS_POWER = 0.5
   private static gridPositions: Vector2D[] | null = null
 
   // Scoring weights for pass evaluation
@@ -71,9 +70,8 @@ export class PassEvaluator {
   ): PassOption[] {
     if (teammates.length === 0) return []
 
-    const passSpeed =
-      GAME_CONFIG.MIN_SHOOT_SPEED +
-      (GAME_CONFIG.SHOOT_SPEED - GAME_CONFIG.MIN_SHOOT_SPEED) * this.PASS_POWER
+    // All passes use full power now
+    const passSpeed = GAME_CONFIG.SHOOT_SPEED
 
     // Group options by teammate
     const optionsByTeammate = new Map(teammates.map(t => [t.id, [] as PassOption[]]))

@@ -17,7 +17,6 @@ export class HasBallStrategy {
   private static readonly SHOOTING_RANGE = GAME_CONFIG.FIELD_WIDTH / 3 // 640px
   private static readonly MIN_INTERCEPT_DISTANCE = 150 // Minimum distance for safe shot
   private static readonly GOAL_MARGIN = 20 // Margin from goal edges for shot targets
-  private static readonly MAX_SHOOT_POWER = 1.0
 
   // Path blocking constants
   private static readonly INTERCEPT_THRESHOLD = 200 // Distance threshold for blocked path
@@ -25,9 +24,6 @@ export class HasBallStrategy {
   // Dribble constants
   private static readonly DRIBBLE_DISTANCES = [150, 250] // Two distance rings
   private static readonly DRIBBLE_ANGLES = 8 // 45° increments
-
-  // Pass constants
-  private static readonly PASS_SHOOT_POWER = 0.5
 
   // Scoring constants
   private static readonly MAX_SPACE_CAP = 300 // Maximum space value in scoring calculation
@@ -57,8 +53,7 @@ export class HasBallStrategy {
       const shotOption = this.findBestShotTarget(carrier, opponents, opponentGoal)
 
       if (shotOption) {
-        const shootPower = Math.min(this.MAX_SHOOT_POWER, distToGoal / this.SHOOTING_RANGE) // Further = harder shot
-        return { goal: 'shoot', target: shotOption.target, shootPower }
+        return { goal: 'shoot', target: shotOption.target, shoot: true }
       }
     }
 
@@ -86,7 +81,7 @@ export class HasBallStrategy {
        const passScore = this.evaluatePassScore(carrier, passOption, opponentGoal, opponents)
        // Choose option with higher score
        if (passScore > dribbleOption.score) {
-         return { goal: 'pass', target: passOption.position, shootPower: this.PASS_SHOOT_POWER }
+         return { goal: 'pass', target: passOption.position, shoot: true }
        } else {
          return { goal: 'dribbleToSpace', target: dribbleOption.position }
        }

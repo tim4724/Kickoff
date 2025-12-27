@@ -303,20 +303,15 @@ export class PhysicsEngine {
   handlePlayerAction(
     player: EnginePlayerData,
     ball: EngineBallData,
-    actionPower: number = 0.8,
-    onShootCallback?: (playerId: string, power: number) => void
+    onShootCallback?: (playerId: string) => void
   ): void {
     if (ball.possessedBy === player.id) {
-      // Shoot in direction player is facing
+      // Shoot in direction player is facing at full speed
       const dx = Math.cos(player.direction)
       const dy = Math.sin(player.direction)
 
-      const speed =
-        this.config.minShootSpeed +
-        (this.config.shootSpeed - this.config.minShootSpeed) * actionPower
-
-      ball.velocityX = dx * speed
-      ball.velocityY = dy * speed
+      ball.velocityX = dx * this.config.shootSpeed
+      ball.velocityY = dy * this.config.shootSpeed
       ball.possessedBy = ''
 
       ball.lastShotTime = gameClock.now()
@@ -329,7 +324,7 @@ export class PhysicsEngine {
 
       // Trigger shoot callback
       if (onShootCallback) {
-        onShootCallback(player.id, actionPower)
+        onShootCallback(player.id)
       }
     } else {
       // Try to gain possession

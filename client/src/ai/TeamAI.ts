@@ -51,7 +51,7 @@ export class TeamAI {
     roles.forEach((role, playerId) => {
       const aiPlayer = this.players.find(p => p.getPlayerId() === playerId)
       if (aiPlayer) {
-        aiPlayer.setGoal(role.goal, role.target, role.shootPower)
+        aiPlayer.setGoal(role.goal, role.target, role.shoot)
       }
     })
 

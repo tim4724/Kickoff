@@ -72,7 +72,6 @@ export const GAME_CONFIG = {
   // Ball physics
   BALL_FRICTION: 0.98,
   SHOOT_SPEED: 1440,
-  MIN_SHOOT_SPEED: 720,
 
   // Goal bounds (derived from field dimensions)
   GOAL_Y_MIN: Math.round(FIELD_HEIGHT / 2 - (FIELD_HEIGHT * GOAL_HEIGHT_RATIO) / 2),

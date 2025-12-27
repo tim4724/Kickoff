@@ -48,7 +48,6 @@ export interface GameEngineState {
 export interface EnginePlayerInput {
   movement: { x: number; y: number }
   action: boolean
-  actionPower?: number
   timestamp: number
   playerId?: string
 }
@@ -60,7 +59,6 @@ export interface PhysicsConfig {
   ballRadius: number
   ballFriction: number
   shootSpeed: number
-  minShootSpeed: number
   challengeRadius: number
   goalYMin: number
   goalYMax: number

@@ -12,19 +12,19 @@ export class AIPlayer {
   private targetX: number | null = null
   private targetY: number | null = null
   private goal: PlayerGoal | null = null // For debug labeling only
-  private shootPower: number | null = null // Shooting power (null = no shoot, 0.0-1.0 = power level)
+  private shouldShoot: boolean = false
 
   constructor(playerId: string) {
     this.playerId = playerId
   }
 
-  public setGoal(goal: PlayerGoal, targetPosition?: { x: number; y: number }, shootPower?: number | null): void {
+  public setGoal(goal: PlayerGoal, targetPosition?: { x: number; y: number }, shoot?: boolean): void {
     this.goal = goal // Store for debug purposes
     if (targetPosition) {
       this.targetX = targetPosition.x
       this.targetY = targetPosition.y
     }
-    this.shootPower = shootPower ?? null // Default to null if not provided
+    this.shouldShoot = shoot ?? false
   }
 
   public getGoal(): PlayerGoal | null {
@@ -42,19 +42,19 @@ export class AIPlayer {
     const movement = this.calculateMovement(gameState)
 
     // For shooting/passing, only trigger action when facing the target
-    let actualShootPower = this.shootPower
-    if (this.shootPower !== null && this.targetX !== null && this.targetY !== null) {
+    let actualShoot = this.shouldShoot
+    if (this.shouldShoot && this.targetX !== null && this.targetY !== null) {
       const isFacingTarget = this.isFacingTarget(gameState)
       if (!isFacingTarget) {
         // Not facing target yet, don't shoot - just rotate
-        actualShootPower = null
+        actualShoot = false
       }
     }
 
     return {
       moveX: movement.x,
       moveY: movement.y,
-      shootPower: actualShootPower,
+      shoot: actualShoot,
     }
   }
 
@@ -73,7 +73,7 @@ export class AIPlayer {
     const distance = GeometryUtils.magnitudeScalar(dx, dy)
 
     // For shooting/passing, always return direction even if close (to rotate player)
-    if (this.shootPower !== null) {
+    if (this.shouldShoot) {
       if (distance < 1) {
         return { x: 0, y: 0 }
       }

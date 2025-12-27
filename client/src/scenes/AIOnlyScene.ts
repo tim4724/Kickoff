@@ -131,8 +131,8 @@ export class AIOnlyScene extends BaseGameScene {
     this.syncVisualsFromEngine()
   }
 
-  protected handleShootAction(_power: number): void {
-    // No-op
+  protected handleShootAction(): void {
+    // No-op - AI only scene
   }
 
   protected cleanupGameState(): void {

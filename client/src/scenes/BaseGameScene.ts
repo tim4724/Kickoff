@@ -73,7 +73,7 @@ export abstract class BaseGameScene extends PixiScene {
   protected abstract initializeGameState(): void
   protected abstract getGameState(): any
   protected abstract updateGameState(delta: number): void
-  protected abstract handleShootAction(power: number): void
+  protected abstract handleShootAction(): void
   protected abstract cleanupGameState(): void
   protected abstract getUnifiedState(): GameEngineState | null
 
@@ -148,8 +148,7 @@ export abstract class BaseGameScene extends PixiScene {
         x: decision.moveX,
         y: decision.moveY,
       },
-      action: decision.shootPower !== null,
-      actionPower: decision.shootPower ?? 0,
+      action: decision.shoot,
       timestamp: this.gameEngine.frameCount,
       playerId: playerId,
     }
@@ -258,8 +257,8 @@ export abstract class BaseGameScene extends PixiScene {
     })
 
     if (includeShoot) {
-      this.gameEngine.onShoot((playerId: string, power: number) => {
-        console.log(`🎯 Player ${playerId} shot with power ${power.toFixed(2)}`)
+      this.gameEngine.onShoot((playerId: string) => {
+        console.log(`🎯 Player ${playerId} shot`)
       })
     }
   }
@@ -439,7 +438,7 @@ export abstract class BaseGameScene extends PixiScene {
             const hasBall = state.ball.possessedBy === this.controlledPlayerId
 
             if (hasBall) {
-              this.handleShootAction(0.8)
+              this.handleShootAction()
             } else {
               this.switchToNextTeammate()
             }
@@ -480,14 +479,14 @@ export abstract class BaseGameScene extends PixiScene {
       this.actionButton.setTeamColor(this.playerTeamColor)
     }
 
-    this.actionButton.setOnReleaseCallback((power) => {
+    this.actionButton.setOnActionCallback(() => {
       const state = this.getGameState()
       if (!state) return
 
       const hasBall = state.ball.possessedBy === this.controlledPlayerId
 
       if (hasBall) {
-        this.handleShootAction(power)
+        this.handleShootAction()
       } else {
         this.switchToNextTeammate()
       }
@@ -981,8 +980,8 @@ export abstract class BaseGameScene extends PixiScene {
           }
           this.actionButton?.__test_simulatePress()
         },
-        releaseButton: (holdMs: number = 500) => {
-          this.actionButton?.__test_simulateRelease(holdMs)
+        releaseButton: () => {
+          this.actionButton?.__test_simulateRelease()
         },
         getState: baseGetState,
       }
