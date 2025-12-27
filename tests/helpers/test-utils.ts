@@ -213,7 +213,7 @@ export async function moveTowardBallAndCapture(
     const dy = state.ballY - state.playerY
     const distance = GeometryUtils.magnitudeScalar(dx, dy)
 
-    if (state.ballPossessor === state.controlledId || distance < GAME_CONFIG.POSSESSION_RADIUS) {
+    if (state.ballPossessor === state.controlledId || distance < GAME_CONFIG.CHALLENGE_RADIUS) {
       return true
     }
 

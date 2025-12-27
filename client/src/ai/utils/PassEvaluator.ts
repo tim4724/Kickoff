@@ -92,7 +92,7 @@ export class PassEvaluator {
         const { interceptor, time } = InterceptionCalculator.calculateInterception(
           opponents,
           predictor,
-          GAME_CONFIG.PRESSURE_RADIUS
+          GAME_CONFIG.CHALLENGE_RADIUS
         )
         earliestOpponentTime = time
         spaceAtTarget = GeometryUtils.distancePoint(pos, interceptor)
@@ -108,7 +108,7 @@ export class PassEvaluator {
         const { time } = InterceptionCalculator.calculateInterception(
           [teammate],
           predictor,
-          GAME_CONFIG.PRESSURE_RADIUS
+          GAME_CONFIG.CHALLENGE_RADIUS
         )
 
         // Skip if teammate intercepts at or after earliest opponent

@@ -88,7 +88,7 @@ export class OffensiveStrategy {
       const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
         remainingPlayers,
         predictBallPosition,
-        GAME_CONFIG.POSSESSION_RADIUS
+        GAME_CONFIG.CHALLENGE_RADIUS
       )
 
       roles.set(interceptor.id, { goal: 'receive-pass', target: interceptPoint })

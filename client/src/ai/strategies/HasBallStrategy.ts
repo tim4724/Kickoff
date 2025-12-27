@@ -130,7 +130,7 @@ export class HasBallStrategy {
     const { interceptPoint } = InterceptionCalculator.calculateInterception(
       opponents,
       predictCarrierPosition,
-      GAME_CONFIG.PRESSURE_RADIUS
+      GAME_CONFIG.CHALLENGE_RADIUS
     )
 
     // Calculate distance from intercept point to carrier's current position
@@ -198,7 +198,7 @@ export class HasBallStrategy {
       const { interceptPoint } = InterceptionCalculator.calculateInterception(
         opponents,
         predictBallPosition,
-        GAME_CONFIG.PRESSURE_RADIUS
+        GAME_CONFIG.CHALLENGE_RADIUS
       )
 
       // Calculate how far the intercept point is from carrier (further = better)

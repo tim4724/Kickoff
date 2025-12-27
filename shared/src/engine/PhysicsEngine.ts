@@ -5,6 +5,7 @@
  */
 
 import type { EnginePlayerData, EngineBallData, PhysicsConfig, EnginePlayerInput } from './types.js'
+import { PHYSICS_DEFAULTS } from './types.js'
 import { GeometryUtils } from '../utils/geometry.js'
 import type { Team } from '../types.js'
 import { GAME_CONFIG } from '../types.js'
@@ -16,15 +17,13 @@ export class PhysicsEngine {
   private lastPossessionLossTime = new Map<string, number>()
 
   // Pre-calculated squared values for performance
-  private pressureRadiusSq: number
-  private possessionRadiusSq: number
+  private challengeRadiusSq: number
   private releaseThresholdSq: number
 
   constructor(config: PhysicsConfig) {
     this.config = config
-    this.pressureRadiusSq = config.pressureRadius * config.pressureRadius
-    this.possessionRadiusSq = config.possessionRadius * config.possessionRadius
-    this.releaseThresholdSq = (config.possessionRadius + 10) * (config.possessionRadius + 10)
+    this.challengeRadiusSq = config.challengeRadius * config.challengeRadius
+    this.releaseThresholdSq = (config.challengeRadius + 10) * (config.challengeRadius + 10)
   }
 
   /**
@@ -201,7 +200,7 @@ export class PhysicsEngine {
 
       const distSq = GeometryUtils.distanceSquaredScalar(player.x, player.y, ball.x, ball.y)
 
-      if (distSq < this.pressureRadiusSq) {
+      if (distSq < this.challengeRadiusSq) {
         opponentsNearby++
         if (distSq < nearestOpponentDist) {
           nearestOpponent = player
@@ -212,22 +211,22 @@ export class PhysicsEngine {
 
     // Update pressure level
     if (opponentsNearby > 0) {
-      const pressureIncrease = this.config.pressureBuildup * dt * opponentsNearby
+      const pressureIncrease = PHYSICS_DEFAULTS.PRESSURE_BUILDUP_RATE * dt * opponentsNearby
       ball.pressureLevel = Math.min(
-        this.config.pressureThreshold,
+        PHYSICS_DEFAULTS.PRESSURE_RELEASE_THRESHOLD,
         ball.pressureLevel + pressureIncrease
       )
     } else {
-      const pressureDecrease = this.config.pressureDecay * dt
+      const pressureDecrease = PHYSICS_DEFAULTS.PRESSURE_DECAY_RATE * dt
       ball.pressureLevel = Math.max(0, ball.pressureLevel - pressureDecrease)
     }
 
     // Check if pressure threshold reached - transfer possession
-    if (ball.pressureLevel >= this.config.pressureThreshold) {
+    if (ball.pressureLevel >= PHYSICS_DEFAULTS.PRESSURE_RELEASE_THRESHOLD) {
       // Check capture lockout
       const timeSinceCapture =
         gameClock.now() - (this.lastPossessionGainTime.get(possessor.id) || 0)
-      if (timeSinceCapture < this.config.captureLockoutMs) {
+      if (timeSinceCapture < PHYSICS_DEFAULTS.CAPTURE_LOCKOUT_MS) {
         return
       }
 
@@ -286,10 +285,10 @@ export class PhysicsEngine {
 
         const distSq = GeometryUtils.distanceSquaredScalar(ball.x, ball.y, player.x, player.y)
 
-        if (distSq < this.possessionRadiusSq) {
+        if (distSq < this.challengeRadiusSq) {
           // Check loss lockout
           const timeSinceLoss = gameClock.now() - (this.lastPossessionLossTime.get(player.id) || 0)
-          if (timeSinceLoss < this.config.lossLockoutMs) continue
+          if (timeSinceLoss < PHYSICS_DEFAULTS.LOSS_LOCKOUT_MS) continue
 
           ball.possessedBy = player.id
           this.lastPossessionGainTime.set(player.id, gameClock.now())
@@ -342,12 +341,12 @@ export class PhysicsEngine {
       const isShooter = player.id === ball.lastShooter
 
       if (
-        distSq < this.possessionRadiusSq &&
+        distSq < this.challengeRadiusSq &&
         ball.possessedBy === '' &&
         !(hasImmunity && isShooter)
       ) {
         const timeSinceLoss = gameClock.now() - (this.lastPossessionLossTime.get(player.id) || 0)
-        if (timeSinceLoss < this.config.lossLockoutMs) return
+        if (timeSinceLoss < PHYSICS_DEFAULTS.LOSS_LOCKOUT_MS) return
 
         ball.possessedBy = player.id
         this.lastPossessionGainTime.set(player.id, gameClock.now())

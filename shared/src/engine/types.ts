@@ -61,16 +61,19 @@ export interface PhysicsConfig {
   ballFriction: number
   shootSpeed: number
   minShootSpeed: number
-  possessionRadius: number
-  pressureRadius: number
-  pressureBuildup: number
-  pressureDecay: number
-  pressureThreshold: number
-  captureLockoutMs: number
-  lossLockoutMs: number
+  challengeRadius: number
   goalYMin: number
   goalYMax: number
 }
+
+// Physics-only constants (not needed outside physics engine)
+export const PHYSICS_DEFAULTS = {
+  PRESSURE_BUILDUP_RATE: 2,
+  PRESSURE_DECAY_RATE: 3,
+  PRESSURE_RELEASE_THRESHOLD: 1.0,
+  CAPTURE_LOCKOUT_MS: 300,
+  LOSS_LOCKOUT_MS: 300,
+} as const
 
 export interface GoalEvent {
   team: Team
