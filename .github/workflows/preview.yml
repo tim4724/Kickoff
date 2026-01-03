@@ -46,7 +46,7 @@ jobs:
           SERVER_IMAGE: ${{ needs.build.outputs.server_sha_tag }}
         run: |
           set -euo pipefail
-          SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g')
+          SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g' | cut -c1-50 | sed 's/-*$//')
           NS="kickoff-${SAFE_BRANCH}"
           HOST_CLIENT="${SAFE_BRANCH}.kickoff-game.duckdns.org"
           HOST_SERVER="server-${SAFE_BRANCH}.kickoff-game.duckdns.org"
@@ -213,7 +213,7 @@ jobs:
         env:
           BRANCH_RAW: ${{ github.ref_name }}
         run: |
-          SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g')
+          SAFE_BRANCH=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9-]#-#g' | cut -c1-50 | sed 's/-*$//')
           HOST_CLIENT="${SAFE_BRANCH}.kickoff-game.duckdns.org"
           {
             echo "### Preview Links"
