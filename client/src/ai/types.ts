@@ -23,6 +23,10 @@ export interface AIGameState {
 
   // Match time
   matchTime: number
+
+  // Score (for critical event detection)
+  scoreBlue: number
+  scoreRed: number
 }
 
 /**

@@ -96,6 +96,8 @@ export class AIManager {
       redPlayers: allPlayers.filter(p => p.team === 'red'),
       ball: gameState.ball,
       matchTime: gameState.matchTime,
+      scoreBlue: gameState.scoreBlue,
+      scoreRed: gameState.scoreRed,
     }
   }
 
