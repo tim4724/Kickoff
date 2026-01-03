@@ -81,8 +81,8 @@ export class OffensiveStrategy {
       roles.set(ballCarrier.id, carrierRole)
     } else {
       // Ball is loose - find best interceptor
-      const predictBallPosition = (t: number): Vector2D => {
-        return InterceptionCalculator.simulateBallPosition(ball, ball.velocityX, ball.velocityY, t)
+      const predictBallPosition = (t: number, out?: Vector2D): Vector2D => {
+        return InterceptionCalculator.simulateBallPosition(ball, ball.velocityX, ball.velocityY, t, out)
       }
 
       const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(

@@ -56,7 +56,7 @@ export class PassEvaluator {
     const dist = GeometryUtils.distancePoint(from, to)
     const vx = dist > 0 ? ((to.x - from.x) / dist) * speed : 0
     const vy = dist > 0 ? ((to.y - from.y) / dist) * speed : 0
-    return (t: number) => InterceptionCalculator.simulateBallPosition(from, vx, vy, t)
+    return (t: number, out?: Vector2D) => InterceptionCalculator.simulateBallPosition(from, vx, vy, t, out)
   }
 
   /**

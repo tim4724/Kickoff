@@ -108,7 +108,14 @@ export class DefensiveStrategy {
       spreadRoles.forEach((role, playerId) => roles.set(playerId, role))
     } else {
       // Opponent reaches ball first - assign our player to intercept them
-      let predictPath: (t: number) => Vector2D = () => ball
+      let predictPath: (t: number, out?: Vector2D) => Vector2D = (_t, out) => {
+        if (out) {
+          out.x = ball.x
+          out.y = ball.y
+          return out
+        }
+        return ball
+      }
       if (GeometryUtils.distanceSquaredPoint(ball, this.ourGoal) <= GeometryUtils.distanceSquaredPoint(ballInterceptor!, this.ourGoal)) {
         predictPath = this.createOpponentPathPredictor(ballInterceptor!)
       }
@@ -144,8 +151,15 @@ export class DefensiveStrategy {
 
     // Determine ball prediction function
     const predictBallPosition = isBallMoving
-      ? (t: number) => InterceptionCalculator.simulateBallPosition(ballPosition, ballVx, ballVy, t)
-      : () => ballPosition
+      ? (t: number, out?: Vector2D) => InterceptionCalculator.simulateBallPosition(ballPosition, ballVx, ballVy, t, out)
+      : (_t: number, out?: Vector2D) => {
+          if (out) {
+            out.x = ballPosition.x
+            out.y = ballPosition.y
+            return out
+          }
+          return ballPosition
+        }
 
     // Find best interceptor among ALL players (ours + opponents)
     const { interceptor, interceptPoint } = InterceptionCalculator.calculateInterception(
@@ -163,7 +177,7 @@ export class DefensiveStrategy {
    */
   private createOpponentPathPredictor(
     opponent: EnginePlayerData
-  ): (t: number) => Vector2D {
+  ): (t: number, out?: Vector2D) => Vector2D {
     // Use target behind goal instead of goal center for better defensive coverage
     // Direction from opponent toward target behind goal
     const dx = this.targetBehindGoal.x - opponent.x
@@ -172,7 +186,7 @@ export class DefensiveStrategy {
 
     const direction = dist < 1 ? { x: 1, y: 0 } : { x: dx / dist, y: dy / dist }
 
-    return (t: number) => InterceptionCalculator.predictPlayerBallPosition(opponent, direction, t)
+    return (t: number, out?: Vector2D) => InterceptionCalculator.predictPlayerBallPosition(opponent, direction, t, out)
   }
 
   /**
