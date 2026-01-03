@@ -113,11 +113,12 @@ export class HasBallStrategy {
     const dirY = dy / dist
 
     // Predict carrier's path to target behind goal (moving at player speed)
-    const predictCarrierPosition = (t: number): Vector2D => {
+    const predictCarrierPosition = (t: number, out?: Vector2D): Vector2D => {
       return InterceptionCalculator.predictPlayerBallPosition(
         carrier,
         { x: dirX, y: dirY },
-        t
+        t,
+        out
       )
     }
 
@@ -180,12 +181,13 @@ export class HasBallStrategy {
       const dirY = dy / dist
 
       // Predict ball position along shot trajectory
-      const predictBallPosition = (t: number): Vector2D => {
+      const predictBallPosition = (t: number, out?: Vector2D): Vector2D => {
         return InterceptionCalculator.simulateBallPosition(
           carrier,
           dirX * GAME_CONFIG.SHOOT_SPEED,
           dirY * GAME_CONFIG.SHOOT_SPEED,
-          t
+          t,
+          out
         )
       }
 
