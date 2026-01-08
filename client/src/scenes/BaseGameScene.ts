@@ -338,6 +338,27 @@ export abstract class BaseGameScene extends PixiScene {
       this.controlArrow = new Graphics()
       this.controlArrow.zIndex = 11
       this.controlArrow.visible = false
+
+      // Pre-draw the arrow pointing right (0 radians)
+      // Geometry is static, we only rotate and move the container
+      const radius = GAME_CONFIG.PLAYER_RADIUS
+      const baseDistance = radius + 12
+      const tipDistance = baseDistance + 24
+      const baseHalfWidth = 18
+
+      // Offsets relative to center (0,0)
+      // Tip is at (tipDistance, 0)
+      // Base Top is at (baseDistance, -baseHalfWidth) assuming Y-down
+      // Base Bottom is at (baseDistance, baseHalfWidth)
+
+      this.controlArrow.moveTo(tipDistance, 0)
+      this.controlArrow.lineTo(baseDistance, baseHalfWidth) // Right/Bottom
+
+      this.controlArrow.moveTo(tipDistance, 0)
+      this.controlArrow.lineTo(baseDistance, -baseHalfWidth) // Left/Top
+
+      this.controlArrow.stroke({ width: 4, color: 0xffffff, alpha: 0.95 })
+
       this.cameraManager.getGameContainer().addChild(this.controlArrow)
     }
   }
@@ -560,21 +581,18 @@ export abstract class BaseGameScene extends PixiScene {
 
     const unifiedState = this.getUnifiedState()
     if (!unifiedState || !this.controlledPlayerId) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
 
     const playerState = unifiedState.players.get(this.controlledPlayerId)
     if (!playerState) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
 
     const sprite = this.players.get(this.controlledPlayerId)
     if (!sprite) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
@@ -583,7 +601,6 @@ export abstract class BaseGameScene extends PixiScene {
     const vy = playerState.velocityY ?? 0
 
     if (isNaN(vx) || isNaN(vy) || !isFinite(vx) || !isFinite(vy)) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
@@ -592,48 +609,20 @@ export abstract class BaseGameScene extends PixiScene {
     const MIN_SPEED_THRESHOLD = 15
 
     if (speed < MIN_SPEED_THRESHOLD) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
 
     const direction = playerState.direction
     if (direction === undefined || direction === null || Number.isNaN(direction)) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
 
-    const radius = GAME_CONFIG.PLAYER_RADIUS
-    const baseDistance = radius + 12
-    const tipDistance = baseDistance + 24
-    const baseHalfWidth = 18
-
-    const dirX = Math.cos(direction)
-    const dirY = Math.sin(direction)
-    const perpX = Math.cos(direction + Math.PI / 2)
-    const perpY = Math.sin(direction + Math.PI / 2)
-
-    const baseCenterX = sprite.x + dirX * baseDistance
-    const baseCenterY = sprite.y + dirY * baseDistance
-    const tipX = sprite.x + dirX * tipDistance
-    const tipY = sprite.y + dirY * tipDistance
-
-    const baseLeftX = baseCenterX + perpX * baseHalfWidth
-    const baseLeftY = baseCenterY + perpY * baseHalfWidth
-    const baseRightX = baseCenterX - perpX * baseHalfWidth
-    const baseRightY = baseCenterY - perpY * baseHalfWidth
-
-    this.controlArrow.clear()
+    // Optimization: Update transform only, avoid redrawing geometry
     this.controlArrow.visible = true
-
-    this.controlArrow.moveTo(tipX, tipY)
-    this.controlArrow.lineTo(baseLeftX, baseLeftY)
-
-    this.controlArrow.moveTo(tipX, tipY)
-    this.controlArrow.lineTo(baseRightX, baseRightY)
-
-    this.controlArrow.stroke({ width: 4, color: 0xffffff, alpha: 0.95 })
+    this.controlArrow.position.set(sprite.x, sprite.y)
+    this.controlArrow.rotation = direction
   }
 
   protected updateBallColor(state: any) {
