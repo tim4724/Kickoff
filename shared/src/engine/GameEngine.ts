@@ -287,7 +287,8 @@ export class GameEngine {
           }
         }
 
-        this.inputQueues.set(player.id, [])
+        // Clear queue without reallocation to reduce GC pressure
+        queue.length = 0
       }
       // If no queued input, mergedInput defaults to {x: 0, y: 0} which allows velocity to decay
 
