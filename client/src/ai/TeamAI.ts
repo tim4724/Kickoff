@@ -34,16 +34,34 @@ export class TeamAI {
     scoreRed: number
   } | null = null
 
+  // Random initial delay to prevent deterministic kickoff advantage
+  private initialDelayMs: number
+  private hasStarted: boolean = false
+
   constructor(teamId: Team, playerIds: string[]) {
     this.teamId = teamId
     this.players = playerIds.map(id => new AIPlayer(id))
     this.lastPossessingTeam = null
     this.defensiveStrategy = new DefensiveStrategy(teamId)
     this.offensiveStrategy = new OffensiveStrategy(teamId)
+
+    // Random initial delay between 0-150ms to vary reaction times at kickoff
+    this.initialDelayMs = Math.random() * 150
   }
 
   public update(gameState: AIGameState): Map<string, AIDecision> {
     const currentTime = gameClock.now()
+
+    // Apply initial delay to prevent deterministic kickoff advantage
+    if (!this.hasStarted && currentTime < this.initialDelayMs) {
+      // Return neutral decisions (no movement) during initial delay
+      const neutralDecisions = new Map<string, AIDecision>()
+      this.players.forEach(player => {
+        neutralDecisions.set(player.getPlayerId(), { moveX: 0, moveY: 0, shoot: false })
+      })
+      return neutralDecisions
+    }
+    this.hasStarted = true
 
     // Check for critical events that force immediate re-evaluation
     const criticalEventOccurred = this.detectCriticalEvent(gameState)
