@@ -5,18 +5,12 @@
  * Owns and coordinates AIPlayer instances
  */
 
-import { AIGameState, AIDecision, PlayerRole } from './types'
+import { AIGameState, AIDecision, PlayerRole, AI_DEFAULTS } from './types'
 import { Team } from '@shared/types'
 import { AIPlayer } from './AIPlayer'
 import { DefensiveStrategy } from './strategies/DefensiveStrategy'
 import { OffensiveStrategy } from './strategies/OffensiveStrategy'
 import { gameClock } from '@shared/engine/GameClock'
-
-/**
- * AI goal persistence duration in milliseconds
- * AI will stick to the same goal for this duration unless critical events occur
- */
-const GOAL_PERSIST_DURATION_MS = 200
 
 export class TeamAI {
   private teamId: Team
@@ -45,8 +39,8 @@ export class TeamAI {
     this.defensiveStrategy = new DefensiveStrategy(teamId)
     this.offensiveStrategy = new OffensiveStrategy(teamId)
 
-    // Random initial delay between 0-150ms to vary reaction times at kickoff
-    this.initialDelayMs = Math.random() * 150
+    // Random initial delay to vary reaction times at kickoff
+    this.initialDelayMs = Math.random() * AI_DEFAULTS.INITIAL_DELAY_MAX_MS
   }
 
   public update(gameState: AIGameState): Map<string, AIDecision> {
@@ -80,19 +74,21 @@ export class TeamAI {
       this.cachedRoles = roles
 
       // Set timer for next recalculation
-      this.goalPersistUntil = currentTime + GOAL_PERSIST_DURATION_MS
+      this.goalPersistUntil = currentTime + AI_DEFAULTS.GOAL_PERSIST_DURATION_MS
 
       // Update snapshot for critical event detection
       this.updateGameStateSnapshot(gameState)
     }
 
-    // Apply cached roles to AIPlayers
-    this.cachedRoles!.forEach((role, playerId) => {
-      const aiPlayer = this.players.find(p => p.getPlayerId() === playerId)
-      if (aiPlayer) {
-        aiPlayer.setGoal(role.goal, role.target, role.shoot)
-      }
-    })
+    // Apply cached roles to AIPlayers (guaranteed to exist after shouldRecalculate logic)
+    if (this.cachedRoles) {
+      this.cachedRoles.forEach((role, playerId) => {
+        const aiPlayer = this.players.find(p => p.getPlayerId() === playerId)
+        if (aiPlayer) {
+          aiPlayer.setGoal(role.goal, role.target, role.shoot)
+        }
+      })
+    }
 
     // Execute decisions for all players (movement calculated every frame)
     const decisions = new Map<string, AIDecision>()
@@ -182,5 +178,18 @@ export class TeamAI {
    */
   public getPlayerIds(): string[] {
     return this.players.map(p => p.getPlayerId())
+  }
+
+  /**
+   * Clear cached state for clean game reset
+   * Call this when the game restarts to prevent stale decision data
+   */
+  public cleanup(): void {
+    this.cachedRoles = null
+    this.goalPersistUntil = 0
+    this.lastGameStateSnapshot = null
+    this.lastPossessingTeam = null
+    this.hasStarted = false
+    this.initialDelayMs = Math.random() * AI_DEFAULTS.INITIAL_DELAY_MAX_MS
   }
 }

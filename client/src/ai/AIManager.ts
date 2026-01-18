@@ -82,8 +82,16 @@ export class AIManager {
    * Clean up all AI instances
    */
   public cleanup(): void {
+    this.teamAIs.forEach(teamAI => teamAI.cleanup())
     this.teamAIs.clear()
     this.enabled = false
+  }
+
+  /**
+   * Reset AI state for game restart (keeps teams intact, clears cached decisions)
+   */
+  public reset(): void {
+    this.teamAIs.forEach(teamAI => teamAI.cleanup())
   }
 
   /**
