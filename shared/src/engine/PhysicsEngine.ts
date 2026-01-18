@@ -175,14 +175,15 @@ export class PhysicsEngine {
   }
 
   /**
-   * Update possession pressure system
+   * Update possession - immediate tackle on contact
+   * When an opponent touches the ball carrier, possession switches instantly
    */
   updatePossessionPressure(
     ball: EngineBallData,
     players: Map<string, EnginePlayerData>,
-    dt: number
+    _dt: number
   ): void {
-    // Only apply pressure if someone has possession
+    // Only check if someone has possession
     if (ball.possessedBy === '') {
       ball.pressureLevel = 0
       return
@@ -194,60 +195,33 @@ export class PhysicsEngine {
       return
     }
 
-    // Count opponents within pressure radius
-    let opponentsNearby = 0
+    // Check capture lockout - prevent instant re-tackle after gaining possession
+    const timeSinceCapture = gameClock.now() - (this.lastPossessionGainTime.get(possessor.id) || 0)
+    if (timeSinceCapture < PHYSICS_DEFAULTS.CAPTURE_LOCKOUT_MS) {
+      return
+    }
+
+    // Find nearest opponent within challenge radius
     let nearestOpponent: EnginePlayerData | null = null
     let nearestOpponentDist = Infinity
 
     for (const player of players.values()) {
-      // Optimization: Skip self and teammates early to avoid distance calculation
       if (player.id === possessor.id || player.team === possessor.team) continue
 
       const distSq = GeometryUtils.distanceSquaredScalar(player.x, player.y, ball.x, ball.y)
 
-      if (distSq < this.challengeRadiusSq) {
-        opponentsNearby++
-        if (distSq < nearestOpponentDist) {
-          nearestOpponent = player
-          nearestOpponentDist = distSq
-        }
+      if (distSq < this.challengeRadiusSq && distSq < nearestOpponentDist) {
+        nearestOpponent = player
+        nearestOpponentDist = distSq
       }
     }
 
-    // Update pressure level
-    if (opponentsNearby > 0) {
-      const pressureIncrease = PHYSICS_DEFAULTS.PRESSURE_BUILDUP_RATE * dt * opponentsNearby
-      ball.pressureLevel = Math.min(
-        PHYSICS_DEFAULTS.PRESSURE_RELEASE_THRESHOLD,
-        ball.pressureLevel + pressureIncrease
-      )
-    } else {
-      const pressureDecrease = PHYSICS_DEFAULTS.PRESSURE_DECAY_RATE * dt
-      ball.pressureLevel = Math.max(0, ball.pressureLevel - pressureDecrease)
-    }
-
-    // Check if pressure threshold reached - transfer possession
-    if (ball.pressureLevel >= PHYSICS_DEFAULTS.PRESSURE_RELEASE_THRESHOLD) {
-      // Check capture lockout
-      const timeSinceCapture =
-        gameClock.now() - (this.lastPossessionGainTime.get(possessor.id) || 0)
-      if (timeSinceCapture < PHYSICS_DEFAULTS.CAPTURE_LOCKOUT_MS) {
-        return
-      }
-
-      // Transfer to nearest opponent
-      if (nearestOpponent) {
-        const opponent = nearestOpponent as EnginePlayerData
-        this.lastPossessionLossTime.set(possessor.id, gameClock.now())
-        ball.possessedBy = opponent.id
-        this.lastPossessionGainTime.set(opponent.id, gameClock.now())
-        ball.pressureLevel = 0
-      } else {
-        // Release if no opponent nearby
-        ball.possessedBy = ''
-        ball.pressureLevel = 0
-        this.lastPossessionLossTime.set(possessor.id, gameClock.now())
-      }
+    // Immediate possession transfer on contact
+    if (nearestOpponent) {
+      this.lastPossessionLossTime.set(possessor.id, gameClock.now())
+      ball.possessedBy = nearestOpponent.id
+      this.lastPossessionGainTime.set(nearestOpponent.id, gameClock.now())
+      ball.pressureLevel = 0
     }
   }
 
