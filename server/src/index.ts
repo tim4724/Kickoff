@@ -1,4 +1,5 @@
 import { Server, matchMaker } from 'colyseus'
+import { WebSocketTransport } from '@colyseus/ws-transport'
 import { createServer } from 'http'
 import express from 'express'
 import cors from 'cors'
@@ -28,7 +29,9 @@ const httpServer = createServer(app)
 
 // Initialize Colyseus
 const gameServer = new Server({
-  server: httpServer,
+  transport: new WebSocketTransport({
+    server: httpServer,
+  }),
 })
 
 // Register room handlers

@@ -55,3 +55,23 @@ export interface PlayerRole {
   shoot?: boolean // Whether to shoot when in position
 }
 
+/**
+ * AI behavior constants
+ * Centralized configuration for AI decision-making parameters
+ */
+export const AI_DEFAULTS = {
+  /**
+   * How long AI persists with current goal before recalculating (ms)
+   * Lower = more responsive but higher CPU, Higher = smoother but less reactive
+   * 200ms chosen as balance: ~5 recalcs/sec vs 60/sec (frame-by-frame)
+   */
+  GOAL_PERSIST_DURATION_MS: 200,
+
+  /**
+   * Maximum random delay at game start (ms)
+   * Prevents deterministic kickoff advantage where one team always reacts first
+   * 150ms range provides noticeable variation without feeling unresponsive
+   */
+  INITIAL_DELAY_MAX_MS: 150,
+} as const
+
