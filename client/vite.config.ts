@@ -10,14 +10,14 @@ const rootPkg = JSON.parse(
 const appVersion = process.env.APP_VERSION || rootPkg.version || '0.0.0'
 
 // Determine app name based on branch/environment
-// Production branches show just "Kickoff", others show "Kickoff [branch]"
+// Production branches show "Kickoff", feature branches show just the branch name
 const branch = process.env.VITE_BRANCH || process.env.BRANCH || ''
 const branchLower = branch.toLowerCase()
 const isProduction = !branch || branchLower === 'main' || branchLower === 'master' || branchLower === 'production'
-// Sanitize branch name: remove brackets to prevent injection, limit length
-const sanitizedBranch = branch.replace(/[\[\]]/g, '').slice(0, 20)
-const appName = isProduction ? 'Kickoff' : `Kickoff [${sanitizedBranch}]`
-const shortName = isProduction ? 'Kickoff' : `KO:${sanitizedBranch.slice(0, 8)}`
+// Sanitize branch name: remove special chars, limit length
+const sanitizedBranch = branch.replace(/[^a-zA-Z0-9-_/]/g, '').slice(0, 20) || 'preview'
+const appName = isProduction ? 'Kickoff' : sanitizedBranch
+const shortName = isProduction ? 'Kickoff' : sanitizedBranch.slice(0, 12)
 
 // Plugin to replace %VITE_APP_NAME% in HTML
 function htmlAppNamePlugin(): Plugin {
