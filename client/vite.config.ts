@@ -12,9 +12,12 @@ const appVersion = process.env.APP_VERSION || rootPkg.version || '0.0.0'
 // Determine app name based on branch/environment
 // Production branches show just "Kickoff", others show "Kickoff [branch]"
 const branch = process.env.VITE_BRANCH || process.env.BRANCH || ''
-const isProduction = !branch || branch === 'main' || branch === 'master' || branch === 'production'
-const appName = isProduction ? 'Kickoff' : `Kickoff [${branch}]`
-const shortName = isProduction ? 'Kickoff' : `KO:${branch.slice(0, 8)}`
+const branchLower = branch.toLowerCase()
+const isProduction = !branch || branchLower === 'main' || branchLower === 'master' || branchLower === 'production'
+// Sanitize branch name: remove brackets to prevent injection, limit length
+const sanitizedBranch = branch.replace(/[\[\]]/g, '').slice(0, 20)
+const appName = isProduction ? 'Kickoff' : `Kickoff [${sanitizedBranch}]`
+const shortName = isProduction ? 'Kickoff' : `KO:${sanitizedBranch.slice(0, 8)}`
 
 // Plugin to replace %VITE_APP_NAME% in HTML
 function htmlAppNamePlugin(): Plugin {
@@ -48,6 +51,7 @@ export default defineConfig({
     htmlAppNamePlugin(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
         name: appName,
@@ -98,7 +102,7 @@ export default defineConfig({
         ],
       },
       devOptions: {
-        enabled: true,
+        enabled: false,
       },
     }),
   ],
