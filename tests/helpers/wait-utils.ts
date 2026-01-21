@@ -104,6 +104,7 @@ export async function waitForBallMovement(
 
 /**
  * Wait for player to move (position changes)
+ * Uses controlledPlayerId to track the actively controlled player
  * @param page Playwright page
  * @param initialX Initial X position
  * @param initialY Initial Y position
@@ -120,7 +121,9 @@ export async function waitForPlayerMovement(
   await page.waitForFunction(
     ({ x, y, dist }) => {
       const scene = (window as any).__gameControls?.scene
-      const player = scene?.player
+      // Use controlledPlayerId because that's the player being moved by input
+      const controlledPlayerId = scene?.controlledPlayerId || scene?.myPlayerId
+      const player = scene?.players?.get(controlledPlayerId)
       if (!player) return false
 
       const dx = player.x - x

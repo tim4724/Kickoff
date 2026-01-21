@@ -7,7 +7,9 @@ import { setTimeScale } from './time-control'
  */
 
 // Default time scale for all tests (can be overridden per test)
-export const DEFAULT_TIME_SCALE = 10
+// Using 1x (real-time) for stability - matches fixtures.ts
+// Higher values can cause timing-sensitive tests to become flaky
+export const DEFAULT_TIME_SCALE = 1
 
 /**
  * Setup function to call at the start of every test

@@ -1,13 +1,12 @@
 import { test, expect } from './fixtures'
 import { waitScaled } from './helpers/time-control'
+import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.describe('AI Behavior', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 30000 })
-    await page.evaluate(() => (window as any).__menuButtons.singlePlayer.emit('pointerup'))
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene', { timeout: 30000 })
-    // Do NOT disable AI
+    // Keep AI enabled for this test
+    await navigateToSinglePlayer(page, { disableAI: false, disableAutoSwitch: false })
   });
 
   test('AI player moves towards ball', async ({ page }) => {

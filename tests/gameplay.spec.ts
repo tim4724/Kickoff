@@ -1,20 +1,11 @@
 import { test, expect } from './fixtures'
-import { movePlayer, getPlayerPosition, disableAI, disableAutoSwitch } from './helpers/test-utils'
+import { movePlayer, getPlayerPosition } from './helpers/test-utils'
+import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.describe('Gameplay Mechanics (Single Player)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 60000 })
-
-    // Enter Single Player
-    await page.evaluate(() => {
-        (window as any).__menuButtons.singlePlayer.emit('pointerup');
-    })
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene', { timeout: 60000 })
-
-    // Disable AI and AutoSwitch for deterministic testing
-    await disableAI(page)
-    await disableAutoSwitch(page)
+    await navigateToSinglePlayer(page)
   });
 
   test('Player movement', async ({ page }) => {

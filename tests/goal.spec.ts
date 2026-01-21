@@ -1,15 +1,12 @@
 import { test, expect } from './fixtures'
-import { disableAI, disableAutoSwitch, getServerState, shoot } from './helpers/test-utils'
+import { getServerState, shoot } from './helpers/test-utils'
 import { waitScaled } from './helpers/time-control'
+import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.describe('Goal Scoring (Single Player)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 60000 })
-    await page.evaluate(() => (window as any).__menuButtons.singlePlayer.emit('pointerup'))
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene', { timeout: 60000 })
-    await disableAI(page)
-    await disableAutoSwitch(page)
+    await navigateToSinglePlayer(page)
   });
 
   test('Score a goal and verify reset', async ({ page }) => {
