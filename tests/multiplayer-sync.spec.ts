@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { setupMultiClientTest, setTestRoomId, generateTestRoomId } from './helpers/room-utils'
+import { generateTestRoomId, cleanupTestContext } from './helpers/room-utils'
 
 test.describe('Multiplayer Synchronization', () => {
   test('Two clients join same room and see each other', async ({ browser }, testInfo) => {
@@ -61,7 +61,8 @@ test.describe('Multiplayer Synchronization', () => {
         }, c1Id)
     }, { timeout: 60000 }).toBe(true)
 
-    await context1.close()
-    await context2.close()
+    // Clean up with proper disconnection
+    await cleanupTestContext(page1, context1)
+    await cleanupTestContext(page2, context2)
   });
 })

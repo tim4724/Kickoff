@@ -2,6 +2,79 @@ import { Page } from '@playwright/test'
 import { waitScaled } from './time-control'
 
 /**
+ * Navigate to Single Player scene
+ *
+ * Waits for menu and button to be fully ready before clicking,
+ * then waits for scene to be fully initialized.
+ *
+ * @param page - Playwright page object
+ * @param options - Configuration options
+ */
+export async function navigateToSinglePlayer(
+  page: Page,
+  options: {
+    disableAI?: boolean
+    disableAutoSwitch?: boolean
+    timeout?: number
+  } = {}
+): Promise<void> {
+  const { disableAI = true, disableAutoSwitch = true, timeout = 30000 } = options
+
+  // Wait for menu AND button to be fully ready (not just menu loaded)
+  await page.waitForFunction(
+    () => {
+      const menuLoaded = (window as any).__menuLoaded === true
+      const button = (window as any).__menuButtons?.singlePlayer
+      // Ensure button exists and is interactive
+      return menuLoaded && button && button.interactive === true
+    },
+    { timeout }
+  )
+
+  // Click the single player button (emit both events like a real click)
+  await page.evaluate(() => {
+    const button = (window as any).__menuButtons.singlePlayer
+    button.emit('pointerdown')
+    button.emit('pointerup')
+  })
+
+  // Wait for scene transition
+  await page.waitForFunction(
+    () => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene',
+    { timeout }
+  )
+
+  // Wait for scene to be fully initialized with players
+  await page.waitForFunction(
+    () => {
+      const scene = (window as any).__gameControls?.scene
+      return scene?.myPlayerId && scene?.players?.size > 0
+    },
+    { timeout: 10000 }
+  )
+
+  // Disable AI if requested
+  if (disableAI) {
+    await page.evaluate(() => {
+      const controls = (window as any).__gameControls
+      if (controls?.test?.setAIEnabled) {
+        controls.test.setAIEnabled(false)
+      }
+    })
+  }
+
+  // Disable auto-switch if requested
+  if (disableAutoSwitch) {
+    await page.evaluate(() => {
+      const controls = (window as any).__gameControls
+      if (controls?.test?.setAutoSwitchEnabled) {
+        controls.test.setAutoSwitchEnabled(false)
+      }
+    })
+  }
+}
+
+/**
  * Test Room Isolation Utilities
  *
  * These helpers ensure each test runs in an isolated Colyseus room,
@@ -9,17 +82,32 @@ import { waitScaled } from './time-control'
  */
 
 /**
+ * Counter to ensure unique room IDs even within the same millisecond
+ */
+let roomIdCounter = 0
+
+/**
  * Generate unique room ID for test isolation
  *
- * Format: test-w{workerIndex}-{timestamp}-{random}
+ * Format: test-w{workerIndex}-{counter}-{timestamp}-{random}
+ *
+ * Uses multiple sources of uniqueness to prevent collisions:
+ * - Auto-incrementing counter (unique per process)
+ * - Worker index (unique per parallel worker)
+ * - Timestamp (unique per millisecond)
+ * - Random string (additional entropy)
  *
  * @param workerIndex - Playwright worker index (0, 1, 2, ...)
  * @returns Unique room ID string
  */
 export function generateTestRoomId(workerIndex: number): string {
+  const counter = roomIdCounter++
   const timestamp = Date.now()
-  const random = Math.random().toString(36).slice(2, 8)
-  return `test-w${workerIndex}-${timestamp}-${random}`
+  // Use crypto.randomUUID if available, otherwise fallback to Math.random
+  const random = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10)
+  return `test-w${workerIndex}-${counter}-${timestamp}-${random}`
 }
 
 /**
@@ -197,4 +285,70 @@ export async function waitForPlayerReady(
     // myPlayerId format: "sessionId-p1" (includes the -p1 suffix)
     return scene?.myPlayerId && scene?.networkManager?.getState()?.players?.has(scene.myPlayerId)
   }, { timeout: timeoutMs })
+}
+
+/**
+ * Gracefully disconnect from a room before closing context
+ *
+ * This ensures the server-side cleanup happens properly before
+ * the browser context is closed.
+ *
+ * @param page - Playwright page object
+ */
+export async function disconnectFromRoom(page: Page): Promise<void> {
+  try {
+    await page.evaluate(() => {
+      const scene = (window as any).__gameControls?.scene
+      const room = scene?.networkManager?.getRoom()
+      if (room) {
+        room.leave()
+      }
+    })
+    // Brief wait for disconnection to propagate
+    await page.waitForTimeout(100)
+  } catch {
+    // Page might already be closed or room might not exist
+  }
+}
+
+/**
+ * Clean up test context with proper disconnection
+ *
+ * Use this in test cleanup to ensure proper resource cleanup.
+ * Wraps context.close() with graceful disconnection.
+ *
+ * @param page - Playwright page object
+ * @param context - Browser context to close
+ */
+export async function cleanupTestContext(
+  page: Page,
+  context: { close: () => Promise<void> }
+): Promise<void> {
+  await disconnectFromRoom(page)
+  await context.close()
+}
+
+/**
+ * Wait for a specific player count in the room
+ *
+ * Useful for verifying players have joined or left.
+ *
+ * @param page - Playwright page object
+ * @param expectedCount - Expected number of players
+ * @param timeoutMs - Maximum wait time (default: 10000ms)
+ */
+export async function waitForPlayerCountInRoom(
+  page: Page,
+  expectedCount: number,
+  timeoutMs: number = 10000
+): Promise<void> {
+  await page.waitForFunction(
+    (count) => {
+      const scene = (window as any).__gameControls?.scene
+      const state = scene?.networkManager?.getState()
+      return state?.players?.size === count
+    },
+    expectedCount,
+    { timeout: timeoutMs }
+  )
 }

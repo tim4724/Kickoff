@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { generateTestRoomId, cleanupTestContext } from './helpers/room-utils'
 
 test.describe('Multiplayer Connection', () => {
   // Scenario 1: Standard Connection Flow
-  test('Two clients join the same room and game starts only after second player joins', async ({ browser }) => {
-    // Use a unique room name for each test
-    const roomName = `test-room-${Date.now()}`
+  test('Two clients join the same room and game starts only after second player joins', async ({ browser }, testInfo) => {
+    // Use a unique room name for each test (robust ID generation prevents collisions)
+    const roomName = generateTestRoomId(testInfo.workerIndex)
 
     // Create two contexts (browsers)
     const context1 = await browser.newContext()
@@ -80,13 +81,14 @@ test.describe('Multiplayer Connection', () => {
 
     console.log('Client 2 returned to menu/disconnected properly.')
 
-    await context1.close();
-    await context2.close();
+    // Clean up with proper disconnection
+    await cleanupTestContext(page2, context2);
+    await context1.close(); // context1 already closed page1
   });
 
   // Scenario 2: Reconnection Flow
-  test('Client can leave and rejoin a new multiplayer game', async ({ browser }) => {
-    const roomName = `test-reconnect-${Date.now()}`
+  test('Client can leave and rejoin a new multiplayer game', async ({ browser }, testInfo) => {
+    const roomName = generateTestRoomId(testInfo.workerIndex)
 
     const context = await browser.newContext()
     const page = await context.newPage()
@@ -163,7 +165,8 @@ test.describe('Multiplayer Connection', () => {
 
     console.log('Match started successfully in second session.')
 
-    await context.close();
-    await context2.close();
+    // Clean up with proper disconnection
+    await cleanupTestContext(page, context);
+    await cleanupTestContext(page2, context2);
   });
 });

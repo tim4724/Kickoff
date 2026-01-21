@@ -26,9 +26,11 @@ test.describe('Game Flow', () => {
     await page.goto('/')
     await page.waitForFunction(() => (window as any).__menuLoaded === true)
 
-    // Click Single Player
+    // Click Single Player (emit both events like a real click)
     await page.evaluate(() => {
-        (window as any).__menuButtons.singlePlayer.emit('pointerup');
+        const button = (window as any).__menuButtons.singlePlayer;
+        button.emit('pointerdown');
+        button.emit('pointerup');
     })
 
     // Wait for scene switch
@@ -51,11 +53,19 @@ test.describe('Game Flow', () => {
 
   test('Multiplayer room connection flow', async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true)
 
-    // Click Multiplayer
+    // Wait for menu AND button to be interactive
+    await page.waitForFunction(() => {
+      const menuLoaded = (window as any).__menuLoaded === true
+      const button = (window as any).__menuButtons?.multiplayer
+      return menuLoaded && button && button.interactive === true
+    })
+
+    // Click Multiplayer (emit both events like a real click)
     await page.evaluate(() => {
-        (window as any).__menuButtons.multiplayer.emit('pointerup');
+        const button = (window as any).__menuButtons.multiplayer;
+        button.emit('pointerdown');
+        button.emit('pointerup');
     })
 
     // Wait for Lobby

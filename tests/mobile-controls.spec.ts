@@ -1,21 +1,14 @@
 import { test, expect } from './fixtures'
-import { disableAI, disableAutoSwitch, getPlayerPosition } from './helpers/test-utils'
+import { getPlayerPosition } from './helpers/test-utils'
+import { waitForPlayerMovement } from './helpers/wait-utils'
+import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.use({ hasTouch: true })
 
 test.describe('Mobile Controls', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 60000 })
-
-    // Simulate tap on Single Player button via internal event
-    await page.evaluate(() => {
-        (window as any).__menuButtons.singlePlayer.emit('pointerup');
-    })
-
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene', { timeout: 60000 })
-    await disableAI(page)
-    await disableAutoSwitch(page)
+    await navigateToSinglePlayer(page)
   });
 
   test('Virtual Joystick controls player', async ({ page }) => {
@@ -35,8 +28,8 @@ test.describe('Mobile Controls', () => {
         }
     }, { x: startX, y: startY, tx: endX, ty: startY });
 
-    // Hold to allow movement accumulation
-    await page.waitForTimeout(1000);
+    // Wait for player to actually move (condition-based, not arbitrary timeout)
+    await waitForPlayerMovement(page, startPos.x, startPos.y, 10, 5000)
 
     const endPos = await getPlayerPosition(page)
 

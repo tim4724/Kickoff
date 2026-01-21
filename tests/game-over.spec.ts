@@ -1,14 +1,12 @@
 import { test, expect } from './fixtures'
-import { disableAI, getServerState } from './helpers/test-utils'
+import { getServerState } from './helpers/test-utils'
 import { waitScaled } from './helpers/time-control'
+import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.describe('Game Over (Single Player)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => (window as any).__menuLoaded === true, { timeout: 30000 })
-    await page.evaluate(() => (window as any).__menuButtons.singlePlayer.emit('pointerup'))
-    await page.waitForFunction(() => (window as any).__gameControls?.scene?.sceneKey === 'SinglePlayerScene', { timeout: 30000 })
-    await disableAI(page)
+    await navigateToSinglePlayer(page, { disableAI: true, disableAutoSwitch: false })
   });
 
   test('Match ends when timer reaches zero', async ({ page }) => {
