@@ -24,7 +24,8 @@ COPY shared ./shared
 # Build client - server URL will be injected at runtime via entrypoint script
 # Build-time default is fine since we override at runtime
 ARG COMMIT_HASH
-RUN COMMIT_HASH=${COMMIT_HASH} npm run build --workspace=client
+ARG VITE_BRANCH
+RUN COMMIT_HASH=${COMMIT_HASH} VITE_BRANCH=${VITE_BRANCH} npm run build --workspace=client
 
 # Production: nginx to serve static files
 FROM nginx:alpine3.20

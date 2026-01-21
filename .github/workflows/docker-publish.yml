@@ -82,6 +82,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             COMMIT_HASH=${{ github.sha }}
+            VITE_BRANCH=${{ github.ref_name }}
           cache-from: type=gha,scope=client
           cache-to: type=gha,mode=max,scope=client
           platforms: ${{ inputs.platforms || 'linux/amd64,linux/arm64' }}
