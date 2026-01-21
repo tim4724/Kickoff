@@ -14,6 +14,19 @@ import { PhysicsEngine } from '@shared/engine/PhysicsEngine'
 import { GeometryUtils } from '@shared/utils/geometry'
 
 export class InterceptionCalculator {
+  // Reused objects to prevent allocation in simulateBallPosition
+  // This method is called thousands of times per frame in AI pass evaluation
+  private static reusedStepResult = { x: 0, y: 0, vx: 0, vy: 0 }
+
+  // Physics config matching game engine (full field bounds, no margin)
+  private static readonly physicsConfig = {
+    ballFriction: GAME_CONFIG.BALL_FRICTION,
+    fieldWidth: GAME_CONFIG.FIELD_WIDTH,
+    fieldHeight: GAME_CONFIG.FIELD_HEIGHT,
+    goalYMin: GAME_CONFIG.GOAL_Y_MIN,
+    goalYMax: GAME_CONFIG.GOAL_Y_MAX,
+  }
+
   /**
    * Find earliest interception from multiple players
    * Returns the first player to intercept, the point, and the time.
@@ -96,22 +109,14 @@ export class InterceptionCalculator {
     const dt = 1 / PHYSICS_HZ // 0.01666s per step (matches GameEngine)
     const steps = Math.ceil(timeSeconds / dt)
 
-    // Physics config matching game engine (full field bounds, no margin)
-    const physicsConfig = {
-      ballFriction: GAME_CONFIG.BALL_FRICTION,
-      fieldWidth: GAME_CONFIG.FIELD_WIDTH,
-      fieldHeight: GAME_CONFIG.FIELD_HEIGHT,
-      goalYMin: GAME_CONFIG.GOAL_Y_MIN,
-      goalYMax: GAME_CONFIG.GOAL_Y_MAX,
-    }
-
     let x = startPos.x
     let y = startPos.y
     let vx = startVelX
     let vy = startVelY
 
-    // Reusable object to avoid allocation in tight loop (can run 100s of times)
-    const stepResult = { x: 0, y: 0, vx: 0, vy: 0 }
+    // Reuse static object to avoid allocation in tight loop
+    const stepResult = InterceptionCalculator.reusedStepResult
+    const physicsConfig = InterceptionCalculator.physicsConfig
 
     // Simulate step-by-step using actual PhysicsEngine logic
     for (let i = 0; i < steps; i++) {
