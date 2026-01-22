@@ -73,6 +73,12 @@ function isIOS(): boolean {
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
+// Detect iPad specifically
+function isIPad(): boolean {
+    return /iPad/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 // Function to setup fullscreen splash - migrated from main.ts
 function setupFullscreenSplash(_app: Application) {
     // Don't show splash if already running as PWA
@@ -168,11 +174,20 @@ function setupFullscreenSplash(_app: Application) {
 
             // Title
             const modalTitle = document.createElement('h2')
-            modalTitle.textContent = 'Install App'
+            modalTitle.textContent = 'Kickoff'
             modalTitle.style.cssText = `
-              margin: 0 0 20px 0;
-              font-size: 22px;
+              margin: 0 0 4px 0;
+              font-size: 28px;
               font-weight: bold;
+            `
+
+            // Subtitle
+            const modalSubtitle = document.createElement('p')
+            modalSubtitle.textContent = 'Fullscreen Experience'
+            modalSubtitle.style.cssText = `
+              margin: 0 0 20px 0;
+              font-size: 14px;
+              color: #888;
             `
 
             // Steps list
@@ -183,24 +198,39 @@ function setupFullscreenSplash(_app: Application) {
               margin: 0;
             `
 
-            // Share icon SVG
+            // SVG Icons
             const shareIconSvg = `<svg fill="currentColor" stroke="currentColor" stroke-width="1.2" width="24" height="24" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
               <path d="M30.3 13.7L25 8.4l-5.3 5.3-1.4-1.4L25 5.6l6.7 6.7z"/>
               <path d="M24 7h2v21h-2z"/>
               <path d="M35 40H15c-1.7 0-3-1.3-3-3V19c0-1.7 1.3-3 3-3h7v2h-7c-.6 0-1 .4-1 1v18c0 .6.4 1 1 1h20c.6 0 1-.4 1-1V19c0-.6-.4-1-1-1h-7v-2h7c1.7 0 3 1.3 3 3v18c0 1.7-1.3 3-3 3z"/>
             </svg>`
 
-            // Add to Home Screen icon SVG
+            const moreIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+              <circle cx="6" cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="18" cy="12" r="1.5" fill="currentColor"/>
+            </svg>`
+
             const addIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
               <rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
               <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>`
 
-            const stepData = [
-                { icon: shareIconSvg, text: 'Tap Share button' },
+            // Different steps for iPad vs iPhone
+            const stepData = isIPad() ? [
+                { icon: shareIconSvg, text: 'Tap Share' },
+                { icon: moreIconSvg, text: 'More' },
                 { icon: addIconSvg, text: 'Add to Home Screen' },
-                { icon: null, text: 'Open from home screen' },
+                { icon: null, text: 'Tap Add' },
+                { icon: null, text: 'Open from Home Screen' },
+            ] : [
+                { icon: moreIconSvg, text: 'Tap Menu' },
+                { icon: shareIconSvg, text: 'Share' },
+                { icon: null, text: 'Scroll down' },
+                { icon: addIconSvg, text: 'Add to Home Screen' },
+                { icon: null, text: 'Tap Add' },
+                { icon: null, text: 'Open from Home Screen' },
             ]
 
             stepData.forEach((step, i) => {
@@ -248,6 +278,7 @@ function setupFullscreenSplash(_app: Application) {
 
             modal.appendChild(closeBtn)
             modal.appendChild(modalTitle)
+            modal.appendChild(modalSubtitle)
             modal.appendChild(steps)
             splash.appendChild(overlay)
             splash.appendChild(modal)
