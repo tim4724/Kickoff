@@ -153,26 +153,6 @@ function setupFullscreenSplash(_app: Application) {
             `
             modal.addEventListener('click', (ev) => ev.stopPropagation(), { capture: true })
 
-            // Close button
-            const closeBtn = document.createElement('button')
-            closeBtn.innerHTML = '&times;'
-            closeBtn.style.cssText = `
-              position: absolute;
-              top: 12px;
-              right: 12px;
-              background: none;
-              border: none;
-              color: #888;
-              font-size: 28px;
-              cursor: pointer;
-              padding: 0;
-              line-height: 1;
-            `
-            closeBtn.addEventListener('click', (ev) => {
-                ev.stopPropagation()
-                cleanupSplash()
-            }, { capture: true })
-
             // Title
             const modalTitle = document.createElement('h2')
             modalTitle.textContent = 'Kickoff'
@@ -284,7 +264,6 @@ function setupFullscreenSplash(_app: Application) {
             `
             openSection.textContent = 'Then open Kickoff from your Home Screen'
 
-            modal.appendChild(closeBtn)
             modal.appendChild(modalTitle)
             modal.appendChild(modalSubtitle)
             modal.appendChild(steps)
