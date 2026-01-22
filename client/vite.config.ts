@@ -57,7 +57,7 @@ export default defineConfig({
         name: appName,
         short_name: shortName,
         description: 'Fast-paced multiplayer arcade soccer',
-        theme_color: '#00ff00',
+        theme_color: '#1a1a1a',
         background_color: '#1a1a1a',
         display: 'standalone',
         orientation: 'landscape',
