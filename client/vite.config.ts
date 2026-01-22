@@ -15,7 +15,7 @@ const branch = process.env.VITE_BRANCH || process.env.BRANCH || ''
 const branchLower = branch.toLowerCase()
 const isProduction = !branch || branchLower === 'main' || branchLower === 'master' || branchLower === 'production'
 // Sanitize branch name: remove special chars, limit length
-const sanitizedBranch = branch.replace(/\//g, '-').replace(/[^a-zA-Z0-9-_]/g, '').slice(0, 20) || 'preview'
+const sanitizedBranch = branch.replace(/\//g, '-').replace(/[^a-zA-Z0-9-_]/g, '').replace(/^-+|-+$/g, '').slice(0, 20) || 'preview'
 const appName = isProduction ? 'Kickoff' : sanitizedBranch
 const shortName = isProduction ? 'Kickoff' : sanitizedBranch.slice(0, 12)
 
