@@ -220,18 +220,13 @@ function setupFullscreenSplash(_app: Application) {
 
             // Different steps for iPad vs iPhone
             const stepData = isIPad() ? [
-                { icon: shareIconSvg, text: 'Tap Share' },
-                { icon: moreIconSvg, text: 'More' },
-                { icon: addIconSvg, text: 'Add to Home Screen' },
-                { icon: null, text: 'Tap Add' },
-                { icon: null, text: 'Open from Home Screen' },
+                { icons: [shareIconSvg, moreIconSvg], text: 'Share → More' },
+                { icons: [addIconSvg], text: 'Add to Home Screen' },
+                { icons: [], text: 'Tap Add' },
             ] : [
-                { icon: moreIconSvg, text: 'Tap Menu' },
-                { icon: shareIconSvg, text: 'Share' },
-                { icon: null, text: 'Scroll down' },
-                { icon: addIconSvg, text: 'Add to Home Screen' },
-                { icon: null, text: 'Tap Add' },
-                { icon: null, text: 'Open from Home Screen' },
+                { icons: [moreIconSvg, shareIconSvg], text: 'Menu → Share' },
+                { icons: [addIconSvg], text: 'Add to Home Screen' },
+                { icons: [], text: 'Tap Add' },
             ]
 
             stepData.forEach((step, i) => {
@@ -261,13 +256,13 @@ function setupFullscreenSplash(_app: Application) {
                 `
 
                 const content = document.createElement('div')
-                content.style.cssText = `display: flex; align-items: center; gap: 8px;`
-                if (step.icon) {
+                content.style.cssText = `display: flex; align-items: center; gap: 6px;`
+                step.icons.forEach(icon => {
                     const iconSpan = document.createElement('span')
-                    iconSpan.innerHTML = step.icon
+                    iconSpan.innerHTML = icon
                     iconSpan.style.cssText = `display: flex; color: #0066ff;`
                     content.appendChild(iconSpan)
-                }
+                })
                 const textSpan = document.createElement('span')
                 textSpan.textContent = step.text
                 content.appendChild(textSpan)
@@ -277,10 +272,23 @@ function setupFullscreenSplash(_app: Application) {
                 steps.appendChild(li)
             })
 
+            // Separate section for "Open from Home Screen"
+            const openSection = document.createElement('div')
+            openSection.style.cssText = `
+              margin-top: 20px;
+              padding-top: 16px;
+              border-top: 1px solid #444;
+              font-size: 14px;
+              color: #888;
+              text-align: center;
+            `
+            openSection.textContent = 'Then open Kickoff from your Home Screen'
+
             modal.appendChild(closeBtn)
             modal.appendChild(modalTitle)
             modal.appendChild(modalSubtitle)
             modal.appendChild(steps)
+            modal.appendChild(openSection)
             splash.appendChild(overlay)
             splash.appendChild(modal)
         } else {
