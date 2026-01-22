@@ -146,7 +146,8 @@ function setupFullscreenSplash(_app: Application) {
               background: #2a2a2a;
               border-radius: 16px;
               padding: 24px;
-              max-width: 320px;
+              width: ${isIPad() ? '320px' : '90%'};
+              max-width: 400px;
               position: relative;
               box-shadow: 0 4px 24px rgba(0,0,0,0.5);
             `
