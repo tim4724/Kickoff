@@ -258,9 +258,10 @@ function setupFullscreenSplash(_app: Application) {
               margin-top: 20px;
               padding-top: 16px;
               border-top: 1px solid #444;
-              font-size: 14px;
-              color: #888;
+              font-size: 16px;
+              color: white;
               text-align: center;
+              font-weight: 500;
             `
             openSection.textContent = 'Then open Kickoff from your Home Screen'
 
