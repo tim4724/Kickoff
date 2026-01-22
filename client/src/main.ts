@@ -118,60 +118,150 @@ function setupFullscreenSplash(_app: Application) {
             blocker.destroy()
         }
 
-        const title = document.createElement('div')
-        title.textContent = 'KICKOFF'
-        title.style.cssText = `
-          font-size: 48px;
-          font-weight: bold;
-          margin-bottom: 40px;
-        `
-
-        splash.appendChild(title)
-
-        // iOS: Show PWA install instructions (fullscreen API not supported)
+        // iOS: Show PWA install instructions modal (fullscreen API not supported)
         if (isIOS()) {
-            const instructions = document.createElement('div')
-            instructions.style.cssText = `
-              max-width: 320px;
-              line-height: 1.6;
+            // Create modal overlay (clicking dismisses)
+            const overlay = document.createElement('div')
+            overlay.style.cssText = `
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
             `
-            instructions.innerHTML = `
-              <p style="font-size: 18px; margin-bottom: 20px;">
-                For the best fullscreen experience, install this app:
-              </p>
-              <p style="font-size: 16px; margin-bottom: 12px;">
-                1. Tap the <strong>Share</strong> button <span style="font-size: 20px;">⬆️</span>
-              </p>
-              <p style="font-size: 16px; margin-bottom: 12px;">
-                2. Select <strong>"Add to Home Screen"</strong>
-              </p>
-              <p style="font-size: 16px; margin-bottom: 24px;">
-                3. Open from your home screen
-              </p>
-            `
-
-            const dismissBtn = document.createElement('button')
-            dismissBtn.textContent = 'CONTINUE IN BROWSER'
-            dismissBtn.style.cssText = `
-              background: transparent;
-              color: #888;
-              border: 1px solid #888;
-              padding: 12px 24px;
-              font-size: 14px;
-              border-radius: 8px;
-              cursor: pointer;
-              touch-action: none;
-            `
-            dismissBtn.addEventListener('click', (ev) => {
+            overlay.addEventListener('click', (ev) => {
                 ev.stopPropagation()
-                ev.preventDefault()
                 cleanupSplash()
             }, { capture: true })
 
-            splash.appendChild(instructions)
-            splash.appendChild(dismissBtn)
+            // Modal content box
+            const modal = document.createElement('div')
+            modal.style.cssText = `
+              background: #2a2a2a;
+              border-radius: 16px;
+              padding: 24px;
+              max-width: 320px;
+              position: relative;
+              box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+            `
+            modal.addEventListener('click', (ev) => ev.stopPropagation(), { capture: true })
+
+            // Close button
+            const closeBtn = document.createElement('button')
+            closeBtn.innerHTML = '&times;'
+            closeBtn.style.cssText = `
+              position: absolute;
+              top: 12px;
+              right: 12px;
+              background: none;
+              border: none;
+              color: #888;
+              font-size: 28px;
+              cursor: pointer;
+              padding: 0;
+              line-height: 1;
+            `
+            closeBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation()
+                cleanupSplash()
+            }, { capture: true })
+
+            // Title
+            const modalTitle = document.createElement('h2')
+            modalTitle.textContent = 'Install App'
+            modalTitle.style.cssText = `
+              margin: 0 0 20px 0;
+              font-size: 22px;
+              font-weight: bold;
+            `
+
+            // Steps list
+            const steps = document.createElement('ol')
+            steps.style.cssText = `
+              list-style: none;
+              padding: 0;
+              margin: 0;
+            `
+
+            // Share icon SVG
+            const shareIconSvg = `<svg fill="currentColor" stroke="currentColor" stroke-width="1.2" width="24" height="24" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+              <path d="M30.3 13.7L25 8.4l-5.3 5.3-1.4-1.4L25 5.6l6.7 6.7z"/>
+              <path d="M24 7h2v21h-2z"/>
+              <path d="M35 40H15c-1.7 0-3-1.3-3-3V19c0-1.7 1.3-3 3-3h7v2h-7c-.6 0-1 .4-1 1v18c0 .6.4 1 1 1h20c.6 0 1-.4 1-1V19c0-.6-.4-1-1-1h-7v-2h7c1.7 0 3 1.3 3 3v18c0 1.7-1.3 3-3 3z"/>
+            </svg>`
+
+            // Add to Home Screen icon SVG
+            const addIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+              <rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>`
+
+            const stepData = [
+                { icon: shareIconSvg, text: 'Tap Share button' },
+                { icon: addIconSvg, text: 'Add to Home Screen' },
+                { icon: null, text: 'Open from home screen' },
+            ]
+
+            stepData.forEach((step, i) => {
+                const li = document.createElement('li')
+                li.style.cssText = `
+                  display: flex;
+                  align-items: center;
+                  margin-bottom: 16px;
+                  font-size: 16px;
+                `
+
+                const num = document.createElement('span')
+                num.textContent = String(i + 1)
+                num.style.cssText = `
+                  background: #0066ff;
+                  color: white;
+                  width: 28px;
+                  height: 28px;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-weight: bold;
+                  font-size: 14px;
+                  flex-shrink: 0;
+                  margin-right: 12px;
+                `
+
+                const content = document.createElement('div')
+                content.style.cssText = `display: flex; align-items: center; gap: 8px;`
+                if (step.icon) {
+                    const iconSpan = document.createElement('span')
+                    iconSpan.innerHTML = step.icon
+                    iconSpan.style.cssText = `display: flex; color: #0066ff;`
+                    content.appendChild(iconSpan)
+                }
+                const textSpan = document.createElement('span')
+                textSpan.textContent = step.text
+                content.appendChild(textSpan)
+
+                li.appendChild(num)
+                li.appendChild(content)
+                steps.appendChild(li)
+            })
+
+            modal.appendChild(closeBtn)
+            modal.appendChild(modalTitle)
+            modal.appendChild(steps)
+            splash.appendChild(overlay)
+            splash.appendChild(modal)
         } else {
-            // Non-iOS: Show fullscreen button
+            // Non-iOS: Show fullscreen button with title
+            const title = document.createElement('div')
+            title.textContent = 'KICKOFF'
+            title.style.cssText = `
+              font-size: 48px;
+              font-weight: bold;
+              margin-bottom: 40px;
+            `
+            splash.appendChild(title)
+
             const button = document.createElement('button')
             button.textContent = 'TAP TO ENTER FULLSCREEN'
             button.style.cssText = `
