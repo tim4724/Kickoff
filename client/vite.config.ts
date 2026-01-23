@@ -1,11 +1,30 @@
 import { defineConfig } from 'vite'
 import { resolve, dirname } from 'path'
 import { readFileSync } from 'fs'
+import { VitePWA } from 'vite-plugin-pwa'
+import type { Plugin } from 'vite'
 
 const rootPkg = JSON.parse(
   readFileSync(resolve(dirname(__dirname), 'package.json'), 'utf-8')
 )
 const appVersion = process.env.APP_VERSION || rootPkg.version || '0.0.0'
+
+// Determine app name based on branch
+const branch = process.env.VITE_BRANCH || process.env.BRANCH || ''
+// Sanitize branch name: remove special chars, limit length
+const sanitizedBranch = branch.replace(/\//g, '-').replace(/[^a-zA-Z0-9-_]/g, '').replace(/^-+|-+$/g, '').slice(0, 20) || 'Kickoff'
+const appName = sanitizedBranch
+const shortName = sanitizedBranch.slice(0, 12)
+
+// Plugin to replace %VITE_APP_NAME% in HTML
+function htmlAppNamePlugin(): Plugin {
+  return {
+    name: 'html-app-name',
+    transformIndexHtml(html) {
+      return html.replace(/%VITE_APP_NAME%/g, appName)
+    },
+  }
+}
 
 export default defineConfig({
   resolve: {
@@ -22,7 +41,87 @@ export default defineConfig({
     ),
     'import.meta.env.APP_VERSION': JSON.stringify(appVersion),
     'import.meta.env.COMMIT_HASH': JSON.stringify(process.env.COMMIT_HASH || ''),
+    'import.meta.env.VITE_BRANCH': JSON.stringify(branch),
+    'import.meta.env.APP_NAME': JSON.stringify(appName),
   },
+  plugins: [
+    htmlAppNamePlugin(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      manifest: {
+        name: appName,
+        short_name: shortName,
+        description: 'Fast-paced multiplayer arcade soccer',
+        theme_color: '#1a1a1a',
+        background_color: '#1a1a1a',
+        display: 'standalone',
+        orientation: 'landscape',
+        start_url: '/',
+        scope: '/',
+        icons: [
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: [], // Don't precache - prioritize fresh content
+        skipWaiting: true,
+        clientsClaim: true,
+        runtimeCaching: [
+          {
+            // HTML: Network first, fall back to cache
+            urlPattern: ({ request }) => request.destination === 'document',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-cache',
+              networkTimeoutSeconds: 3,
+            },
+          },
+          {
+            // JS/CSS: Network first for fresh code
+            urlPattern: ({ request }) =>
+              request.destination === 'script' || request.destination === 'style',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'assets-cache',
+              networkTimeoutSeconds: 3,
+            },
+          },
+          {
+            // Images: Cache first (they don't change often)
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'image-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 1 week
+              },
+            },
+          },
+        ],
+      },
+      devOptions: {
+        enabled: false,
+      },
+    }),
+  ],
   server: {
     port: process.env.VITE_PORT ? parseInt(process.env.VITE_PORT) : 5173,
     host: '0.0.0.0',

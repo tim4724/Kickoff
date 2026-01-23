@@ -3,16 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#00ff00" />
+    <meta name="theme-color" content="#1a1a1a" />
     <meta name="description" content="Fast-paced multiplayer arcade soccer" />
 
     <!-- iOS PWA Meta Tags for Fullscreen -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Kickoff" />
+    <meta name="apple-mobile-web-app-title" content="%VITE_APP_NAME%" />
+
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <title>Kickoff ⚽</title>
     <style>
+      /* Expose safe area insets as CSS custom properties for JavaScript access */
+      :root {
+        --sat: env(safe-area-inset-top, 0px);
+        --sar: env(safe-area-inset-right, 0px);
+        --sab: env(safe-area-inset-bottom, 0px);
+        --sal: env(safe-area-inset-left, 0px);
+      }
+
       * {
         margin: 0;
         padding: 0;

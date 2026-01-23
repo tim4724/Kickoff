@@ -515,7 +515,10 @@ export abstract class BaseGameScene extends PixiScene {
     text.position.set(14, 10)
     this.backButton.addChild(text)
 
-    this.backButton.position.set(10, 10)
+    // Account for iOS safe area (notch/dynamic island) in PWA standalone mode
+    const safeTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sat') || '0', 10)
+    const safeLeft = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sal') || '0', 10)
+    this.backButton.position.set(10 + safeLeft, 10 + safeTop)
     this.backButton.eventMode = 'static'
     this.backButton.cursor = 'pointer'
     this.backButton.on('pointerdown', () => {

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Dark border circle (behind) -->
+  <circle cx="256" cy="256" r="240" fill="#1a1a1a"/>
+
+  <!-- White circle (on top) -->
+  <circle cx="256" cy="256" r="228" fill="#ffffff"/>
+
+  <!-- Bold K letter -->
+  <g fill="#1a1a1a">
+    <rect x="155" y="130" width="65" height="252" rx="6"/>
+    <path d="M220 256 L220 205 L325 130 L365 130 L365 172 L258 256 Z"/>
+    <path d="M220 256 L220 307 L325 382 L365 382 L365 340 L258 256 Z"/>
+  </g>
+</svg>
