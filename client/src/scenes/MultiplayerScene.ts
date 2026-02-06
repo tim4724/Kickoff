@@ -25,6 +25,8 @@ export class MultiplayerScene extends BaseGameScene {
   private positionInitialized: boolean = false
   private returningToMenu: boolean = false
   private aiEnabled: boolean = true
+  private lastControlledPlayerId?: string
+  private lastMovementWasNonZero: boolean = false
 
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
@@ -44,6 +46,8 @@ export class MultiplayerScene extends BaseGameScene {
     this.colorInitialized = false
     this.positionInitialized = false
     this.stateUpdateCount = 0
+    this.lastControlledPlayerId = undefined
+    this.lastMovementWasNonZero = false
 
     this.connectToMultiplayer()
   }
@@ -59,6 +63,21 @@ export class MultiplayerScene extends BaseGameScene {
 
     try {
       const dt = delta / 1000 // Convert to seconds assuming delta is MS.
+
+      const currentControlledId = this.controlledPlayerId
+      if (this.lastControlledPlayerId && this.lastControlledPlayerId !== currentControlledId) {
+        if (this.networkManager.isConnected()) {
+          // Send a stop for the previously controlled player to avoid lingering movement
+          this.networkManager.sendInput(
+            { x: 0, y: 0 },
+            false,
+            this.lastControlledPlayerId,
+            true
+          )
+        }
+        this.lastMovementWasNonZero = false
+      }
+      this.lastControlledPlayerId = currentControlledId
 
       const movement = this.collectMovementInput()
 
@@ -92,6 +111,16 @@ export class MultiplayerScene extends BaseGameScene {
             this.controlledPlayerId,
             true
           )
+          this.lastMovementWasNonZero = true
+        } else if (!hasMovement && this.lastMovementWasNonZero && this.networkManager.isConnected()) {
+          // Send a single "stop" input so the server doesn't keep moving on hold-last-input
+          this.networkManager.sendInput(
+            { x: 0, y: 0 },
+            false,
+            this.controlledPlayerId,
+            true
+          )
+          this.lastMovementWasNonZero = false
         }
       }
 

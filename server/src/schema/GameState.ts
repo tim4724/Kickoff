@@ -72,6 +72,8 @@ export class GameState extends Schema {
     // Initialize GameEngine
     this.gameEngine = new GameEngine({
       matchDuration: GAME_CONFIG.MATCH_DURATION,
+      // Hold last movement for ~100ms at 60Hz to mask packet loss
+      holdLastInputFrames: 6,
     })
 
     // Register callbacks

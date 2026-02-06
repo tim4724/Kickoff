@@ -18,6 +18,9 @@ import { GAME_CONFIG } from '../types.js'
 
 export interface GameEngineConfig {
   matchDuration: number // seconds
+  // Optional: hold last movement input for a few physics frames to mask packet loss
+  // Set to 0 to disable (default)
+  holdLastInputFrames?: number
 }
 
 export class GameEngine {
@@ -25,6 +28,9 @@ export class GameEngine {
   private state: GameEngineState
   private goalScored: boolean = false
   private inputQueues: Map<string, EnginePlayerInput[]> = new Map()
+  private lastMovementByPlayer: Map<string, { x: number; y: number }> = new Map()
+  private lastMovementFrame: Map<string, number> = new Map()
+  private holdLastInputFrames: number
 
   // Reusable input object to avoid allocation in game loop
   private reusedInput: EnginePlayerInput = {
@@ -50,6 +56,8 @@ export class GameEngine {
   private goalResetTimerId?: number
 
   constructor(config: GameEngineConfig) {
+    this.holdLastInputFrames = config.holdLastInputFrames ?? 0
+
     // Initialize physics engine
     const physicsConfig: PhysicsConfig = {
       fieldWidth: GAME_CONFIG.FIELD_WIDTH,
@@ -222,6 +230,16 @@ export class GameEngine {
     this.state.players.delete(p1Id)
     this.state.players.delete(p2Id)
     this.state.players.delete(p3Id)
+
+    this.inputQueues.delete(p1Id)
+    this.inputQueues.delete(p2Id)
+    this.inputQueues.delete(p3Id)
+    this.lastMovementByPlayer.delete(p1Id)
+    this.lastMovementByPlayer.delete(p2Id)
+    this.lastMovementByPlayer.delete(p3Id)
+    this.lastMovementFrame.delete(p1Id)
+    this.lastMovementFrame.delete(p2Id)
+    this.lastMovementFrame.delete(p3Id)
   }
 
   /**
@@ -279,6 +297,13 @@ export class GameEngine {
         mergedInput.movement.y = latestInput.movement.y
         mergedInput.timestamp = latestInput.timestamp
 
+        // Record last movement for hold-last-input
+        this.lastMovementByPlayer.set(player.id, {
+          x: latestInput.movement.x,
+          y: latestInput.movement.y,
+        })
+        this.lastMovementFrame.set(player.id, this.frameCount)
+
         // Check if ANY queued input has action=true
         for (const input of queue) {
           if (input.action) {
@@ -288,6 +313,17 @@ export class GameEngine {
         }
 
         this.inputQueues.set(player.id, [])
+      } else if (this.holdLastInputFrames > 0) {
+        const lastFrame = this.lastMovementFrame.get(player.id)
+        const lastMovement = this.lastMovementByPlayer.get(player.id)
+        if (
+          lastFrame !== undefined &&
+          lastMovement &&
+          this.frameCount - lastFrame <= this.holdLastInputFrames
+        ) {
+          mergedInput.movement.x = lastMovement.x
+          mergedInput.movement.y = lastMovement.y
+        }
       }
       // If no queued input, mergedInput defaults to {x: 0, y: 0} which allows velocity to decay
 
