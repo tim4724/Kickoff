@@ -30,7 +30,7 @@ jobs:
     - name: TypeScript type check (shared)
       run: npx tsc --noEmit --project shared/tsconfig.json
     - name: Run Playwright tests
-      run: npm run test:e2e -- --workers=1
+      run: npm run test:e2e -- --workers=4
     - uses: actions/upload-artifact@v4
       if: always()
       with:

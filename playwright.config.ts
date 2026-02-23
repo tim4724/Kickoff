@@ -15,8 +15,8 @@ export default defineConfig({
   // Smart retry strategy
   retries: process.env.CI ? 2 : 1,
 
-  // Workers
-  workers: 2,
+  // Workers — CI runners (4 vCPU) override via --workers flag
+  workers: 8,
 
   // Global timeout
   timeout: 90000,

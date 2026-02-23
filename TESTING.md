@@ -3,7 +3,7 @@
 ## Quick start
 ```bash
 # Auto-starts test servers on 3001/5174
-npm run test:e2e                  # Default 2 workers
+npm run test:e2e                  # Default 8 workers
 npm run test:e2e -- --workers=8   # More workers
 
 # Interactive/debug
