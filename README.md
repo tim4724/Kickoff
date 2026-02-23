@@ -25,8 +25,8 @@ npm run dev:server       # Server only (3000)
 npm run dev:shared       # Shared types/watch
 
 # Testing (Playwright spins up its own test servers on 3001/5174)
-npm run test:e2e                      # All E2E (2 workers)
-npm run test:e2e -- --workers=8       # Custom worker count
+npm run test:e2e                      # All E2E (auto-detect workers)
+npm run test:e2e -- --workers=4       # Custom worker count
 npm run test:e2e:ui                   # Playwright UI
 npm run test:e2e:headed               # Headed browser
 npm run test:e2e:debug                # Debug mode
@@ -76,7 +76,7 @@ Kickoff/
 ## Performance Snapshot
 
 - Input lag: ~55 ms (target <100 ms)
-- Test coverage: 13 E2E tests; 2 workers with 10× time acceleration
+- Test coverage: 13 E2E tests (CI: 4 workers)
 
 ## License
 

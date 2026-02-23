@@ -1,5 +1,4 @@
 import { test, expect } from './fixtures'
-import { generateTestRoomId } from './helpers/room-utils'
 
 test.describe('Game Flow', () => {
   test('Menu loads and has correct buttons', async ({ page }) => {
@@ -42,7 +41,7 @@ test.describe('Game Flow', () => {
     })
     expect(gameRunning).toBe(true)
 
-    // Click Back Button
+    // Click Back Button (pointerdown triggers navigation which destroys the scene)
     await page.evaluate(() => {
         (window as any).__gameControls.backButton.emit('pointerdown');
     })
@@ -96,7 +95,7 @@ test.describe('Game Flow', () => {
     const sessionId = await page.evaluate(() => (window as any).__gameControls.scene.mySessionId)
     expect(sessionId).toBeTruthy()
 
-    // Return to menu
+    // Return to menu (pointerdown triggers navigation which destroys the scene)
     await page.evaluate(() => {
          (window as any).__gameControls.backButton.emit('pointerdown');
     })

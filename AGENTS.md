@@ -25,6 +25,6 @@ Guidance for coding agents working on Kickoff. Keep it current; prefer this over
 ## Gotchas
 - Always use GAME_CONFIG for field/physics values; avoid hardcoding pixels.
 - Respect port separation: dev (3000/5173) vs tests (3001/5174).
-- Use `waitScaled()` helpers in tests (time acceleration); avoid raw `waitForTimeout`.
+- In tests, use `page.waitForFunction()` for conditions; `waitForFrames()` only for small settle delays (1-5 frames). Never use `waitForTimeout`.
 - Server is authoritative for possession/shooting; client prediction is for UX only.
 - Keep auto-start test servers in mind—no need to run dev servers before `npm run test:e2e`.

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { generateTestRoomId, cleanupTestContext } from './helpers/room-utils'
 
 test.describe('Multiplayer Connection', () => {
@@ -143,18 +143,7 @@ test.describe('Multiplayer Connection', () => {
     const context2 = await browser.newContext()
     const page2 = await context2.newPage()
 
-    // Get room ID from Client 1 using robust logic
-    const c1RoomId = await page.evaluate(() => {
-        const room = (window as any).__gameControls.scene.networkManager.getRoom();
-        return room.id || room.roomId;
-    });
-    console.log('Client 1 Room ID:', c1RoomId);
-
-    if (!c1RoomId) {
-        throw new Error('Could not retrieve room ID from Client 1');
-    }
-
-    // Client 2 joins that room
+    // Client 2 joins the same room by name (roomName_1 matches the joinOrCreate name)
     await page2.goto(`/?roomId=${roomName}_1#multiplayer`);
 
     // Wait for match start

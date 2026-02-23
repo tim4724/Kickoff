@@ -1,6 +1,4 @@
 import { test, expect } from './fixtures'
-import { getServerState } from './helpers/test-utils'
-import { waitScaled } from './helpers/time-control'
 import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.describe('Game Over (Single Player)', () => {
@@ -16,12 +14,11 @@ test.describe('Game Over (Single Player)', () => {
         controls.scene.gameEngine.state.matchTime = 2;
     })
 
-    // Wait for match end
-    await waitScaled(page, 3000)
-
-    // Check if phase is ended
-    const state = await getServerState(page)
-    expect(state.phase).toBe('ended')
+    // Wait for match to end (poll instead of fixed wait — CI runners are slower)
+    await page.waitForFunction(() => {
+      const controls = (window as any).__gameControls
+      return controls?.scene?.gameEngine?.state?.phase === 'ended'
+    }, { timeout: 15000 })
 
     const matchEnded = await page.evaluate(() => {
         return (window as any).__gameControls.scene.matchEnded
