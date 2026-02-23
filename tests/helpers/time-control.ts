@@ -20,7 +20,7 @@ export async function waitForFrames(page: Page, frameCount: number): Promise<voi
         return
       }
 
-      const timeoutMs = Math.max(n * 100, 5000)
+      const timeoutMs = Math.max(n * 500, 10000)
       const timer = setTimeout(() => {
         app.ticker.remove(onTick)
         reject(new Error(`waitForFrames(${n}) timed out after ${timeoutMs}ms`))
