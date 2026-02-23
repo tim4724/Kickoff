@@ -13,8 +13,12 @@ import { Page } from '@playwright/test'
  */
 export async function waitForFrames(page: Page, frameCount: number): Promise<void> {
   await page.evaluate((n) => {
-    return new Promise<void>(resolve => {
+    return new Promise<void>((resolve, reject) => {
       const app = (window as any).game
+      if (!app?.ticker) {
+        reject(new Error('PixiJS app not ready'))
+        return
+      }
       let remaining = n
       const onTick = () => {
         if (--remaining <= 0) {
