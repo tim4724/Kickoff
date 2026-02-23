@@ -19,9 +19,17 @@ export async function waitForFrames(page: Page, frameCount: number): Promise<voi
         reject(new Error('PixiJS app not ready'))
         return
       }
+
+      const timeoutMs = Math.max(n * 100, 5000)
+      const timer = setTimeout(() => {
+        app.ticker.remove(onTick)
+        reject(new Error(`waitForFrames(${n}) timed out after ${timeoutMs}ms`))
+      }, timeoutMs)
+
       let remaining = n
       const onTick = () => {
         if (--remaining <= 0) {
+          clearTimeout(timer)
           app.ticker.remove(onTick)
           resolve()
         }
