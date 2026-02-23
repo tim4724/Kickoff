@@ -1,6 +1,5 @@
 import { test, expect } from './fixtures'
 import { setupMultiClientTest } from './helpers/room-utils'
-import { waitScaled } from './helpers/time-control'
 
 test.describe('Multiplayer Gameplay', () => {
   test('Movement sync: Client A moves, Client B sees updates', async ({ browser }, testInfo) => {
@@ -27,9 +26,20 @@ test.describe('Multiplayer Gameplay', () => {
         return { x: p.x, y: p.y };
     }, p1Id)
 
-    // Move P1 (on Client 1)
+    // Move P1 right — hold key until position changes significantly
     await page1.keyboard.down('ArrowRight');
-    await waitScaled(page1, 2000);
+
+    await page1.waitForFunction(
+      ({ id, minX }) => {
+        const scene = (window as any).__gameControls?.scene
+        const state = scene?.networkManager?.getState()
+        const player = state?.players?.get(id)
+        return player && player.x > minX
+      },
+      { id: p1Id, minX: initialP1PosOnC2.x + 50 },
+      { timeout: 10000 }
+    )
+
     await page1.keyboard.up('ArrowRight');
 
     // Check P1 pos on Client 2

@@ -1,5 +1,4 @@
 import { test, expect } from './fixtures'
-import { waitScaled } from './helpers/time-control'
 import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.describe('AI Behavior', () => {
@@ -23,16 +22,21 @@ test.describe('AI Behavior', () => {
         controls.test.teleportPlayer(px, by, id); // Place AI to the right
     }, { id: aiId, bx: ballX, by: ballY, px: startX })
 
-    // Wait for AI to react
-    await waitScaled(page, 1000)
+    // Wait for AI to move toward ball (condition-based, no arbitrary frame count)
+    await page.waitForFunction(
+      ({ id, threshold }) => {
+        const player = (window as any).__gameControls?.scene?.players?.get(id)
+        return player && player.x < threshold
+      },
+      { id: aiId, threshold: startX - 10 },
+      { timeout: 10000 }
+    )
 
-    // Check AI position
     const aiPos = await page.evaluate((id) => {
         const player = (window as any).__gameControls.scene.players.get(id);
         return { x: player.x, y: player.y };
     }, aiId)
 
-    // AI should have moved left (towards ball)
     expect(aiPos.x).toBeLessThan(startX - 10)
   })
 })

@@ -1,6 +1,5 @@
 import { test, expect } from './fixtures'
-import { getPlayerPosition } from './helpers/test-utils'
-import { waitForPlayerMovement } from './helpers/wait-utils'
+import { getPlayerPosition, waitForPlayerMovement } from './helpers/test-utils'
 import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.use({ hasTouch: true })

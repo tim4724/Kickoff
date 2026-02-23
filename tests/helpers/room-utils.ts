@@ -1,5 +1,5 @@
 import { Page } from '@playwright/test'
-import { waitScaled } from './time-control'
+import { waitForFrames } from './time-control'
 
 /**
  * Navigate to Single Player scene
@@ -260,8 +260,8 @@ export async function setupSinglePlayerTest(
     return scene?.scene?.key === 'SinglePlayerScene' && scene?.myPlayerId && scene?.players?.size > 0
   }, { timeout: 10000 })
 
-  // Small delay for scene initialization
-  await waitScaled(page, 500)
+  // Let scene initialize
+  await waitForFrames(page, 5)
 }
 
 /**

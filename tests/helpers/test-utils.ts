@@ -1,5 +1,5 @@
 import { Page } from '@playwright/test'
-import { waitScaled } from './time-control'
+import { waitForFrames } from './time-control'
 import { GAME_CONFIG } from '../../shared/src/types'
 import { GeometryUtils } from '../../shared/src/utils/geometry'
 
@@ -126,9 +126,9 @@ export async function movePlayer(
   durationMs: number
 ) {
   await client.keyboard.down(direction)
-  await waitScaled(client, durationMs)
+  await waitForFrames(client, Math.ceil(durationMs / 16.67))
   await client.keyboard.up(direction)
-  await waitScaled(client, 200) // Small buffer for state to settle
+  await waitForFrames(client, 2) // Let state settle
 }
 
 /**
@@ -168,7 +168,7 @@ export async function gainPossession(
     )
 
     await client.keyboard.up('ArrowRight')
-    await waitScaled(client, 100) // Small buffer for state to settle
+    await waitForFrames(client, 2) // Let state settle
     return true
   } catch (error) {
     await client.keyboard.up('ArrowRight')
@@ -205,7 +205,7 @@ export async function moveTowardBallAndCapture(
     })
 
     if (!state.controlledId) {
-      await waitScaled(client, 100)
+      await waitForFrames(client, 5)
       continue
     }
 
@@ -230,11 +230,11 @@ export async function moveTowardBallAndCapture(
         ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft')
         : (dy > 0 ? 'ArrowDown' : 'ArrowUp')
       await client.keyboard.down(key)
-      await waitScaled(client, 300)
+      await waitForFrames(client, 18)
       await client.keyboard.up(key)
     }
 
-    await waitScaled(client, 200)
+    await waitForFrames(client, 5)
   }
 
   return false
@@ -245,9 +245,9 @@ export async function moveTowardBallAndCapture(
  */
 export async function shoot(client: Page, holdDurationMs: number = 200) {
   await client.keyboard.down('Space')
-  await waitScaled(client, holdDurationMs)
+  await waitForFrames(client, Math.ceil(holdDurationMs / 16.67))
   await client.keyboard.up('Space')
-  await waitScaled(client, 200)
+  await waitForFrames(client, 2)
 }
 
 /**
@@ -376,4 +376,30 @@ export async function assertPhase(
   if (state.phase !== expectedPhase) {
     throw new Error(`Phase is ${state.phase}, expected ${expectedPhase}`)
   }
+}
+
+/**
+ * Wait for player to move from initial position
+ */
+export async function waitForPlayerMovement(
+  page: Page,
+  initialX: number,
+  initialY: number,
+  minDistance = 10,
+  timeout = 5000
+): Promise<void> {
+  await page.waitForFunction(
+    ({ x, y, dist }) => {
+      const scene = (window as any).__gameControls?.scene
+      const controlledPlayerId = scene?.controlledPlayerId || scene?.myPlayerId
+      const player = scene?.players?.get(controlledPlayerId)
+      if (!player) return false
+
+      const dx = player.x - x
+      const dy = player.y - y
+      return Math.sqrt(dx * dx + dy * dy) > dist
+    },
+    { x: initialX, y: initialY, dist: minDistance },
+    { timeout }
+  )
 }

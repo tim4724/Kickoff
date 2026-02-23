@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures'
 import { getServerState, shoot } from './helpers/test-utils'
-import { waitScaled } from './helpers/time-control'
+import { waitForFrames } from './helpers/time-control'
 import { navigateToSinglePlayer } from './helpers/room-utils'
 
 test.describe('Goal Scoring (Single Player)', () => {
@@ -23,24 +23,33 @@ test.describe('Goal Scoring (Single Player)', () => {
 
     // Move to capture
     await page.keyboard.down('ArrowRight');
-    await waitScaled(page, 500);
+    await waitForFrames(page, 30)
     await page.keyboard.up('ArrowRight');
 
     // Shoot
     await shoot(page);
 
-    // Wait for goal processing
-    await waitScaled(page, 3000)
+    // Wait for goal to register
+    await page.waitForFunction(() => {
+      const scene = (window as any).__gameControls?.scene
+      const state = scene?.gameEngine?.getState()
+      return state?.scoreBlue === 1
+    }, { timeout: 10000 })
 
     const goalState = await getServerState(page)
     expect(goalState.scoreBlue).toBe(1)
 
-    // Positions should reset after delay (2000ms pause)
-    await waitScaled(page, 3000)
+    // Wait for ball to reset to center after goal pause
+    await page.waitForFunction(() => {
+      const scene = (window as any).__gameControls?.scene
+      const state = scene?.gameEngine?.getState()
+      if (!state?.ball) return false
+      const dx = state.ball.x - 850
+      const dy = state.ball.y - 500
+      return Math.sqrt(dx * dx + dy * dy) < 50
+    }, { timeout: 10000 })
 
     const resetState = await getServerState(page)
-    // Ball should be at center (850, 500) for 1700×1000 field
-    // Allow some variance as it might drift slightly if not perfectly reset or physics active
     expect(resetState.ball.x).toBeCloseTo(850, 10)
     expect(resetState.ball.y).toBeCloseTo(500, 10)
   })
