@@ -8,15 +8,11 @@ export default defineConfig({
   fullyParallel: true, // Enable parallel execution with isolated test rooms
   forbidOnly: !!process.env.CI,
 
-  // Global setup/teardown
-  globalSetup: './tests/global-setup.ts',
-  globalTeardown: './tests/global-teardown.ts',
-
   // Smart retry strategy
   retries: process.env.CI ? 2 : 1,
 
-  // Workers — CI runners (4 vCPU) override via --workers flag
-  workers: 8,
+  // Workers — CI overrides via --workers=4; locally Playwright auto-detects (cpus/2)
+  workers: undefined,
 
   // Global timeout
   timeout: 90000,
