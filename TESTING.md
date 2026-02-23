@@ -1,14 +1,10 @@
-# Testing Guide (concise)
+# Testing Guide
 
 ## Quick start
 ```bash
 # Auto-starts test servers on 3001/5174
-npm run test:e2e                  # Default 4 workers
+npm run test:e2e                  # Default 2 workers
 npm run test:e2e -- --workers=8   # More workers
-
-# Suite subsets
-npm run test:stable
-npm run test:physics
 
 # Interactive/debug
 npm run test:e2e:ui
@@ -29,6 +25,9 @@ npm run test:e2e:report
 - 10× time acceleration is enabled in tests; use `waitScaled()` utilities instead of raw `waitForTimeout()`.
 - Isolation helpers: `setupIsolatedTest` / `setupMultiClientTest` in `tests/helpers/room-utils.ts`.
 - Time helpers: `tests/helpers/time-control.ts`.
+- Wait helpers: `tests/helpers/wait-utils.ts`, `tests/helpers/deterministic-wait-utils.ts`.
+- Test utilities: `tests/helpers/test-utils.ts`, `tests/helpers/test-setup.ts`, `tests/helpers/test-constants.ts`.
+- Touch testing: `tests/helpers/touch-test-utils.ts`.
 
 ## Determinism
 - Authoritative server runs a fixed 30 Hz tick (`shared/src/types.ts:GAME_CONFIG`).
@@ -37,7 +36,10 @@ npm run test:e2e:report
 ## Folder map
 ```
 tests/
-├── helpers/        # time-control, room-utils, game-state, wait-utils
-├── stable-tests/   # Core/always-green suites
-└── physics-tests/  # Mechanics-focused suites
+├── helpers/        # room-utils, time-control, wait-utils, test-utils, etc.
+├── config/         # Playwright project configuration
+├── *.spec.ts       # All spec files (13 tests across 10 files)
+├── fixtures.ts     # Custom test fixtures
+├── global-setup.ts
+└── global-teardown.ts
 ```

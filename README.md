@@ -25,13 +25,11 @@ npm run dev:server       # Server only (3000)
 npm run dev:shared       # Shared types/watch
 
 # Testing (Playwright spins up its own test servers on 3001/5174)
-npm run test:e2e                      # All E2E (4 workers)
+npm run test:e2e                      # All E2E (2 workers)
 npm run test:e2e -- --workers=8       # Custom worker count
 npm run test:e2e:ui                   # Playwright UI
 npm run test:e2e:headed               # Headed browser
 npm run test:e2e:debug                # Debug mode
-npm run test:physics                  # Physics-only tests
-npm run test:stable                   # Stable tests only
 npm run clean:test                    # Remove test artifacts
 npm run test:e2e:report               # Open HTML report
 
@@ -49,7 +47,7 @@ Kickoff/
 │   └── src/ai/      # AI system for bot players (3v3 gameplay)
 ├── server/          # Colyseus multiplayer server (Node.js)
 ├── shared/          # Shared engine + GAME_CONFIG constants
-└── tests/           # Playwright E2E tests (40 tests)
+└── tests/           # Playwright E2E tests (13 tests)
 ```
 
 ## Current Status
@@ -59,21 +57,26 @@ Kickoff/
 - Ball capture with pressure + lockouts; variable-power shooting
 - 3v3 gameplay with hierarchical AI (AIManager → TeamAI → AIPlayer)
 - Dual-camera rendering (game + UI), letterboxing for non-16:9
-- Playwright suite: 40 tests, auto-starts dedicated test servers, 10× time acceleration
+- Playwright suite: 13 tests, auto-starts dedicated test servers, 10× time acceleration
+
+## Near-Term Focus
+- Match flow polish (timer/UI/end screen).
+- AI tuning and balance adjustments.
+- Reduce flaky/failing cases if any regressions appear; keep tests green.
 
 ## Documentation
 
-- [AGENTS.md](AGENTS.md) — current working notes and commands
-- [QUICKSTART.md](QUICKSTART.md) — player/dev quickstart
-- [MVP_ROADMAP.md](MVP_ROADMAP.md) — roadmap snapshot
-- [ARCHITECTURE.md](ARCHITECTURE.md) — high-level system design (historical sections)
-- [SPECIFICATION.md](SPECIFICATION.md) — product spec (historical scope)
-- Deep dive: [client/src/ai/AI_STRUCTURE.md](client/src/ai/AI_STRUCTURE.md)
+- [AGENTS.md](AGENTS.md) — agent guidance: snapshot, gotchas, key constants
+- [CLAUDE.md](CLAUDE.md) — symlink → AGENTS.md
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system design + gameplay mechanics
+- [TESTING.md](TESTING.md) — test commands, ports, helpers, folder map
+- [DOCKER.md](DOCKER.md) — Docker deployment
+- [client/src/ai/AI_STRUCTURE.md](client/src/ai/AI_STRUCTURE.md) — AI deep dive
 
 ## Performance Snapshot
 
 - Input lag: ~55 ms (target <100 ms)
-- Test coverage: 40 E2E tests; ~2.5 min suite with 4 workers and 10× time acceleration
+- Test coverage: 13 E2E tests; 2 workers with 10× time acceleration
 
 ## License
 

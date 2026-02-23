@@ -1,5 +1,3 @@
-# Docker Deployment Guide
-
 # Docker Guide
 
 Keep it simple: build locally with the multi-pod compose file. The GHCR-only compose file was removed; use the workflow-published images directly if you need prebuilt artifacts.

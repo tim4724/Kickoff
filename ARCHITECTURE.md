@@ -1,9 +1,5 @@
 # Kickoff - System Architecture
 
-**Document Status:** This document provides a high-level overview of the Kickoff game architecture. For specific implementation details, development commands, or gameplay constants, refer to `AGENTS.md`, `README.md`, `QUICKSTART.md`, and the source code in `shared/src/types.ts`.
-
----
-
 ## 🏗️ Architecture Overview
 
 Kickoff is a real-time multiplayer arcade soccer game built on a classic client-server model.
@@ -47,7 +43,7 @@ Kickoff is a real-time multiplayer arcade soccer game built on a classic client-
     -   Runs the game simulation at a fixed tick rate of 30 Hz.
 
 2.  **Game State (Shared Schema)**
-    -   The authoritative game state is defined in a shared Colyseus schema (`shared/src/rooms/MyRoomState.ts`).
+    -   The authoritative game state is defined in a Colyseus schema (`server/src/schema/GameState.ts`).
     -   This schema includes data for all players, the ball, the score, and the match timer.
     -   Colyseus automatically handles delta-compression, sending only the changes to clients to minimize bandwidth usage.
 
@@ -59,3 +55,31 @@ Kickoff is a real-time multiplayer arcade soccer game built on a classic client-
 
 4.  **Matchmaking Service**
     -   A simple queue-based system that pairs players to create new match rooms.
+
+---
+
+## 🎮 Gameplay Mechanics
+
+### Control Scheme
+
+-   **Virtual Joystick** (left side of screen): Controls player movement.
+-   **Action Button** (right side of screen): Context-sensitive button for passing and shooting. Power is determined by how long the button is held.
+-   **Player Switching:** Control automatically switches to the AI teammate closest to the ball. A clear visual indicator highlights the currently controlled player.
+
+### Match Structure
+
+-   **Format:** 1 human + 2 AI bots vs. 1 human + 2 AI bots.
+-   **Duration:** Short mobile sessions, typically around 2 minutes.
+-   **Field:** Standard 1700×1000 pitch.
+-   **Scoring:** The team with the most goals at the end of the match wins.
+
+### AI Teammate Behavior
+
+-   AI teammates are designed to be competent and supportive, not frustrating.
+-   The AI operates on a strategy-based system, switching between offensive and defensive roles based on ball possession.
+-   AI players automatically position themselves, attempt to intercept passes, and make runs to support the human player.
+
+### Ball Mechanics
+
+-   Simplified, arcade-style physics model. The ball has a slight "magnetism" to make dribbling and control more forgiving.
+-   A player gains possession by moving close to the ball. The system includes pressure and lockout timers to prevent rapid possession changes.
