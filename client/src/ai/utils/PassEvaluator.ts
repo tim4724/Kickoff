@@ -98,8 +98,15 @@ export class PassEvaluator {
         spaceAtTarget = this.SPACE_CAP
       }
 
-      // Forward progress is same for all teammates at this position
-      const forwardProgress = GeometryUtils.distancePoint(ballPos, opponentGoal) - GeometryUtils.distancePoint(pos, opponentGoal)
+      // In own third, ignore forward progress entirely — prioritize safety (space)
+      const inOwnThird = opponentGoal.x > GAME_CONFIG.FIELD_WIDTH / 2
+        ? ballPos.x < GAME_CONFIG.FIELD_WIDTH / 3
+        : ballPos.x > (GAME_CONFIG.FIELD_WIDTH * 2) / 3
+
+      const forwardProgress = inOwnThird ? 0 : Math.min(
+        GeometryUtils.distancePoint(ballPos, opponentGoal) - GeometryUtils.distancePoint(pos, opponentGoal),
+        this.SPACE_CAP
+      )
 
       // Check each teammate's interception time
       for (const teammate of teammates) {
