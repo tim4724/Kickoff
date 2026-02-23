@@ -51,7 +51,7 @@ export class HasBallStrategy {
 
     if (canShoot && distToGoal < this.SHOOTING_RANGE) {
       // Evaluate shot angles using interception logic
-      const shotOption = this.findBestShotTarget(carrier, opponents, opponentGoal)
+      const shotOption = this.findBestShotTarget(carrier, opponents, opponentGoal, targetBehindGoal)
 
       if (shotOption) {
         return { goal: 'shoot', target: shotOption.target, shoot: true }
@@ -148,10 +148,12 @@ export class HasBallStrategy {
   private static findBestShotTarget(
     carrier: EnginePlayerData,
     opponents: EnginePlayerData[],
-    opponentGoal: Vector2D
+    opponentGoal: Vector2D,
+    targetBehindGoal: Vector2D
   ): { target: Vector2D; interceptDistance: number } | null {
-    // Generate candidate shot targets across the goal
-    const goalX = opponentGoal.x
+    // Generate candidate shot targets across the goal, using the x position
+    // behind the goal line so shots always have a horizontal component
+    const shotX = targetBehindGoal.x
     const candidateYPositions = [
       GAME_CONFIG.GOAL_Y_MIN + this.GOAL_MARGIN, // Top corner (with margin)
       GAME_CONFIG.GOAL_Y_MIN + (GAME_CONFIG.GOAL_Y_MAX - GAME_CONFIG.GOAL_Y_MIN) / 3, // Upper third
@@ -168,7 +170,7 @@ export class HasBallStrategy {
     const shotOptions: ShotOption[] = []
 
     for (const targetY of candidateYPositions) {
-      const shotTarget: Vector2D = { x: goalX, y: targetY }
+      const shotTarget: Vector2D = { x: shotX, y: targetY }
 
       // Calculate shot trajectory direction
       const dx = shotTarget.x - carrier.x
