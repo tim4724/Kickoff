@@ -43,7 +43,7 @@ export class OffensiveStrategy {
    * @param gameState - Current game state
    * @returns Map of player ID to role assignment
    */
-  execute(gameState: AIGameState): Map<string, PlayerRole> {
+  execute(gameState: AIGameState, canShoot: boolean = true): Map<string, PlayerRole> {
     const roles = new Map<string, PlayerRole>()
 
     // Get team-specific players (mutable - we'll remove assigned players)
@@ -75,7 +75,8 @@ export class OffensiveStrategy {
         opponents,
         this.opponentGoal,
         this.targetBehindGoal,
-        passOptions
+        passOptions,
+        canShoot
       )
 
       roles.set(ballCarrier.id, carrierRole)

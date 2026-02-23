@@ -44,11 +44,12 @@ export class HasBallStrategy {
     opponents: EnginePlayerData[],
     opponentGoal: Vector2D,
     targetBehindGoal: Vector2D,
-    passOptions: PassOption[]
+    passOptions: PassOption[],
+    canShoot: boolean = true
   ): PlayerRole {
     const distToGoal = GeometryUtils.distancePoint(carrier, opponentGoal)
 
-    if (distToGoal < this.SHOOTING_RANGE) {
+    if (canShoot && distToGoal < this.SHOOTING_RANGE) {
       // Evaluate shot angles using interception logic
       const shotOption = this.findBestShotTarget(carrier, opponents, opponentGoal)
 
