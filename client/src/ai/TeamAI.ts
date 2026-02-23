@@ -122,12 +122,13 @@ export class TeamAI {
 
     // Track per-player possession timing for shoot cooldown
     const currentCarrierId = holderPlayer?.id ?? null
+    const now = gameClock.now()
     if (currentCarrierId !== this.currentPossessorId) {
       this.currentPossessorId = currentCarrierId
-      this.possessionGainedAt = gameClock.now()
+      this.possessionGainedAt = now
     }
     const canShoot = currentCarrierId !== null &&
-      gameClock.now() - this.possessionGainedAt >= AI_DEFAULTS.SHOOT_COOLDOWN_MS
+      now - this.possessionGainedAt >= AI_DEFAULTS.SHOOT_COOLDOWN_MS
 
     // Determine strategy and execute
     let roles
