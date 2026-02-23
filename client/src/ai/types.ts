@@ -73,5 +73,11 @@ export const AI_DEFAULTS = {
    * 150ms range provides noticeable variation without feeling unresponsive
    */
   INITIAL_DELAY_MAX_MS: 150,
+
+  /**
+   * Cooldown after AI gains possession before shooting is allowed (ms)
+   * Forces AI to dribble/pass first, creating more human-like behavior
+   */
+  SHOOT_COOLDOWN_MS: 500,
 } as const
 

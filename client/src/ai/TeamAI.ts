@@ -32,6 +32,10 @@ export class TeamAI {
   private initialDelayMs: number
   private hasStarted: boolean = false
 
+  // Shoot cooldown tracking: prevents instant shooting after gaining possession
+  private currentPossessorId: string | null = null
+  private possessionGainedAt: number = 0
+
   constructor(teamId: Team, playerIds: string[]) {
     this.teamId = teamId
     this.players = playerIds.map(id => new AIPlayer(id))
@@ -116,6 +120,16 @@ export class TeamAI {
       this.lastPossessingTeam = holderPlayer.team
     }
 
+    // Track per-player possession timing for shoot cooldown
+    const currentCarrierId = holderPlayer?.id ?? null
+    const now = gameClock.now()
+    if (currentCarrierId !== this.currentPossessorId) {
+      this.currentPossessorId = currentCarrierId
+      this.possessionGainedAt = now
+    }
+    const canShoot = currentCarrierId !== null &&
+      now - this.possessionGainedAt >= AI_DEFAULTS.SHOOT_COOLDOWN_MS
+
     // Determine strategy and execute
     let roles
     if (this.lastPossessingTeam !== this.teamId) {
@@ -123,7 +137,7 @@ export class TeamAI {
       roles = this.defensiveStrategy.execute(gameState)
     } else {
       // Our team has the ball - offensive play
-      roles = this.offensiveStrategy.execute(gameState)
+      roles = this.offensiveStrategy.execute(gameState, canShoot)
     }
 
     return roles
@@ -190,6 +204,8 @@ export class TeamAI {
     this.lastGameStateSnapshot = null
     this.lastPossessingTeam = null
     this.hasStarted = false
+    this.currentPossessorId = null
+    this.possessionGainedAt = 0
     this.initialDelayMs = Math.random() * AI_DEFAULTS.INITIAL_DELAY_MAX_MS
   }
 }
