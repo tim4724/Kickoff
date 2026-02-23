@@ -68,6 +68,7 @@ export const GAME_CONFIG = {
 
   // Player physics
   PLAYER_SPEED: Math.round(FIELD_HEIGHT * 0.35),
+  PLAYER_ACCELERATION: 0.15, // 0-1: lower = more inertia, 1 = instant
 
   // Ball physics
   BALL_FRICTION: 0.98,

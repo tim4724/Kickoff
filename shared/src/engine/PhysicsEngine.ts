@@ -110,10 +110,15 @@ export class PhysicsEngine {
     const targetVelocityX = input.movement.x * this.config.playerSpeed
     const targetVelocityY = input.movement.y * this.config.playerSpeed
 
-    // Inertia: smooth acceleration/deceleration (lower = more momentum, higher = faster response)
-    const ACCELERATION_FACTOR = 0.15
-    player.velocityX += (targetVelocityX - player.velocityX) * ACCELERATION_FACTOR
-    player.velocityY += (targetVelocityY - player.velocityY) * ACCELERATION_FACTOR
+    // Acceleration: 1 = instant, lower = more inertia/momentum
+    const accel = this.config.playerAcceleration
+    if (accel >= 1) {
+      player.velocityX = targetVelocityX
+      player.velocityY = targetVelocityY
+    } else {
+      player.velocityX += (targetVelocityX - player.velocityX) * accel
+      player.velocityY += (targetVelocityY - player.velocityY) * accel
+    }
 
     // Update position
     player.x += player.velocityX * dt

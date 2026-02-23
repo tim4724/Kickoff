@@ -74,6 +74,8 @@ export class GameState extends Schema {
       matchDuration: GAME_CONFIG.MATCH_DURATION,
       // Hold last movement for ~100ms at 60Hz to mask packet loss
       holdLastInputFrames: 6,
+      // Instant response — network latency provides natural inertia feel
+      playerAcceleration: 1,
     })
 
     // Register callbacks

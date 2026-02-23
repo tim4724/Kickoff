@@ -21,6 +21,8 @@ export interface GameEngineConfig {
   // Optional: hold last movement input for a few physics frames to mask packet loss
   // Set to 0 to disable (default)
   holdLastInputFrames?: number
+  // Override player acceleration (0-1). Default uses GAME_CONFIG.PLAYER_ACCELERATION
+  playerAcceleration?: number
 }
 
 export class GameEngine {
@@ -63,6 +65,7 @@ export class GameEngine {
       fieldWidth: GAME_CONFIG.FIELD_WIDTH,
       fieldHeight: GAME_CONFIG.FIELD_HEIGHT,
       playerSpeed: GAME_CONFIG.PLAYER_SPEED,
+      playerAcceleration: config.playerAcceleration ?? GAME_CONFIG.PLAYER_ACCELERATION,
       ballRadius: GAME_CONFIG.BALL_RADIUS,
       ballFriction: GAME_CONFIG.BALL_FRICTION,
       shootSpeed: GAME_CONFIG.SHOOT_SPEED,
