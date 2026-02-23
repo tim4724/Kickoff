@@ -76,6 +76,11 @@ export class PassEvaluator {
     // Group options by teammate
     const optionsByTeammate = new Map(teammates.map(t => [t.id, [] as PassOption[]]))
 
+    // In own third, ignore forward progress entirely — prioritize safety (space)
+    const inOwnThird = opponentGoal.x > GAME_CONFIG.FIELD_WIDTH / 2
+      ? ballPos.x < GAME_CONFIG.FIELD_WIDTH / 3
+      : ballPos.x > (GAME_CONFIG.FIELD_WIDTH * 2) / 3
+
     // Evaluate each grid position
     for (const pos of this.getGrid()) {
       // Use squared distance for comparison (no sqrt needed)
@@ -97,11 +102,6 @@ export class PassEvaluator {
       } else {
         spaceAtTarget = this.SPACE_CAP
       }
-
-      // In own third, ignore forward progress entirely — prioritize safety (space)
-      const inOwnThird = opponentGoal.x > GAME_CONFIG.FIELD_WIDTH / 2
-        ? ballPos.x < GAME_CONFIG.FIELD_WIDTH / 3
-        : ballPos.x > (GAME_CONFIG.FIELD_WIDTH * 2) / 3
 
       const forwardProgress = inOwnThird ? 0 : Math.min(
         GeometryUtils.distancePoint(ballPos, opponentGoal) - GeometryUtils.distancePoint(pos, opponentGoal),

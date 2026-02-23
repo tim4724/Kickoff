@@ -126,7 +126,7 @@ export class TeamAI {
       this.currentPossessorId = currentCarrierId
       this.possessionGainedAt = gameClock.now()
     }
-    const canShoot = currentCarrierId === null ||
+    const canShoot = currentCarrierId !== null &&
       gameClock.now() - this.possessionGainedAt >= AI_DEFAULTS.SHOOT_COOLDOWN_MS
 
     // Determine strategy and execute
