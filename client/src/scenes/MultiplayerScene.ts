@@ -464,7 +464,7 @@ export class MultiplayerScene extends BaseGameScene {
             this.controlledPlayerId = `${this.mySessionId}-p1`
           }
           
-          if (this.colorInitialized && state?.players?.size > 0) {
+          if (this.colorInitialized && state?.players?.size > 0 && !this.aiManager) {
             this.initializeAI()
           }
         } catch (error) {
@@ -609,23 +609,28 @@ export class MultiplayerScene extends BaseGameScene {
       }
     })
 
-    // Update broadcast-style scoreboard
-    if (this.blueScoreText) this.blueScoreText.text = `${state.scoreBlue}`
-    if (this.redScoreText) this.redScoreText.text = `${state.scoreRed}`
+    // Update scoreboard — only set .text when value changes to avoid expensive
+    // PixiJS Text re-renders (canvas draw + GPU texture upload on every change).
+    // The timer text changes every 1 second, which was causing a periodic frame drop.
+    const blueStr = `${state.scoreBlue}`
+    const redStr = `${state.scoreRed}`
+    if (this.blueScoreText && this.blueScoreText.text !== blueStr) this.blueScoreText.text = blueStr
+    if (this.redScoreText && this.redScoreText.text !== redStr) this.redScoreText.text = redStr
 
     const minutes = Math.floor(state.matchTime / 60)
     const seconds = Math.floor(state.matchTime % 60)
-    this.timerText.text = `${minutes}:${seconds.toString().padStart(2, '0')}`
+    const timerStr = `${minutes}:${seconds.toString().padStart(2, '0')}`
+    if (this.timerText.text !== timerStr) this.timerText.text = timerStr
 
-    // Timer urgency effect in last 30 seconds
+    // Timer urgency effect in last 30 seconds (guard style.fill to avoid re-renders)
     if (state.matchTime <= 30 && state.matchTime > 0) {
-      this.timerText.style.fill = '#ff5252'
+      if (this.timerText.style.fill !== '#ff5252') this.timerText.style.fill = '#ff5252'
       if (this.timerBg) {
         this.timerBg.tint = 0xff5252
         this.timerBg.alpha = 0.15 + Math.sin(Date.now() / 200) * 0.05
       }
     } else {
-      this.timerText.style.fill = '#ffffff'
+      if (this.timerText.style.fill !== '#ffffff') this.timerText.style.fill = '#ffffff'
       if (this.timerBg) {
         this.timerBg.tint = 0xffffff
         this.timerBg.alpha = 1
