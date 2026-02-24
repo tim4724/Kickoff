@@ -30,16 +30,14 @@ export class MultiplayerScene extends BaseGameScene {
   private lastMovementWasNonZero: boolean = false
   private smoothnessMetrics?: NetworkSmoothnessMetrics
 
-  // Snapshot interpolation state — store recent server snapshots and interpolate
-  // between them with a small delay.  Eliminates the "sawtooth" target-position
-  // discontinuity that dead-reckoning + lerp produces on every patch arrival.
-  private static readonly INTERP_DELAY_MS = 25 // render ~1.5 patch-intervals in the past at 60Hz
-  private static readonly MAX_SNAPSHOTS = 6
-  private static readonly SNAP_DISTANCE = 100 // teleport threshold (goal reset, etc.)
-
-  private ballSnapshots: Array<{ x: number; y: number; vx: number; vy: number; t: number }> = []
-  private lastBallPossessedBy: string = ''
-  private remotePlayerSnapshots = new Map<string, Array<{ x: number; y: number; t: number }>>()
+  // Dead reckoning state — track last known server positions + velocities so we can
+  // extrapolate between patches and eliminate visual stalls during network jitter
+  private lastBallServerX: number = 0
+  private lastBallServerY: number = 0
+  private lastBallServerVX: number = 0
+  private lastBallServerVY: number = 0
+  private lastBallStateReceivedAt: number = 0
+  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; t: number }>()
 
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
@@ -207,9 +205,8 @@ export class MultiplayerScene extends BaseGameScene {
       this.smoothnessMetrics = undefined
     }
 
-    this.ballSnapshots.length = 0
-    this.lastBallPossessedBy = ''
-    this.remotePlayerSnapshots.clear()
+    this.lastRemotePlayerStates.clear()
+    this.lastBallStateReceivedAt = 0
 
     console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
   }
@@ -563,103 +560,42 @@ export class MultiplayerScene extends BaseGameScene {
       const now = performance.now()
       const serverBall = state.ball
 
-      // Detect possession change → reset snapshots so we don't interpolate across a teleport
-      const currentPossessor = serverBall.possessedBy || ''
-      if (currentPossessor !== this.lastBallPossessedBy) {
-        this.ballSnapshots.length = 0
-        this.lastBallPossessedBy = currentPossessor
-      }
-
-      // Push a new snapshot when the server reports a changed position
-      const snaps = this.ballSnapshots
-      const lastSnap = snaps.length > 0 ? snaps[snaps.length - 1] : null
+      // Update dead-reckoning snapshot whenever server reports a new position/velocity
       if (
-        !lastSnap ||
-        serverBall.x !== lastSnap.x ||
-        serverBall.y !== lastSnap.y ||
-        (serverBall.velocityX ?? 0) !== lastSnap.vx ||
-        (serverBall.velocityY ?? 0) !== lastSnap.vy
+        serverBall.x !== this.lastBallServerX ||
+        serverBall.y !== this.lastBallServerY ||
+        serverBall.velocityX !== this.lastBallServerVX ||
+        serverBall.velocityY !== this.lastBallServerVY
       ) {
-        snaps.push({
-          x: serverBall.x,
-          y: serverBall.y,
-          vx: serverBall.velocityX ?? 0,
-          vy: serverBall.velocityY ?? 0,
-          t: now,
-        })
-        if (snaps.length > MultiplayerScene.MAX_SNAPSHOTS) snaps.shift()
+        this.lastBallServerX = serverBall.x
+        this.lastBallServerY = serverBall.y
+        this.lastBallServerVX = serverBall.velocityX
+        this.lastBallServerVY = serverBall.velocityY
+        this.lastBallStateReceivedAt = now
       }
 
       if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
         this.ball.x = serverBall.x
         this.ball.y = serverBall.y
-      } else if (snaps.length < 2) {
-        // Not enough snapshots yet — snap directly
-        this.ball.x = serverBall.x
-        this.ball.y = serverBall.y
       } else {
-        // Snapshot interpolation: render at (now - INTERP_DELAY) and interpolate
-        // between the two bracketing snapshots.  This eliminates the sawtooth
-        // target-position discontinuity that dead-reckoning produces on each patch.
-        const renderTime = now - MultiplayerScene.INTERP_DELAY_MS
+        // Dead reckoning: extrapolate ball using last known velocity to fill gaps between patches.
+        // Skip when ball is possessed — velocity is stale and the ball tracks the player instead.
+        let targetX = this.lastBallServerX
+        let targetY = this.lastBallServerY
 
-        // Find the two snapshots that bracket renderTime
-        let s0 = snaps[0]
-        let s1 = snaps[1]
-        for (let i = 1; i < snaps.length; i++) {
-          if (snaps[i].t >= renderTime) {
-            s0 = snaps[i - 1]
-            s1 = snaps[i]
-            break
-          }
-          // If renderTime is past all snapshots, use the last two
-          s0 = snaps[i - 1]
-          s1 = snaps[i]
-        }
-
-        const interval = s1.t - s0.t
-        let targetX: number
-        let targetY: number
-
-        if (interval <= 0) {
-          targetX = s1.x
-          targetY = s1.y
-        } else {
-          // alpha: <0 = render time before s0 (ramp-up), 0-1 = interpolating, >1 = extrapolating
-          const rawAlpha = (renderTime - s0.t) / interval
-
-          if (rawAlpha < 0) {
-            // Render time is before first snapshot pair — use latest position to avoid stall
-            const latest = snaps[snaps.length - 1]
-            targetX = latest.x
-            targetY = latest.y
-          } else if (rawAlpha <= 1.0) {
-            // Pure interpolation between two known server positions
-            targetX = s0.x + (s1.x - s0.x) * rawAlpha
-            targetY = s0.y + (s1.y - s0.y) * rawAlpha
-          } else {
-            // Slight extrapolation using last snapshot's velocity (capped at 2x interval)
-            const alpha = Math.min(rawAlpha, 2.0)
-            const extraDt = ((alpha - 1.0) * interval) / 1000
-            targetX = s1.x + s1.vx * extraDt
-            targetY = s1.y + s1.vy * extraDt
-          }
-
+        if (!serverBall.possessedBy && this.lastBallStateReceivedAt > 0) {
+          const dtS = Math.min((now - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
+          // Integrate ball friction: 0.98 per 60Hz physics step
+          const frictionScale = Math.pow(GAME_CONFIG.BALL_FRICTION, dtS * 60)
+          targetX = this.lastBallServerX + this.lastBallServerVX * frictionScale * dtS
+          targetY = this.lastBallServerY + this.lastBallServerVY * frictionScale * dtS
           targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
           targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
         }
 
-        // Teleport detection: snap immediately on large jumps (goal reset, etc.)
-        const dx = targetX - this.ball.x
-        const dy = targetY - this.ball.y
-        if (dx * dx + dy * dy > MultiplayerScene.SNAP_DISTANCE * MultiplayerScene.SNAP_DISTANCE) {
-          this.ball.x = targetX
-          this.ball.y = targetY
-        } else {
-          // Gentle final smoothing (high factor — target is already continuous)
-          this.ball.x += dx * 0.7
-          this.ball.y += dy * 0.7
-        }
+        const lerpFactor = VISUAL_CONSTANTS.BALL_LERP_FACTOR
+        this.ball.x += (targetX - this.ball.x) * lerpFactor
+        this.ball.y += (targetY - this.ball.y) * lerpFactor
       }
       this.ballShadow.x = this.ball.x + 2
       this.ballShadow.y = this.ball.y + 3
@@ -732,78 +668,30 @@ export class MultiplayerScene extends BaseGameScene {
     }
 
     const now = performance.now()
+    const pvx = playerState.velocityX ?? 0
+    const pvy = playerState.velocityY ?? 0
+    let cached = this.lastRemotePlayerStates.get(sessionId)
 
-    // Build snapshot buffer for this player
-    let snaps = this.remotePlayerSnapshots.get(sessionId)
-    if (!snaps) {
-      snaps = []
-      this.remotePlayerSnapshots.set(sessionId, snaps)
+    // Update snapshot when server reports a position or velocity change
+    if (!cached || cached.x !== playerState.x || cached.y !== playerState.y || cached.vx !== pvx || cached.vy !== pvy) {
+      cached = { x: playerState.x, y: playerState.y, vx: pvx, vy: pvy, t: now }
+      this.lastRemotePlayerStates.set(sessionId, cached)
     }
 
-    const lastSnap = snaps.length > 0 ? snaps[snaps.length - 1] : null
-    if (!lastSnap || lastSnap.x !== playerState.x || lastSnap.y !== playerState.y) {
-      snaps.push({ x: playerState.x, y: playerState.y, t: now })
-      if (snaps.length > MultiplayerScene.MAX_SNAPSHOTS) snaps.shift()
+    // Dead reckoning: extrapolate using last known velocity to fill gaps between patches
+    let targetX = cached.x
+    let targetY = cached.y
+
+    const speed = Math.sqrt(cached.vx * cached.vx + cached.vy * cached.vy)
+    if (speed > 1 && cached.t > 0) {
+      const dtS = Math.min((now - cached.t) / 1000, 0.05) // cap at 50ms
+      targetX = Math.max(0, Math.min(cached.x + cached.vx * dtS, GAME_CONFIG.FIELD_WIDTH))
+      targetY = Math.max(0, Math.min(cached.y + cached.vy * dtS, GAME_CONFIG.FIELD_HEIGHT))
     }
 
-    if (snaps.length < 2) {
-      // Not enough history — snap directly
-      sprite.x = playerState.x
-      sprite.y = playerState.y
-      return
-    }
-
-    // Snapshot interpolation (same approach as ball)
-    const renderTime = now - MultiplayerScene.INTERP_DELAY_MS
-    let s0 = snaps[0]
-    let s1 = snaps[1]
-    for (let i = 1; i < snaps.length; i++) {
-      if (snaps[i].t >= renderTime) {
-        s0 = snaps[i - 1]
-        s1 = snaps[i]
-        break
-      }
-      s0 = snaps[i - 1]
-      s1 = snaps[i]
-    }
-
-    const interval = s1.t - s0.t
-    let targetX: number
-    let targetY: number
-
-    if (interval <= 0) {
-      targetX = s1.x
-      targetY = s1.y
-    } else {
-      const rawAlpha = (renderTime - s0.t) / interval
-      if (rawAlpha < 0) {
-        // Render time before first pair — use latest to avoid stall
-        const latest = snaps[snaps.length - 1]
-        targetX = latest.x
-        targetY = latest.y
-      } else if (rawAlpha <= 1.0) {
-        targetX = s0.x + (s1.x - s0.x) * rawAlpha
-        targetY = s0.y + (s1.y - s0.y) * rawAlpha
-      } else {
-        // Extrapolate linearly from last two snapshots (capped at 2x interval)
-        const alpha = Math.min(rawAlpha, 2.0)
-        targetX = s1.x + (s1.x - s0.x) * (alpha - 1.0)
-        targetY = s1.y + (s1.y - s0.y) * (alpha - 1.0)
-      }
-      targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
-      targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
-    }
-
-    // Teleport detection
-    const dx = targetX - sprite.x
-    const dy = targetY - sprite.y
-    if (dx * dx + dy * dy > MultiplayerScene.SNAP_DISTANCE * MultiplayerScene.SNAP_DISTANCE) {
-      sprite.x = targetX
-      sprite.y = targetY
-    } else {
-      sprite.x += dx * 0.7
-      sprite.y += dy * 0.7
-    }
+    const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
+    sprite.x += (targetX - sprite.x) * lerpFactor
+    sprite.y += (targetY - sprite.y) * lerpFactor
   }
 
   private updateLocalPlayerColor() {
