@@ -620,7 +620,11 @@ export class MultiplayerScene extends BaseGameScene {
           this.ball.y = serverBall.y
         }
       } else {
-        // Ball is free — dead reckoning extrapolation + lerp
+        // Ball is free — dead reckoning extrapolation (no lerp).
+        // At 60Hz patches, corrections are ~1-3 px — invisible without smoothing.
+        // Adding a lerp chase creates a sawtooth: the ball lags behind the
+        // extrapolated target, then when a patch corrects the target backward
+        // the ball stalls momentarily.  Direct assignment avoids this.
         let targetX = this.lastBallServerX
         let targetY = this.lastBallServerY
 
@@ -634,9 +638,8 @@ export class MultiplayerScene extends BaseGameScene {
           targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
         }
 
-        const lerpFactor = VISUAL_CONSTANTS.BALL_LERP_FACTOR
-        this.ball.x += (targetX - this.ball.x) * lerpFactor
-        this.ball.y += (targetY - this.ball.y) * lerpFactor
+        this.ball.x = targetX
+        this.ball.y = targetY
       }
       this.ballShadow.x = this.ball.x + 2
       this.ballShadow.y = this.ball.y + 3
