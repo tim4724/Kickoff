@@ -10,6 +10,7 @@ import { AIManager } from '@/ai'
 import { sceneRouter } from '@/utils/SceneRouter'
 import type { Room } from 'colyseus.js'
 import { PixiSceneManager } from '@/utils/PixiSceneManager'
+import { NetworkSmoothnessMetrics } from '@/utils/NetworkSmoothnessMetrics'
 
 /**
  * Multiplayer Game Scene (PixiJS)
@@ -27,6 +28,7 @@ export class MultiplayerScene extends BaseGameScene {
   private aiEnabled: boolean = true
   private lastControlledPlayerId?: string
   private lastMovementWasNonZero: boolean = false
+  private smoothnessMetrics?: NetworkSmoothnessMetrics
 
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
@@ -48,6 +50,9 @@ export class MultiplayerScene extends BaseGameScene {
     this.stateUpdateCount = 0
     this.lastControlledPlayerId = undefined
     this.lastMovementWasNonZero = false
+
+    this.smoothnessMetrics = new NetworkSmoothnessMetrics()
+    window.__networkMetrics = this.smoothnessMetrics
 
     this.connectToMultiplayer()
   }
@@ -134,7 +139,9 @@ export class MultiplayerScene extends BaseGameScene {
 
       const state = this.networkManager.getState()
       if (state) {
+        this.smoothnessMetrics?.samplePreSync(state, this.players, this.myPlayerId)
         this.syncFromServerState(state)
+        this.smoothnessMetrics?.samplePostSync(this.ball, this.players, this.myPlayerId)
       }
     } catch (error) {
       console.error('[MultiplayerScene] Error during updateGameState:', error)
@@ -182,6 +189,11 @@ export class MultiplayerScene extends BaseGameScene {
     
     if (this.aiManager) {
       this.aiManager = undefined
+    }
+
+    if (this.smoothnessMetrics) {
+      delete window.__networkMetrics
+      this.smoothnessMetrics = undefined
     }
 
     console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
