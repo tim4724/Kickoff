@@ -30,6 +30,15 @@ export class MultiplayerScene extends BaseGameScene {
   private lastMovementWasNonZero: boolean = false
   private smoothnessMetrics?: NetworkSmoothnessMetrics
 
+  // Dead reckoning state — track last known server positions + velocities so we can
+  // extrapolate between patches and eliminate visual stalls during network jitter
+  private lastBallServerX: number = 0
+  private lastBallServerY: number = 0
+  private lastBallServerVX: number = 0
+  private lastBallServerVY: number = 0
+  private lastBallStateReceivedAt: number = 0
+  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; t: number }>()
+
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
   }
@@ -195,6 +204,9 @@ export class MultiplayerScene extends BaseGameScene {
       delete window.__networkMetrics
       this.smoothnessMetrics = undefined
     }
+
+    this.lastRemotePlayerStates.clear()
+    this.lastBallStateReceivedAt = 0
 
     console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
   }
@@ -545,13 +557,45 @@ export class MultiplayerScene extends BaseGameScene {
     this.stateUpdateCount++
 
     if (state.ball) {
+      const now = performance.now()
+      const serverBall = state.ball
+
+      // Update dead-reckoning snapshot whenever server reports a new position/velocity
+      if (
+        serverBall.x !== this.lastBallServerX ||
+        serverBall.y !== this.lastBallServerY ||
+        serverBall.velocityX !== this.lastBallServerVX ||
+        serverBall.velocityY !== this.lastBallServerVY
+      ) {
+        this.lastBallServerX = serverBall.x
+        this.lastBallServerY = serverBall.y
+        this.lastBallServerVX = serverBall.velocityX
+        this.lastBallServerVY = serverBall.velocityY
+        this.lastBallStateReceivedAt = now
+      }
+
       if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
-        this.ball.x = state.ball.x
-        this.ball.y = state.ball.y
+        this.ball.x = serverBall.x
+        this.ball.y = serverBall.y
       } else {
+        // Dead reckoning: extrapolate ball using last known velocity to fill gaps between patches.
+        // Skip when ball is possessed — velocity is stale and the ball tracks the player instead.
+        let targetX = this.lastBallServerX
+        let targetY = this.lastBallServerY
+
+        if (!serverBall.possessedBy && this.lastBallStateReceivedAt > 0) {
+          const dtS = Math.min((now - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
+          // Integrate ball friction: 0.98 per 60Hz physics step
+          const frictionScale = Math.pow(GAME_CONFIG.BALL_FRICTION, dtS * 60)
+          targetX = this.lastBallServerX + this.lastBallServerVX * frictionScale * dtS
+          targetY = this.lastBallServerY + this.lastBallServerVY * frictionScale * dtS
+          targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
+          targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
+        }
+
         const lerpFactor = VISUAL_CONSTANTS.BALL_LERP_FACTOR
-        this.ball.x += (state.ball.x - this.ball.x) * lerpFactor
-        this.ball.y += (state.ball.y - this.ball.y) * lerpFactor
+        this.ball.x += (targetX - this.ball.x) * lerpFactor
+        this.ball.y += (targetY - this.ball.y) * lerpFactor
       }
       this.ballShadow.x = this.ball.x + 2
       this.ballShadow.y = this.ball.y + 3
@@ -623,9 +667,37 @@ export class MultiplayerScene extends BaseGameScene {
       if (!sprite) return
     }
 
+    const now = performance.now()
+    let cached = this.lastRemotePlayerStates.get(sessionId)
+
+    // Update snapshot when server reports a position change
+    if (!cached || cached.x !== playerState.x || cached.y !== playerState.y) {
+      cached = {
+        x: playerState.x,
+        y: playerState.y,
+        vx: playerState.velocityX ?? 0,
+        vy: playerState.velocityY ?? 0,
+        t: now,
+      }
+      this.lastRemotePlayerStates.set(sessionId, cached)
+    }
+
+    // Dead reckoning: extrapolate using last known velocity to fill gaps between patches
+    let targetX = cached.x
+    let targetY = cached.y
+
+    const speed = Math.sqrt(cached.vx * cached.vx + cached.vy * cached.vy)
+    if (speed > 1 && cached.t > 0) {
+      const dtS = Math.min((now - cached.t) / 1000, 0.05) // cap at 50ms
+      targetX = cached.x + cached.vx * dtS
+      targetY = cached.y + cached.vy * dtS
+      targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
+      targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
+    }
+
     const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
-    sprite.x += (playerState.x - sprite.x) * lerpFactor
-    sprite.y += (playerState.y - sprite.y) * lerpFactor
+    sprite.x += (targetX - sprite.x) * lerpFactor
+    sprite.y += (targetY - sprite.y) * lerpFactor
   }
 
   private updateLocalPlayerColor() {

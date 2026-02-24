@@ -7,14 +7,16 @@ export const VISUAL_CONSTANTS = {
   CONTROLLED_PLAYER_BORDER: 6, // Increased thicker border for controlled player
   UNCONTROLLED_PLAYER_BORDER: 3, // Slightly thicker for better visibility
 
-  // Interpolation factors (reduced for lower latency)
-  BALL_LERP_FACTOR: 0.5, // Increased from 0.3 for faster ball sync
-  REMOTE_PLAYER_LERP_FACTOR: 0.5, // Increased from 0.3 for faster remote player sync
+  // Interpolation factors — tuned for 60Hz patch rate + dead reckoning.
+  // Dead reckoning predicts most of the movement; lerp corrects residual prediction error.
+  // Lower values = smoother convergence with less oscillation.
+  BALL_LERP_FACTOR: 0.3,
+  REMOTE_PLAYER_LERP_FACTOR: 0.3,
 
-  // Reconciliation factors (increased for faster correction)
-  BASE_RECONCILE_FACTOR: 0.2, // Increased from 0.05 for faster correction
-  MODERATE_RECONCILE_FACTOR: 0.5, // Increased from 0.3
-  STRONG_RECONCILE_FACTOR: 0.8, // Increased from 0.6
+  // Reconciliation factors — raised to correct local player errors faster at 60Hz.
+  BASE_RECONCILE_FACTOR: 0.35,
+  MODERATE_RECONCILE_FACTOR: 0.6,
+  STRONG_RECONCILE_FACTOR: 0.9,
 
   // Error thresholds for reconciliation
   MODERATE_ERROR_THRESHOLD: 25,
