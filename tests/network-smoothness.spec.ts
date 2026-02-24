@@ -135,11 +135,14 @@ test.describe('Network Smoothness', () => {
     console.log(`  Jump ratio:           ${metrics.jumpRatio}`)
     console.log('================================================================')
 
-    // Generous initial thresholds — will tighten after patch rate fix
+    // Thresholds tuned after 60Hz patch rate + dead reckoning improvements.
+    // maxJump < 30: no large position pops (was 60 before improvements)
+    // stallRatio < 0.05: nearly continuous motion (was 0.5 before)
+    // jumpRatio < 0.1: rare non-linear jumps allowed for network jitter
     expect(metrics.totalFrames).toBeGreaterThan(10)
-    expect(metrics.maxJump).toBeLessThan(60)
-    expect(metrics.stallRatio).toBeLessThan(0.5)
-    expect(metrics.jumpRatio).toBeLessThan(0.3)
+    expect(metrics.maxJump).toBeLessThan(30)
+    expect(metrics.stallRatio).toBeLessThan(0.05)
+    expect(metrics.jumpRatio).toBeLessThan(0.1)
 
     await context1.close()
     await context2.close()
