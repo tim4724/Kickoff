@@ -39,6 +39,11 @@ export class MultiplayerScene extends BaseGameScene {
   private lastBallStateReceivedAt: number = 0
   private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; t: number }>()
 
+  // Per-frame cache for getUnifiedState() — avoids allocating a new Map 3+ times per frame
+  private _cachedUnifiedState: GameEngineState | null = null
+  private _cachedUnifiedStateFrame: number = -1
+  private _frameCounter: number = 0
+
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
   }
@@ -74,6 +79,9 @@ export class MultiplayerScene extends BaseGameScene {
     if (!this.container.visible || !this.isMultiplayer || !this.networkManager) {
       return
     }
+
+    // Advance frame counter so getUnifiedState() cache invalidates each frame
+    this._frameCounter++
 
     try {
       const dt = delta / 1000 // Convert to seconds assuming delta is MS.
@@ -212,9 +220,15 @@ export class MultiplayerScene extends BaseGameScene {
   }
 
   protected getUnifiedState(): GameEngineState | null {
+    // Return cached result if already computed this frame (avoids 3+ Map allocations per frame)
+    if (this._cachedUnifiedStateFrame === this._frameCounter) {
+      return this._cachedUnifiedState
+    }
     const rawState = this.networkManager?.getState()
     if (!rawState) return null
-    return this.fromNetwork(rawState)
+    this._cachedUnifiedState = this.fromNetwork(rawState)
+    this._cachedUnifiedStateFrame = this._frameCounter
+    return this._cachedUnifiedState
   }
 
   /**
@@ -431,18 +445,22 @@ export class MultiplayerScene extends BaseGameScene {
         }
       })
 
-      this.networkManager.on('stateChange', (state: any) => {
+      this.networkManager.on('stateChange', (_state: any) => {
         try {
-          if (state?.players) {
-            state.players.forEach((player: any, playerId: string) => {
-              if (!this.players.has(playerId)) {
-                console.log(`🎭 Creating player sprite from state: ${playerId} (${player.team})`)
-                this.createPlayerSprite(playerId, player.x, player.y, player.team)
-              }
-            })
-          }
+          // After initialization, use the live Colyseus state directly to avoid
+          // the Map allocation that NetworkManager.onStateChange creates every patch.
+          const state = this.networkManager?.getState() as any
+          if (!state?.players) return
 
-          if (!this.colorInitialized && state?.players?.has(this.myPlayerId)) {
+          // Create sprites for any new players
+          state.players.forEach((player: any, playerId: string) => {
+            if (!this.players.has(playerId)) {
+              console.log(`🎭 Creating player sprite from state: ${playerId} (${player.team})`)
+              this.createPlayerSprite(playerId, player.x, player.y, player.team)
+            }
+          })
+
+          if (!this.colorInitialized && state.players.has(this.myPlayerId)) {
             console.log(`🎨 [Init] Initializing colors (colorInitialized=${this.colorInitialized})`)
             this.updateLocalPlayerColor()
 
@@ -453,18 +471,18 @@ export class MultiplayerScene extends BaseGameScene {
 
             this.colorInitialized = true
             console.log(`🎨 [Init] Color initialization complete`)
-            
+
             this.initializeControlArrow()
             this.updatePlayerBorders()
           }
-          
+
           if (!this.myPlayerId && this.mySessionId) {
             console.warn('[MultiplayerScene] myPlayerId not set, initializing from sessionId')
             this.myPlayerId = `${this.mySessionId}-p1`
             this.controlledPlayerId = `${this.mySessionId}-p1`
           }
-          
-          if (this.colorInitialized && state?.players?.size > 0 && !this.aiManager) {
+
+          if (this.colorInitialized && state.players.size > 0 && !this.aiManager) {
             this.initializeAI()
           }
         } catch (error) {
@@ -655,8 +673,8 @@ export class MultiplayerScene extends BaseGameScene {
     } else {
       if (this.timerText.style.fill !== '#ffffff') this.timerText.style.fill = '#ffffff'
       if (this.timerBg) {
-        this.timerBg.tint = 0xffffff
-        this.timerBg.alpha = 1
+        if (this.timerBg.tint !== 0xffffff) this.timerBg.tint = 0xffffff
+        if (this.timerBg.alpha !== 1) this.timerBg.alpha = 1
       }
     }
   }
