@@ -47,6 +47,9 @@ export class MatchRoom extends Room<GameState> {
     const gameState = new GameState()
     this.setState(gameState)
 
+    // Sync state to clients at tick rate (default is 50ms/20Hz — too slow for smooth play)
+    this.patchRate = 1000 / GAME_CONFIG.TICK_RATE
+
     // Start game loop at 60 Hz
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / GAME_CONFIG.TICK_RATE)
 
