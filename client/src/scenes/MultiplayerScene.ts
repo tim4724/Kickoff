@@ -577,13 +577,36 @@ export class MultiplayerScene extends BaseGameScene {
       if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
         this.ball.x = serverBall.x
         this.ball.y = serverBall.y
+      } else if (serverBall.possessedBy) {
+        // Ball is possessed — lock it to the possessing player's SPRITE position
+        // instead of lerping toward the server ball position.  The server places
+        // the ball at player + direction * POSSESSION_BALL_OFFSET, but the player
+        // sprite is predicted ahead of the server (dead reckoning / client prediction).
+        // Lerping would make the ball visibly trail the player.
+        const possessorSprite = this.players.get(serverBall.possessedBy)
+        if (possessorSprite) {
+          // Use the server ball position relative to the server player position
+          // to compute the offset, then apply it to the local sprite position.
+          const possessorState = state.players?.get(serverBall.possessedBy)
+          if (possessorState) {
+            const offsetX = serverBall.x - possessorState.x
+            const offsetY = serverBall.y - possessorState.y
+            this.ball.x = possessorSprite.x + offsetX
+            this.ball.y = possessorSprite.y + offsetY
+          } else {
+            this.ball.x = serverBall.x
+            this.ball.y = serverBall.y
+          }
+        } else {
+          this.ball.x = serverBall.x
+          this.ball.y = serverBall.y
+        }
       } else {
-        // Dead reckoning: extrapolate ball using last known velocity to fill gaps between patches.
-        // Skip when ball is possessed — velocity is stale and the ball tracks the player instead.
+        // Ball is free — dead reckoning extrapolation + lerp
         let targetX = this.lastBallServerX
         let targetY = this.lastBallServerY
 
-        if (!serverBall.possessedBy && this.lastBallStateReceivedAt > 0) {
+        if (this.lastBallStateReceivedAt > 0) {
           const dtS = Math.min((now - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
           // Integrate ball friction: 0.98 per 60Hz physics step
           const frictionScale = Math.pow(GAME_CONFIG.BALL_FRICTION, dtS * 60)
