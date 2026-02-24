@@ -1,4 +1,4 @@
-import { Application, Text } from 'pixi.js'
+import { Application, Text, Graphics } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
 import { NetworkManager } from '@/network/NetworkManager'
 import { GeometryUtils } from '@shared/utils/geometry'
@@ -45,6 +45,17 @@ export class MultiplayerScene extends BaseGameScene {
   private _frameCounter: number = 0
   private frameDeltaS: number = 0
 
+  // Network debug overlay — toggle via window.__netDebug.enable() in devtools
+  private netDebugEnabled: boolean = false
+  private netDebugGhosts: boolean = false
+  private netDebugGfx?: Graphics
+  private netDebugLog: Array<{
+    t: number; entity: string; spriteX: number; spriteY: number;
+    serverX: number; serverY: number; dx: number; dy: number;
+    errX: number; errY: number; vx: number; vy: number; patch: boolean
+  }> = []
+  private netDebugPrevPositions = new Map<string, { x: number; y: number }>()
+
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
   }
@@ -69,6 +80,7 @@ export class MultiplayerScene extends BaseGameScene {
     this.smoothnessMetrics = new NetworkSmoothnessMetrics()
     window.__networkMetrics = this.smoothnessMetrics
 
+    this.setupNetDebug()
     this.connectToMultiplayer()
   }
 
@@ -215,6 +227,7 @@ export class MultiplayerScene extends BaseGameScene {
       this.smoothnessMetrics = undefined
     }
 
+    this.teardownNetDebug()
     this.lastRemotePlayerStates.clear()
     this.lastBallStateReceivedAt = 0
 
@@ -645,6 +658,12 @@ export class MultiplayerScene extends BaseGameScene {
       }
       this.ballShadow.x = this.ball.x + 2
       this.ballShadow.y = this.ball.y + 3
+
+      // Debug: log ball frame data
+      const ballPatchArrived = serverBall.x !== this.lastBallServerX || serverBall.y !== this.lastBallServerY
+      this.recordNetDebug('ball', this.ball.x, this.ball.y,
+        serverBall.x, serverBall.y, 0, 0,
+        serverBall.velocityX ?? 0, serverBall.velocityY ?? 0, ballPatchArrived)
     }
 
     state.players.forEach((player: any, playerId: string) => {
@@ -682,6 +701,9 @@ export class MultiplayerScene extends BaseGameScene {
         if (this.timerBg.alpha !== 1) this.timerBg.alpha = 1
       }
     }
+
+    // Debug: draw ghost dots at server positions
+    this.drawNetDebugGhosts(state)
   }
 
   private reconcileLocalPlayer(playerState: any) {
@@ -713,6 +735,11 @@ export class MultiplayerScene extends BaseGameScene {
 
     myPlayerSprite.x += (serverX - myPlayerSprite.x) * reconcileFactor
     myPlayerSprite.y += (serverY - myPlayerSprite.y) * reconcileFactor
+
+    // Debug: log local player reconciliation
+    this.recordNetDebug(this.myPlayerId!, myPlayerSprite.x, myPlayerSprite.y,
+      serverX, serverY, serverX - myPlayerSprite.x, serverY - myPlayerSprite.y,
+      playerState.velocityX ?? 0, playerState.velocityY ?? 0, true)
   }
 
   private updateRemotePlayer(sessionId: string, playerState: any) {
@@ -741,10 +768,8 @@ export class MultiplayerScene extends BaseGameScene {
     }
 
     // Detect when server sends a new snapshot (position or velocity changed)
-    if (cached.x !== playerState.x || cached.y !== playerState.y || cached.vx !== pvx || cached.vy !== pvy) {
-      // Error = where server says the player is vs where our sprite ended up.
-      // This captures accumulated drift from velocity mismatch + any remaining
-      // uncorrected error from previous patches.
+    const isPatch = cached.x !== playerState.x || cached.y !== playerState.y || cached.vx !== pvx || cached.vy !== pvy
+    if (isPatch) {
       cached.errX = playerState.x - sprite.x
       cached.errY = playerState.y - sprite.y
       cached.x = playerState.x
@@ -774,6 +799,117 @@ export class MultiplayerScene extends BaseGameScene {
     // Clamp to field bounds
     sprite.x = Math.max(0, Math.min(sprite.x, GAME_CONFIG.FIELD_WIDTH))
     sprite.y = Math.max(0, Math.min(sprite.y, GAME_CONFIG.FIELD_HEIGHT))
+
+    // Debug: log remote player frame data
+    this.recordNetDebug(sessionId, sprite.x, sprite.y,
+      playerState.x, playerState.y, cached.errX, cached.errY,
+      cached.vx, cached.vy, isPatch)
+  }
+
+  // ─── Network Debug Overlay ──────────────────────────────────────────
+  // Toggle in browser devtools:
+  //   __netDebug.enable()   — start logging per-frame data
+  //   __netDebug.ghosts()   — show server position ghost dots
+  //   __netDebug.disable()  — stop everything
+  //   __netDebug.dump()     — print last N frames as console.table
+  //   __netDebug.dump(20)   — print last 20 frames
+  //   __netDebug.clear()    — reset log
+
+  private setupNetDebug() {
+    const scene = this
+    ;(window as any).__netDebug = {
+      enable() { scene.netDebugEnabled = true; console.log('netDebug: logging enabled') },
+      disable() {
+        scene.netDebugEnabled = false
+        scene.netDebugGhosts = false
+        if (scene.netDebugGfx) scene.netDebugGfx.visible = false
+        console.log('netDebug: disabled')
+      },
+      ghosts() {
+        scene.netDebugEnabled = true
+        scene.netDebugGhosts = true
+        if (!scene.netDebugGfx) {
+          scene.netDebugGfx = new Graphics()
+          scene.cameraManager.getGameContainer().addChild(scene.netDebugGfx)
+        }
+        scene.netDebugGfx.visible = true
+        console.log('netDebug: ghost dots enabled')
+      },
+      dump(n = 60) {
+        const log = scene.netDebugLog.slice(-n)
+        console.table(log)
+        return log
+      },
+      clear() { scene.netDebugLog.length = 0; scene.netDebugPrevPositions.clear() },
+      get log() { return scene.netDebugLog },
+    }
+  }
+
+  private teardownNetDebug() {
+    if (this.netDebugGfx) {
+      this.netDebugGfx.destroy()
+      this.netDebugGfx = undefined
+    }
+    this.netDebugLog.length = 0
+    this.netDebugPrevPositions.clear()
+    this.netDebugEnabled = false
+    this.netDebugGhosts = false
+    delete (window as any).__netDebug
+  }
+
+  private recordNetDebug(
+    entity: string, spriteX: number, spriteY: number,
+    serverX: number, serverY: number,
+    errX: number, errY: number, vx: number, vy: number,
+    patch: boolean
+  ) {
+    if (!this.netDebugEnabled) return
+    const prev = this.netDebugPrevPositions.get(entity)
+    const dx = prev ? spriteX - prev.x : 0
+    const dy = prev ? spriteY - prev.y : 0
+    this.netDebugPrevPositions.set(entity, { x: spriteX, y: spriteY })
+
+    this.netDebugLog.push({
+      t: Math.round(performance.now()),
+      entity,
+      spriteX: Math.round(spriteX * 10) / 10,
+      spriteY: Math.round(spriteY * 10) / 10,
+      serverX: Math.round(serverX * 10) / 10,
+      serverY: Math.round(serverY * 10) / 10,
+      dx: Math.round(dx * 100) / 100,
+      dy: Math.round(dy * 100) / 100,
+      errX: Math.round(errX * 100) / 100,
+      errY: Math.round(errY * 100) / 100,
+      vx: Math.round(vx),
+      vy: Math.round(vy),
+      patch,
+    })
+    // Ring buffer: keep last 600 entries (~10 seconds at 60fps)
+    if (this.netDebugLog.length > 600) this.netDebugLog.splice(0, this.netDebugLog.length - 600)
+  }
+
+  private drawNetDebugGhosts(state: any) {
+    if (!this.netDebugGhosts || !this.netDebugGfx || !state) return
+    const g = this.netDebugGfx
+    g.clear()
+
+    // Ball ghost — green cross at server position
+    if (state.ball) {
+      g.moveTo(state.ball.x - 6, state.ball.y)
+      g.lineTo(state.ball.x + 6, state.ball.y)
+      g.moveTo(state.ball.x, state.ball.y - 6)
+      g.lineTo(state.ball.x, state.ball.y + 6)
+      g.stroke({ width: 2, color: 0x00ff00, alpha: 0.8 })
+    }
+
+    // Player ghosts — hollow circles at server positions
+    if (state.players) {
+      state.players.forEach((p: any, id: string) => {
+        const color = id === this.myPlayerId ? 0xffff00 : 0xff00ff
+        g.circle(p.x, p.y, GAME_CONFIG.PLAYER_RADIUS)
+        g.stroke({ width: 1.5, color, alpha: 0.5 })
+      })
+    }
   }
 
   private updateLocalPlayerColor() {

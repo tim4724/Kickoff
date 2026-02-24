@@ -35,6 +35,16 @@ declare global {
     // Network smoothness metrics (dev/debug)
     __networkMetrics?: NetworkSmoothnessMetrics
 
+    // Network debug overlay (toggle in devtools)
+    __netDebug?: {
+      enable(): void
+      disable(): void
+      ghosts(): void
+      dump(n?: number): any[]
+      clear(): void
+      log: any[]
+    }
+
     // Game clock for testing
     GameClock?: typeof gameClock
   }
