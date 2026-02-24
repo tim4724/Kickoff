@@ -668,17 +668,13 @@ export class MultiplayerScene extends BaseGameScene {
     }
 
     const now = performance.now()
+    const pvx = playerState.velocityX ?? 0
+    const pvy = playerState.velocityY ?? 0
     let cached = this.lastRemotePlayerStates.get(sessionId)
 
-    // Update snapshot when server reports a position change
-    if (!cached || cached.x !== playerState.x || cached.y !== playerState.y) {
-      cached = {
-        x: playerState.x,
-        y: playerState.y,
-        vx: playerState.velocityX ?? 0,
-        vy: playerState.velocityY ?? 0,
-        t: now,
-      }
+    // Update snapshot when server reports a position or velocity change
+    if (!cached || cached.x !== playerState.x || cached.y !== playerState.y || cached.vx !== pvx || cached.vy !== pvy) {
+      cached = { x: playerState.x, y: playerState.y, vx: pvx, vy: pvy, t: now }
       this.lastRemotePlayerStates.set(sessionId, cached)
     }
 
@@ -689,10 +685,8 @@ export class MultiplayerScene extends BaseGameScene {
     const speed = Math.sqrt(cached.vx * cached.vx + cached.vy * cached.vy)
     if (speed > 1 && cached.t > 0) {
       const dtS = Math.min((now - cached.t) / 1000, 0.05) // cap at 50ms
-      targetX = cached.x + cached.vx * dtS
-      targetY = cached.y + cached.vy * dtS
-      targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
-      targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
+      targetX = Math.max(0, Math.min(cached.x + cached.vx * dtS, GAME_CONFIG.FIELD_WIDTH))
+      targetY = Math.max(0, Math.min(cached.y + cached.vy * dtS, GAME_CONFIG.FIELD_HEIGHT))
     }
 
     const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
