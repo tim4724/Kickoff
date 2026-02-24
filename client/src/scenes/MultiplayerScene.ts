@@ -37,12 +37,13 @@ export class MultiplayerScene extends BaseGameScene {
   private lastBallServerVX: number = 0
   private lastBallServerVY: number = 0
   private lastBallStateReceivedAt: number = 0
-  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; t: number }>()
+  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; t: number; errX: number; errY: number }>()
 
   // Per-frame cache for getUnifiedState() — avoids allocating a new Map 3+ times per frame
   private _cachedUnifiedState: GameEngineState | null = null
   private _cachedUnifiedStateFrame: number = -1
   private _frameCounter: number = 0
+  private frameDeltaS: number = 0
 
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
@@ -82,9 +83,10 @@ export class MultiplayerScene extends BaseGameScene {
 
     // Advance frame counter so getUnifiedState() cache invalidates each frame
     this._frameCounter++
+    this.frameDeltaS = delta / 1000
 
     try {
-      const dt = delta / 1000 // Convert to seconds assuming delta is MS.
+      const dt = this.frameDeltaS
 
       const currentControlledId = this.controlledPlayerId
       if (this.lastControlledPlayerId && this.lastControlledPlayerId !== currentControlledId) {
@@ -691,6 +693,13 @@ export class MultiplayerScene extends BaseGameScene {
     const deltaX = Math.abs(myPlayerSprite.x - serverX)
     const deltaY = Math.abs(myPlayerSprite.y - serverY)
 
+    // Dead zone: skip reconciliation when error is below MIN_CORRECTION.
+    // Small errors are normal (client prediction is slightly ahead of server).
+    // Reconciling tiny errors every frame creates a constant pull-back jitter.
+    if (deltaX < VISUAL_CONSTANTS.MIN_CORRECTION && deltaY < VISUAL_CONSTANTS.MIN_CORRECTION) {
+      return
+    }
+
     let reconcileFactor: number = VISUAL_CONSTANTS.BASE_RECONCILE_FACTOR
 
     if (deltaX > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD || deltaY > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD) {
@@ -716,31 +725,55 @@ export class MultiplayerScene extends BaseGameScene {
       if (!sprite) return
     }
 
-    const now = performance.now()
     const pvx = playerState.velocityX ?? 0
     const pvy = playerState.velocityY ?? 0
     let cached = this.lastRemotePlayerStates.get(sessionId)
 
-    // Update snapshot when server reports a position or velocity change
-    if (!cached || cached.x !== playerState.x || cached.y !== playerState.y || cached.vx !== pvx || cached.vy !== pvy) {
-      cached = { x: playerState.x, y: playerState.y, vx: pvx, vy: pvy, t: now }
-      this.lastRemotePlayerStates.set(sessionId, cached)
+    // First snapshot — snap directly to server position
+    if (!cached) {
+      sprite.x = playerState.x
+      sprite.y = playerState.y
+      this.lastRemotePlayerStates.set(sessionId, {
+        x: playerState.x, y: playerState.y, vx: pvx, vy: pvy,
+        t: performance.now(), errX: 0, errY: 0,
+      })
+      return
     }
 
-    // Dead reckoning: extrapolate using last known velocity to fill gaps between patches
-    let targetX = cached.x
-    let targetY = cached.y
-
-    const speed = Math.sqrt(cached.vx * cached.vx + cached.vy * cached.vy)
-    if (speed > 1 && cached.t > 0) {
-      const dtS = Math.min((now - cached.t) / 1000, 0.05) // cap at 50ms
-      targetX = Math.max(0, Math.min(cached.x + cached.vx * dtS, GAME_CONFIG.FIELD_WIDTH))
-      targetY = Math.max(0, Math.min(cached.y + cached.vy * dtS, GAME_CONFIG.FIELD_HEIGHT))
+    // Detect when server sends a new snapshot (position or velocity changed)
+    if (cached.x !== playerState.x || cached.y !== playerState.y || cached.vx !== pvx || cached.vy !== pvy) {
+      // Error = where server says the player is vs where our sprite ended up.
+      // This captures accumulated drift from velocity mismatch + any remaining
+      // uncorrected error from previous patches.
+      cached.errX = playerState.x - sprite.x
+      cached.errY = playerState.y - sprite.y
+      cached.x = playerState.x
+      cached.y = playerState.y
+      cached.vx = pvx
+      cached.vy = pvy
+      cached.t = performance.now()
     }
 
-    const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
-    sprite.x += (targetX - sprite.x) * lerpFactor
-    sprite.y += (targetY - sprite.y) * lerpFactor
+    // 1. Velocity-based movement: advance sprite smoothly every frame.
+    //    Completely decoupled from patch timing — no stalls between patches.
+    sprite.x += cached.vx * this.frameDeltaS
+    sprite.y += cached.vy * this.frameDeltaS
+
+    // 2. Error correction: spread server position corrections over several frames.
+    //    50% per frame converges in ~4 frames (~67ms) — fast enough to prevent
+    //    drift but gradual enough to avoid visible pops.
+    if (cached.errX !== 0 || cached.errY !== 0) {
+      sprite.x += cached.errX * 0.5
+      sprite.y += cached.errY * 0.5
+      cached.errX *= 0.5
+      cached.errY *= 0.5
+      if (Math.abs(cached.errX) < 0.01) cached.errX = 0
+      if (Math.abs(cached.errY) < 0.01) cached.errY = 0
+    }
+
+    // Clamp to field bounds
+    sprite.x = Math.max(0, Math.min(sprite.x, GAME_CONFIG.FIELD_WIDTH))
+    sprite.y = Math.max(0, Math.min(sprite.y, GAME_CONFIG.FIELD_HEIGHT))
   }
 
   private updateLocalPlayerColor() {
