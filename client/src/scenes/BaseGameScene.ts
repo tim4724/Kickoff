@@ -343,6 +343,7 @@ export abstract class BaseGameScene extends PixiScene {
       this.controlArrow = new Graphics()
       this.controlArrow.zIndex = 11
       this.controlArrow.visible = false
+      this.controlArrowDrawn = false
       this.cameraManager.getGameContainer().addChild(this.controlArrow)
     }
   }

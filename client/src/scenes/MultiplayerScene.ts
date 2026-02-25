@@ -27,6 +27,9 @@ export class MultiplayerScene extends BaseGameScene {
   private aiEnabled: boolean = true
   private lastControlledPlayerId?: string
   private lastMovementWasNonZero: boolean = false
+  // Client-predicted velocity for the local player (mirrors server's acceleration model)
+  private predictedVX: number = 0
+  private predictedVY: number = 0
   // Dead reckoning state — track last known server positions + velocities so we can
   // extrapolate between patches and eliminate visual stalls during network jitter
   private lastBallServerX: number = 0
@@ -103,12 +106,24 @@ export class MultiplayerScene extends BaseGameScene {
         Math.abs(movement.x) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT ||
         Math.abs(movement.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
 
-      if (hasMovement) {
+      {
         const controlledSprite = this.players.get(this.controlledPlayerId)
 
         if (controlledSprite) {
-          controlledSprite.x += movement.x * GAME_CONFIG.PLAYER_SPEED * dt
-          controlledSprite.y += movement.y * GAME_CONFIG.PLAYER_SPEED * dt
+          // Mirror server's acceleration model (PhysicsEngine.processPlayerInput)
+          const targetVX = movement.x * GAME_CONFIG.PLAYER_SPEED
+          const targetVY = movement.y * GAME_CONFIG.PLAYER_SPEED
+          const accel = GAME_CONFIG.PLAYER_ACCELERATION
+          if (accel >= 1) {
+            this.predictedVX = targetVX
+            this.predictedVY = targetVY
+          } else {
+            this.predictedVX += (targetVX - this.predictedVX) * accel
+            this.predictedVY += (targetVY - this.predictedVY) * accel
+          }
+
+          controlledSprite.x += this.predictedVX * dt
+          controlledSprite.y += this.predictedVY * dt
 
           // Clamp to field bounds (matches server physics)
           controlledSprite.x = Math.max(0, Math.min(controlledSprite.x, GAME_CONFIG.FIELD_WIDTH))
@@ -117,11 +132,6 @@ export class MultiplayerScene extends BaseGameScene {
       }
 
       if (this.controlledPlayerId) {
-        const movement = this.collectMovementInput()
-        const hasMovement =
-          Math.abs(movement.x) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT ||
-          Math.abs(movement.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
-        
         if (hasMovement && this.networkManager.isConnected()) {
           this.networkManager.sendInput(
             movement,
@@ -418,7 +428,7 @@ export class MultiplayerScene extends BaseGameScene {
           if (!this.players.has(player.id)) {
             this.createPlayerSprite(player.id, player.x, player.y, player.team)
           }
-          this.initializeAI()
+          if (!this.aiManager) this.initializeAI()
         } catch (error) {
           console.error('[MultiplayerScene] Error handling playerJoin:', error)
         }
@@ -428,7 +438,7 @@ export class MultiplayerScene extends BaseGameScene {
         try {
           console.log('👋 Remote player left:', playerId)
           this.removeRemotePlayer(playerId)
-          this.initializeAI()
+          if (!this.aiManager) this.initializeAI()
         } catch (error) {
           console.error('[MultiplayerScene] Error handling playerLeave:', error)
         }
@@ -560,14 +570,15 @@ export class MultiplayerScene extends BaseGameScene {
       return
     }
 
-    if (!this.stateUpdateCount) this.stateUpdateCount = 0
     this.stateUpdateCount++
 
     if (state.ball) {
       const now = performance.now()
       const serverBall = state.ball
 
-      // Update dead-reckoning snapshot whenever server reports a new position/velocity
+      // Always refresh timestamp so dead-reckoning doesn't overshoot when a
+      // stationary ball starts moving again.  Update snapshot values on change.
+      this.lastBallStateReceivedAt = now
       if (
         serverBall.x !== this.lastBallServerX ||
         serverBall.y !== this.lastBallServerY ||
@@ -578,7 +589,6 @@ export class MultiplayerScene extends BaseGameScene {
         this.lastBallServerY = serverBall.y
         this.lastBallServerVX = serverBall.velocityX
         this.lastBallServerVY = serverBall.velocityY
-        this.lastBallStateReceivedAt = now
       }
 
       if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
