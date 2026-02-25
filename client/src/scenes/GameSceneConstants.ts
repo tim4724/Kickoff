@@ -10,7 +10,7 @@ export const VISUAL_CONSTANTS = {
   // Reconciliation factors — raised to correct local player errors faster at 60Hz.
   BASE_RECONCILE_FACTOR: 0.35,
   MODERATE_RECONCILE_FACTOR: 0.6,
-  STRONG_RECONCILE_FACTOR: 0.9,
+  STRONG_RECONCILE_FACTOR: 0.8,
 
   // Error thresholds for reconciliation
   MODERATE_ERROR_THRESHOLD: 25,

@@ -1009,6 +1009,11 @@ export abstract class BaseGameScene extends PixiScene {
 
     if (this.joystick) this.joystick.destroy()
     if (this.actionButton) this.actionButton.destroy()
+    if (this.controlArrow) {
+      this.controlArrow.destroy()
+      this.controlArrow = undefined
+      this.controlArrowDrawn = false
+    }
     if (this.cameraManager) this.cameraManager.destroy()
     if (this.aiDebugRenderer) this.aiDebugRenderer.destroy()
 

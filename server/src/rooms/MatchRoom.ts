@@ -3,13 +3,12 @@ import { GameState } from '../schema/GameState.js'
 import { gameClock } from '@kickoff/shared/engine/GameClock'
 import type { MatchRoomOptions, PlayerReadyEvent, MatchStartEvent, MatchEndEvent, RoomClosedEvent } from '../types/room.js'
 
-const GAME_CONFIG = {
-  TICK_RATE: 60, // Increased from 30 for lower latency
-  MATCH_DURATION: 120,
-} as const
+// These must match GAME_CONFIG in shared/src/types.ts
+const TICK_RATE = 60
+const MATCH_DURATION = 120
 
 // Fixed timestep physics configuration
-const FIXED_TIMESTEP_MS = 1000 / 60 // 16.666ms - deterministic physics step
+const FIXED_TIMESTEP_MS = 1000 / TICK_RATE // 16.666ms - deterministic physics step
 const FIXED_TIMESTEP_S = FIXED_TIMESTEP_MS / 1000 // 0.01666s
 const MAX_PHYSICS_STEPS = 24 // Increased to handle high CPU contention during parallel tests (8 workers = 16 browser contexts)
 
@@ -48,10 +47,10 @@ export class MatchRoom extends Room<GameState> {
     this.setState(gameState)
 
     // Sync state to clients at tick rate (default is 50ms/20Hz — too slow for smooth play)
-    this.patchRate = 1000 / GAME_CONFIG.TICK_RATE
+    this.patchRate = 1000 / TICK_RATE
 
     // Start game loop at 60 Hz
-    this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / GAME_CONFIG.TICK_RATE)
+    this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / TICK_RATE)
 
     // Handle player inputs (multiple inputs per message)
     this.onMessage('inputs', (client, message) => {
@@ -164,7 +163,7 @@ export class MatchRoom extends Room<GameState> {
     // Reset physics accumulator for clean deterministic start
     this.physicsAccumulator = 0
 
-    const startEvent: MatchStartEvent = { duration: GAME_CONFIG.MATCH_DURATION }
+    const startEvent: MatchStartEvent = { duration: MATCH_DURATION }
     this.broadcast('match_start', startEvent)
   }
 

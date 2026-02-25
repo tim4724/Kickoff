@@ -79,5 +79,6 @@ export const GAME_CONFIG = {
   GOAL_Y_MAX: Math.round(FIELD_HEIGHT / 2 + (FIELD_HEIGHT * GOAL_HEIGHT_RATIO) / 2),
 
   // Game timing
+  TICK_RATE: 60,
   MATCH_DURATION: 120,
 } as const

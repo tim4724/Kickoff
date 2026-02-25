@@ -536,10 +536,13 @@ export class MultiplayerScene extends BaseGameScene {
     this.returningToMenu = true
     console.log(`🔙 Returning to menu: ${message}`)
 
-    // Disconnect immediately to allow server to clean up session while user sees the message
+    // Disconnect immediately to allow server to clean up session while user sees the message.
+    // Set isMultiplayer = false to stop the update loop from calling sendInput/flushInputs
+    // on the now-disconnected networkManager during the 2-second navigation delay.
     if (this.networkManager) {
       console.log('🔌 [ReturnToMenu] Disconnecting early to facilitate cleanup')
       this.networkManager.disconnect()
+      this.isMultiplayer = false
     }
     
     setTimeout(() => {
@@ -742,8 +745,10 @@ export class MultiplayerScene extends BaseGameScene {
 
     // 1. Velocity-based movement: advance sprite smoothly every frame.
     //    Completely decoupled from patch timing — no stalls between patches.
-    sprite.x += cached.vx * this.frameDeltaS
-    sprite.y += cached.vy * this.frameDeltaS
+    //    Fallback to 1/60 on the very first frame before updateGameState has run.
+    const dt = this.frameDeltaS > 0 ? this.frameDeltaS : 1 / 60
+    sprite.x += cached.vx * dt
+    sprite.y += cached.vy * dt
 
     // 2. Error correction: spread server position corrections over several frames.
     //    50% per frame converges in ~4 frames (~67ms) — fast enough to prevent
@@ -826,32 +831,26 @@ export class MultiplayerScene extends BaseGameScene {
 
     const myTeam: 'blue' | 'red' = localPlayer.team
     
-    const myTeamPlayerIds: string[] = []
-    const opponentTeamPlayerIds: string[] = []
+    const bluePlayerIds: string[] = []
+    const redPlayerIds: string[] = []
 
     state.players.forEach((player: any, playerId: string) => {
-      if (player.team === myTeam) {
-        myTeamPlayerIds.push(playerId)
+      if (player.team === 'blue') {
+        bluePlayerIds.push(playerId)
+      } else {
+        redPlayerIds.push(playerId)
       }
     })
 
     if (!this.aiManager) {
       this.aiManager = new AIManager()
     }
-    
-    if (myTeam === 'blue') {
-      this.aiManager.initialize(
-        myTeamPlayerIds,
-        opponentTeamPlayerIds,
-        (playerId, decision) => this.applyAIDecision(playerId, decision)
-      )
-    } else {
-      this.aiManager.initialize(
-        opponentTeamPlayerIds,
-        myTeamPlayerIds,
-        (playerId, decision) => this.applyAIDecision(playerId, decision)
-      )
-    }
+
+    this.aiManager.initialize(
+      bluePlayerIds,
+      redPlayerIds,
+      (playerId, decision) => this.applyAIDecision(playerId, decision)
+    )
 
     console.log(`🤖 AI initialized for ${myTeam} team`)
   }
@@ -910,8 +909,10 @@ export class MultiplayerScene extends BaseGameScene {
       return super.shouldAllowAIControl(playerId)
     }
 
+    // Block AI control of the human-controlled player
     if (playerId === this.controlledPlayerId) return false
-    if (playerId === this.mySessionId) return true
+    // Allow AI control of bots belonging to this client's session (format: "<sessionId>-p2", "-p3")
+    if (this.mySessionId && playerId.startsWith(`${this.mySessionId}-`)) return true
 
     return super.shouldAllowAIControl(playerId)
   }
