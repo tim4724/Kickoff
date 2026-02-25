@@ -20,16 +20,12 @@ export class MultiplayerScene extends BaseGameScene {
   protected mySessionId?: string
   private isMultiplayer: boolean = false
   private roomDebugText!: Text
-  private stateUpdateCount: number = 0
   private colorInitialized: boolean = false
   private positionInitialized: boolean = false
   private returningToMenu: boolean = false
   private aiEnabled: boolean = true
   private lastControlledPlayerId?: string
   private lastMovementWasNonZero: boolean = false
-  // Client-predicted velocity for the local player (mirrors server's acceleration model)
-  private predictedVX: number = 0
-  private predictedVY: number = 0
   // Dead reckoning state — track last known server positions + velocities so we can
   // extrapolate between patches and eliminate visual stalls during network jitter
   private lastBallServerX: number = 0
@@ -62,7 +58,6 @@ export class MultiplayerScene extends BaseGameScene {
     this.mySessionId = undefined
     this.colorInitialized = false
     this.positionInitialized = false
-    this.stateUpdateCount = 0
     this.lastControlledPlayerId = undefined
     this.lastMovementWasNonZero = false
 
@@ -106,24 +101,13 @@ export class MultiplayerScene extends BaseGameScene {
         Math.abs(movement.x) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT ||
         Math.abs(movement.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
 
-      {
+      if (hasMovement) {
         const controlledSprite = this.players.get(this.controlledPlayerId)
 
         if (controlledSprite) {
-          // Mirror server's acceleration model (PhysicsEngine.processPlayerInput)
-          const targetVX = movement.x * GAME_CONFIG.PLAYER_SPEED
-          const targetVY = movement.y * GAME_CONFIG.PLAYER_SPEED
-          const accel = GAME_CONFIG.PLAYER_ACCELERATION
-          if (accel >= 1) {
-            this.predictedVX = targetVX
-            this.predictedVY = targetVY
-          } else {
-            this.predictedVX += (targetVX - this.predictedVX) * accel
-            this.predictedVY += (targetVY - this.predictedVY) * accel
-          }
-
-          controlledSprite.x += this.predictedVX * dt
-          controlledSprite.y += this.predictedVY * dt
+          // Instant velocity — matches server's playerAcceleration: 1 (MatchRoom GameEngine config)
+          controlledSprite.x += movement.x * GAME_CONFIG.PLAYER_SPEED * dt
+          controlledSprite.y += movement.y * GAME_CONFIG.PLAYER_SPEED * dt
 
           // Clamp to field bounds (matches server physics)
           controlledSprite.x = Math.max(0, Math.min(controlledSprite.x, GAME_CONFIG.FIELD_WIDTH))
@@ -214,6 +198,13 @@ export class MultiplayerScene extends BaseGameScene {
 
     this.lastRemotePlayerStates.clear()
     this.lastBallStateReceivedAt = 0
+    this.lastBallServerX = 0
+    this.lastBallServerY = 0
+    this.lastBallServerVX = 0
+    this.lastBallServerVY = 0
+    this._cachedUnifiedState = null
+    this._cachedUnifiedStateFrame = -1
+    this._frameCounter = 0
 
     console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
   }
@@ -446,6 +437,11 @@ export class MultiplayerScene extends BaseGameScene {
 
       this.networkManager.on('stateChange', (_state: any) => {
         try {
+          // Record patch arrival time for dead-reckoning extrapolation.
+          // Must be here (fires on Colyseus patches) not in syncFromServerState
+          // (called every render frame), otherwise dtS would always be 0.
+          this.lastBallStateReceivedAt = performance.now()
+
           // After initialization, use the live Colyseus state directly to avoid
           // the Map allocation that NetworkManager.onStateChange creates every patch.
           const state = this.networkManager?.getState() as any
@@ -570,82 +566,77 @@ export class MultiplayerScene extends BaseGameScene {
       return
     }
 
-    this.stateUpdateCount++
+    const now = performance.now()
+    const serverBall = state.ball
 
-    if (state.ball) {
-      const now = performance.now()
-      const serverBall = state.ball
+    // Update dead-reckoning snapshot values when they change.
+    // Timestamp is set in the stateChange handler (on actual Colyseus patches).
+    if (
+      serverBall.x !== this.lastBallServerX ||
+      serverBall.y !== this.lastBallServerY ||
+      serverBall.velocityX !== this.lastBallServerVX ||
+      serverBall.velocityY !== this.lastBallServerVY
+    ) {
+      this.lastBallServerX = serverBall.x
+      this.lastBallServerY = serverBall.y
+      this.lastBallServerVX = serverBall.velocityX
+      this.lastBallServerVY = serverBall.velocityY
+    }
 
-      // Always refresh timestamp so dead-reckoning doesn't overshoot when a
-      // stationary ball starts moving again.  Update snapshot values on change.
-      this.lastBallStateReceivedAt = now
-      if (
-        serverBall.x !== this.lastBallServerX ||
-        serverBall.y !== this.lastBallServerY ||
-        serverBall.velocityX !== this.lastBallServerVX ||
-        serverBall.velocityY !== this.lastBallServerVY
-      ) {
-        this.lastBallServerX = serverBall.x
-        this.lastBallServerY = serverBall.y
-        this.lastBallServerVX = serverBall.velocityX
-        this.lastBallServerVY = serverBall.velocityY
-      }
-
-      if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
-        this.ball.x = serverBall.x
-        this.ball.y = serverBall.y
-      } else if (serverBall.possessedBy) {
-        // Ball is possessed — lock it to the possessing player's SPRITE position
-        // instead of lerping toward the server ball position.  The server places
-        // the ball at player + direction * POSSESSION_BALL_OFFSET, but the player
-        // sprite is predicted ahead of the server (dead reckoning / client prediction).
-        // Lerping would make the ball visibly trail the player.
-        const possessorSprite = this.players.get(serverBall.possessedBy)
-        if (possessorSprite) {
-          // Use the server ball position relative to the server player position
-          // to compute the offset, then apply it to the local sprite position.
-          const possessorState = state.players?.get(serverBall.possessedBy)
-          if (possessorState) {
-            const offsetX = serverBall.x - possessorState.x
-            const offsetY = serverBall.y - possessorState.y
-            this.ball.x = possessorSprite.x + offsetX
-            this.ball.y = possessorSprite.y + offsetY
-          } else {
-            this.ball.x = serverBall.x
-            this.ball.y = serverBall.y
-          }
+    if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
+      this.ball.x = serverBall.x
+      this.ball.y = serverBall.y
+    } else if (serverBall.possessedBy) {
+      // Ball is possessed — lock it to the possessing player's SPRITE position
+      // instead of lerping toward the server ball position.  The server places
+      // the ball at player + direction * POSSESSION_BALL_OFFSET, but the player
+      // sprite is predicted ahead of the server (dead reckoning / client prediction).
+      // Lerping would make the ball visibly trail the player.
+      const possessorSprite = this.players.get(serverBall.possessedBy)
+      if (possessorSprite) {
+        // Use the server ball position relative to the server player position
+        // to compute the offset, then apply it to the local sprite position.
+        const possessorState = state.players?.get(serverBall.possessedBy)
+        if (possessorState) {
+          const offsetX = serverBall.x - possessorState.x
+          const offsetY = serverBall.y - possessorState.y
+          this.ball.x = possessorSprite.x + offsetX
+          this.ball.y = possessorSprite.y + offsetY
         } else {
           this.ball.x = serverBall.x
           this.ball.y = serverBall.y
         }
       } else {
-        // Ball is free — dead reckoning extrapolation (no lerp).
-        // At 60Hz patches, corrections are ~1-3 px — invisible without smoothing.
-        // Adding a lerp chase creates a sawtooth: the ball lags behind the
-        // extrapolated target, then when a patch corrects the target backward
-        // the ball stalls momentarily.  Direct assignment avoids this.
-        let targetX = this.lastBallServerX
-        let targetY = this.lastBallServerY
-
-        if (this.lastBallStateReceivedAt > 0) {
-          const dtS = Math.min((now - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
-          // Integrate velocity with exponential friction decay: v(t) = v0 * f^(t*60)
-          // Displacement = integral of v(t) dt = v0 * (f^(t*60) - 1) / (60 * ln(f))
-          const steps = dtS * 60
-          const logF = Math.log(GAME_CONFIG.BALL_FRICTION) // ln(0.98) ≈ -0.0202
-          const displacement = (Math.pow(GAME_CONFIG.BALL_FRICTION, steps) - 1) / (60 * logF)
-          targetX = this.lastBallServerX + this.lastBallServerVX * displacement
-          targetY = this.lastBallServerY + this.lastBallServerVY * displacement
-          targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
-          targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
-        }
-
-        this.ball.x = targetX
-        this.ball.y = targetY
+        this.ball.x = serverBall.x
+        this.ball.y = serverBall.y
       }
-      this.ballShadow.x = this.ball.x + 2
-      this.ballShadow.y = this.ball.y + 3
+    } else {
+      // Ball is free — dead reckoning extrapolation (no lerp).
+      // At 60Hz patches, corrections are ~1-3 px — invisible without smoothing.
+      // Adding a lerp chase creates a sawtooth: the ball lags behind the
+      // extrapolated target, then when a patch corrects the target backward
+      // the ball stalls momentarily.  Direct assignment avoids this.
+      let targetX = this.lastBallServerX
+      let targetY = this.lastBallServerY
+
+      if (this.lastBallStateReceivedAt > 0) {
+        const dtS = Math.min((now - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
+        // Integrate velocity with exponential friction decay: v(t) = v0 * f^(t*60)
+        // Displacement = integral of v(t) dt = v0 * (f^(t*60) - 1) / (60 * ln(f))
+        const steps = dtS * 60
+        const logF = Math.log(GAME_CONFIG.BALL_FRICTION) // ln(0.98) ≈ -0.0202
+        const displacement = (Math.pow(GAME_CONFIG.BALL_FRICTION, steps) - 1) / (60 * logF)
+        targetX = this.lastBallServerX + this.lastBallServerVX * displacement
+        targetY = this.lastBallServerY + this.lastBallServerVY * displacement
+        targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
+        targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
+      }
+
+      this.ball.x = targetX
+      this.ball.y = targetY
     }
+    this.ballShadow.x = this.ball.x + 2
+    this.ballShadow.y = this.ball.y + 3
 
     state.players.forEach((player: any, playerId: string) => {
       if (playerId === this.myPlayerId) {
