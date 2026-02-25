@@ -7,12 +7,6 @@ export const VISUAL_CONSTANTS = {
   CONTROLLED_PLAYER_BORDER: 6, // Increased thicker border for controlled player
   UNCONTROLLED_PLAYER_BORDER: 3, // Slightly thicker for better visibility
 
-  // Interpolation factors — tuned for 60Hz patch rate + dead reckoning.
-  // Dead reckoning predicts most of the movement; lerp corrects residual prediction error.
-  // Lower values = smoother convergence with less oscillation.
-  BALL_LERP_FACTOR: 0.3,
-  REMOTE_PLAYER_LERP_FACTOR: 0.3,
-
   // Reconciliation factors — raised to correct local player errors faster at 60Hz.
   BASE_RECONCILE_FACTOR: 0.35,
   MODERATE_RECONCILE_FACTOR: 0.6,
@@ -26,10 +20,6 @@ export const VISUAL_CONSTANTS = {
   MIN_MOVEMENT_INPUT: 0.01,
   MIN_POSITION_CHANGE: 0.5,
   MIN_CORRECTION: 2,
-  REMOTE_MOVEMENT_THRESHOLD: 1,
-
-  // Debug logging
-  STATE_UPDATE_LOG_INTERVAL: 60, // Log every 60 updates (~2 seconds at 30fps)
 
   // Team colors (darkened for ball)
   BALL_BLUE_COLOR: 0x0047b3,

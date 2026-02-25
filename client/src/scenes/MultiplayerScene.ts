@@ -10,7 +10,6 @@ import { AIManager } from '@/ai'
 import { sceneRouter } from '@/utils/SceneRouter'
 import type { Room } from 'colyseus.js'
 import { PixiSceneManager } from '@/utils/PixiSceneManager'
-import { NetworkSmoothnessMetrics } from '@/utils/NetworkSmoothnessMetrics'
 
 /**
  * Multiplayer Game Scene (PixiJS)
@@ -28,8 +27,6 @@ export class MultiplayerScene extends BaseGameScene {
   private aiEnabled: boolean = true
   private lastControlledPlayerId?: string
   private lastMovementWasNonZero: boolean = false
-  private smoothnessMetrics?: NetworkSmoothnessMetrics
-
   // Dead reckoning state — track last known server positions + velocities so we can
   // extrapolate between patches and eliminate visual stalls during network jitter
   private lastBallServerX: number = 0
@@ -37,7 +34,7 @@ export class MultiplayerScene extends BaseGameScene {
   private lastBallServerVX: number = 0
   private lastBallServerVY: number = 0
   private lastBallStateReceivedAt: number = 0
-  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; t: number; errX: number; errY: number }>()
+  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; errX: number; errY: number }>()
 
   // Per-frame cache for getUnifiedState() — avoids allocating a new Map 3+ times per frame
   private _cachedUnifiedState: GameEngineState | null = null
@@ -65,9 +62,6 @@ export class MultiplayerScene extends BaseGameScene {
     this.stateUpdateCount = 0
     this.lastControlledPlayerId = undefined
     this.lastMovementWasNonZero = false
-
-    this.smoothnessMetrics = new NetworkSmoothnessMetrics()
-    window.__networkMetrics = this.smoothnessMetrics
 
     this.connectToMultiplayer()
   }
@@ -158,9 +152,7 @@ export class MultiplayerScene extends BaseGameScene {
 
       const state = this.networkManager.getState()
       if (state) {
-        this.smoothnessMetrics?.samplePreSync(state, this.players, this.myPlayerId)
         this.syncFromServerState(state)
-        this.smoothnessMetrics?.samplePostSync(this.ball, this.players, this.myPlayerId)
       }
     } catch (error) {
       console.error('[MultiplayerScene] Error during updateGameState:', error)
@@ -208,11 +200,6 @@ export class MultiplayerScene extends BaseGameScene {
     
     if (this.aiManager) {
       this.aiManager = undefined
-    }
-
-    if (this.smoothnessMetrics) {
-      delete window.__networkMetrics
-      this.smoothnessMetrics = undefined
     }
 
     this.lastRemotePlayerStates.clear()
@@ -632,10 +619,13 @@ export class MultiplayerScene extends BaseGameScene {
 
         if (this.lastBallStateReceivedAt > 0) {
           const dtS = Math.min((now - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
-          // Integrate ball friction: 0.98 per 60Hz physics step
-          const frictionScale = Math.pow(GAME_CONFIG.BALL_FRICTION, dtS * 60)
-          targetX = this.lastBallServerX + this.lastBallServerVX * frictionScale * dtS
-          targetY = this.lastBallServerY + this.lastBallServerVY * frictionScale * dtS
+          // Integrate velocity with exponential friction decay: v(t) = v0 * f^(t*60)
+          // Displacement = integral of v(t) dt = v0 * (f^(t*60) - 1) / (60 * ln(f))
+          const steps = dtS * 60
+          const logF = Math.log(GAME_CONFIG.BALL_FRICTION) // ln(0.98) ≈ -0.0202
+          const displacement = (Math.pow(GAME_CONFIG.BALL_FRICTION, steps) - 1) / (60 * logF)
+          targetX = this.lastBallServerX + this.lastBallServerVX * displacement
+          targetY = this.lastBallServerY + this.lastBallServerVY * displacement
           targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
           targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
         }
@@ -736,7 +726,7 @@ export class MultiplayerScene extends BaseGameScene {
       sprite.y = playerState.y
       this.lastRemotePlayerStates.set(sessionId, {
         x: playerState.x, y: playerState.y, vx: pvx, vy: pvy,
-        t: performance.now(), errX: 0, errY: 0,
+        errX: 0, errY: 0,
       })
       return
     }
@@ -749,7 +739,6 @@ export class MultiplayerScene extends BaseGameScene {
       cached.y = playerState.y
       cached.vx = pvx
       cached.vy = pvy
-      cached.t = performance.now()
     }
 
     // 1. Velocity-based movement: advance sprite smoothly every frame.

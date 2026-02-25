@@ -9,8 +9,6 @@ import type { VirtualJoystick } from '@/controls/VirtualJoystick'
 import type { ActionButton } from '@/controls/ActionButton'
 import type { gameClock } from '@shared/engine/GameClock'
 import type { PixiScene } from '@/utils/PixiScene'
-import type { NetworkSmoothnessMetrics } from '@/utils/NetworkSmoothnessMetrics'
-
 declare global {
   interface Window {
     // Menu scene flag
@@ -31,9 +29,6 @@ declare global {
       backButton?: Container
       test?: GameControlsTestAPI
     }
-
-    // Network smoothness metrics (dev/debug)
-    __networkMetrics?: NetworkSmoothnessMetrics
 
     // Game clock for testing
     GameClock?: typeof gameClock
