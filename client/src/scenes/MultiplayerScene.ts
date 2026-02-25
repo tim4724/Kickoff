@@ -437,11 +437,6 @@ export class MultiplayerScene extends BaseGameScene {
 
       this.networkManager.on('stateChange', (_state: any) => {
         try {
-          // Record patch arrival time for dead-reckoning extrapolation.
-          // Must be here (fires on Colyseus patches) not in syncFromServerState
-          // (called every render frame), otherwise dtS would always be 0.
-          this.lastBallStateReceivedAt = performance.now()
-
           // After initialization, use the live Colyseus state directly to avoid
           // the Map allocation that NetworkManager.onStateChange creates every patch.
           const state = this.networkManager?.getState() as any
@@ -558,6 +553,7 @@ export class MultiplayerScene extends BaseGameScene {
       sprite.destroy()
       this.players.delete(sessionId)
     }
+    this.lastRemotePlayerStates.delete(sessionId)
     console.log('🗑️ Remote player removed:', sessionId)
   }
 
@@ -566,11 +562,12 @@ export class MultiplayerScene extends BaseGameScene {
       return
     }
 
-    const now = performance.now()
     const serverBall = state.ball
 
-    // Update dead-reckoning snapshot values when they change.
-    // Timestamp is set in the stateChange handler (on actual Colyseus patches).
+    // Update dead-reckoning snapshot and timestamp when ball state changes.
+    // Timestamp tracks when the last *new* ball data arrived, so dead-reckoning
+    // can extrapolate forward between patches. Stationary balls (v=0) produce
+    // zero displacement regardless of dt, so a stale timestamp is harmless.
     if (
       serverBall.x !== this.lastBallServerX ||
       serverBall.y !== this.lastBallServerY ||
@@ -581,6 +578,7 @@ export class MultiplayerScene extends BaseGameScene {
       this.lastBallServerY = serverBall.y
       this.lastBallServerVX = serverBall.velocityX
       this.lastBallServerVY = serverBall.velocityY
+      this.lastBallStateReceivedAt = performance.now()
     }
 
     if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
@@ -620,7 +618,7 @@ export class MultiplayerScene extends BaseGameScene {
       let targetY = this.lastBallServerY
 
       if (this.lastBallStateReceivedAt > 0) {
-        const dtS = Math.min((now - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
+        const dtS = Math.min((performance.now() - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
         // Integrate velocity with exponential friction decay: v(t) = v0 * f^(t*60)
         // Displacement = integral of v(t) dt = v0 * (f^(t*60) - 1) / (60 * ln(f))
         const steps = dtS * 60
