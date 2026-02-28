@@ -14,7 +14,7 @@ export interface PlayerInput {
 
 export type Team = 'blue' | 'red'
 
-export type PlayerState = 'idle' | 'running' | 'kicking'
+export type PlayerState = 'idle' | 'running' | 'kicking' | 'stunned'
 
 export type GamePhase = 'waiting' | 'playing' | 'ended'
 

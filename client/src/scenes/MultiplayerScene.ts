@@ -5,6 +5,7 @@ import { GeometryUtils } from '@shared/utils/geometry'
 import { BaseGameScene } from './BaseGameScene'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import type { GameEngineState, EnginePlayerData } from '@shared/engine/types'
+import { PHYSICS_DEFAULTS } from '@shared/engine/types'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { AIManager } from '@/ai'
 import { sceneRouter } from '@/utils/SceneRouter'
@@ -105,9 +106,14 @@ export class MultiplayerScene extends BaseGameScene {
         const controlledSprite = this.players.get(this.controlledPlayerId)
 
         if (controlledSprite) {
+          // Check if server says player is stunned — reduce prediction speed to match
+          const serverState = this.networkManager.getState()
+          const serverPlayer = serverState?.players?.get(this.controlledPlayerId)
+          const stunFactor = serverPlayer?.state === 'stunned' ? PHYSICS_DEFAULTS.STUN_SPEED_FACTOR : 1
+
           // Instant velocity — matches server's playerAcceleration: 1 (MatchRoom GameEngine config)
-          controlledSprite.x += movement.x * GAME_CONFIG.PLAYER_SPEED * dt
-          controlledSprite.y += movement.y * GAME_CONFIG.PLAYER_SPEED * dt
+          controlledSprite.x += movement.x * GAME_CONFIG.PLAYER_SPEED * stunFactor * dt
+          controlledSprite.y += movement.y * GAME_CONFIG.PLAYER_SPEED * stunFactor * dt
 
           // Clamp to field bounds (matches server physics)
           controlledSprite.x = Math.max(0, Math.min(controlledSprite.x, GAME_CONFIG.FIELD_WIDTH))

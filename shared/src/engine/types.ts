@@ -20,6 +20,7 @@ export interface EnginePlayerData {
 
   // Server-side only fields (not synced)
   kickingUntil?: number
+  stunnedUntil?: number
 }
 
 export interface EngineBallData {
@@ -81,6 +82,8 @@ export interface PhysicsConfig {
 export const PHYSICS_DEFAULTS = {
   CAPTURE_LOCKOUT_MS: 300,
   LOSS_LOCKOUT_MS: 300,
+  STUN_DURATION_MS: 1000,
+  STUN_SPEED_FACTOR: 0.5,
 } as const
 
 export interface GoalEvent {

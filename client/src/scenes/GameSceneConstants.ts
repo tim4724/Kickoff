@@ -35,6 +35,10 @@ export const VISUAL_CONSTANTS = {
 
   // Border color
   BORDER_COLOR: 0xffffff,
+
+  // Stun visual effects
+  STUN_RADIUS_FACTOR: 0.85,
+  STUN_TRANSITION_SPEED: 8,
 } as const
 
 export type TeamColor = 'blue' | 'red'

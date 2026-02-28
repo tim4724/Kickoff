@@ -69,6 +69,9 @@ export abstract class BaseGameScene extends PixiScene {
   protected lastBallPossessor: string = ''
   protected autoSwitchEnabled: boolean = true
 
+  // Stun visual state (0 = normal, 1 = fully stunned)
+  protected playerStunProgress: Map<string, number> = new Map()
+
   // Optional GameEngine and AI support
   protected gameEngine?: GameEngine
   protected aiManager?: AIManager
@@ -645,6 +648,78 @@ export abstract class BaseGameScene extends PixiScene {
     )
   }
 
+  /**
+   * Lerp stun visual progress and redraw affected players with shrink + desaturation
+   */
+  protected updateStunVisuals(dt: number): void {
+    const unifiedState = this.getUnifiedState()
+    if (!unifiedState) return
+
+    for (const [playerId, playerData] of unifiedState.players) {
+      const isStunned = playerData.state === 'stunned'
+      const target = isStunned ? 1 : 0
+      const current = this.playerStunProgress.get(playerId) ?? 0
+      const speed = VISUAL_CONSTANTS.STUN_TRANSITION_SPEED * dt
+
+      let next: number
+      if (Math.abs(target - current) < 0.01) {
+        next = target
+      } else {
+        next = current + (target - current) * Math.min(speed, 1)
+      }
+
+      // Only redraw when progress actually changes
+      if (next !== current) {
+        this.playerStunProgress.set(playerId, next)
+        this.redrawPlayerWithStun(playerId, playerData, next)
+      } else if (next === 0 && current === 0) {
+        // Clean up entry if fully normal
+        this.playerStunProgress.delete(playerId)
+      }
+    }
+  }
+
+  private redrawPlayerWithStun(playerId: string, _playerData: EnginePlayerData, stunProgress: number): void {
+    const sprite = this.players.get(playerId)
+    if (!sprite) return
+
+    const baseColor = this.playerFillColors.get(playerId) || 0xffffff
+    const isControlled = playerId === this.controlledPlayerId
+
+    const borderWidth = isControlled
+      ? VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER
+      : VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER
+
+    // Interpolate radius: full → 85% at stunProgress=1
+    const radiusFactor = 1 - stunProgress * (1 - VISUAL_CONSTANTS.STUN_RADIUS_FACTOR)
+    const radius = GAME_CONFIG.PLAYER_RADIUS * radiusFactor
+
+    // Desaturate color toward gray
+    const fillColor = stunProgress > 0 ? this.desaturateColor(baseColor, stunProgress) : baseColor
+    // Fade border slightly when stunned
+    const borderAlpha = 1 - stunProgress * 0.4
+
+    sprite.clear()
+    sprite.circle(0, 0, radius)
+    sprite.fill(fillColor)
+    sprite.stroke({ width: borderWidth, color: 0xffffff, alpha: borderAlpha })
+  }
+
+  private desaturateColor(color: number, amount: number): number {
+    const r = (color >> 16) & 0xff
+    const g = (color >> 8) & 0xff
+    const b = color & 0xff
+
+    // Luminance-based gray value
+    const gray = Math.round(r * 0.299 + g * 0.587 + b * 0.114)
+
+    const nr = Math.round(r + (gray - r) * amount)
+    const ng = Math.round(g + (gray - g) * amount)
+    const nb = Math.round(b + (gray - b) * amount)
+
+    return (nr << 16) | (ng << 8) | nb
+  }
+
   protected checkAutoSwitchOnPossession() {
     if (!this.autoSwitchEnabled) return
 
@@ -926,6 +1001,7 @@ export abstract class BaseGameScene extends PixiScene {
     }
 
     this.updateBallColor(state)
+    this.updateStunVisuals(delta / 1000)
     this.updateControlArrow()
     this.checkAutoSwitchOnPossession()
 
@@ -1006,6 +1082,7 @@ export abstract class BaseGameScene extends PixiScene {
 
     this.players.clear()
     this.playerFillColors.clear()
+    this.playerStunProgress.clear()
 
     if (this.joystick) this.joystick.destroy()
     if (this.actionButton) this.actionButton.destroy()

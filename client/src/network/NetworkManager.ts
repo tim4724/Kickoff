@@ -125,7 +125,7 @@ export interface RemotePlayer {
   y: number
   velocityX: number
   velocityY: number
-  state: 'idle' | 'running' | 'kicking'
+  state: PlayerState
   direction: number
 }
 

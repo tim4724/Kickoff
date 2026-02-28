@@ -106,9 +106,21 @@ export class PhysicsEngine {
    * Process player input and update player position/velocity with inertia
    */
   processPlayerInput(player: EnginePlayerData, input: EnginePlayerInput, dt: number): void {
-    // Target velocity based on input
-    const targetVelocityX = input.movement.x * this.config.playerSpeed
-    const targetVelocityY = input.movement.y * this.config.playerSpeed
+    const now = gameClock.now()
+
+    // Check stun: reduce speed and maintain stunned state
+    const isStunned = player.stunnedUntil !== undefined && now < player.stunnedUntil
+    if (isStunned) {
+      player.state = 'stunned'
+    } else if (player.stunnedUntil !== undefined) {
+      // Stun just expired — clear it
+      player.stunnedUntil = undefined
+    }
+
+    // Target velocity based on input (halved if stunned)
+    const speedMultiplier = isStunned ? PHYSICS_DEFAULTS.STUN_SPEED_FACTOR : 1
+    const targetVelocityX = input.movement.x * this.config.playerSpeed * speedMultiplier
+    const targetVelocityY = input.movement.y * this.config.playerSpeed * speedMultiplier
 
     // Acceleration: 1 = instant, lower = more inertia/momentum
     const accel = this.config.playerAcceleration
@@ -128,19 +140,24 @@ export class PhysicsEngine {
     player.x = Math.max(0, Math.min(this.config.fieldWidth, player.x))
     player.y = Math.max(0, Math.min(this.config.fieldHeight, player.y))
 
-    // Update state (preserve 'kicking' if still active)
-    const now = gameClock.now()
+    // Update state (preserve 'kicking' > 'stunned' > normal)
     if (player.kickingUntil && now < player.kickingUntil) {
       // Keep kicking state, but update direction if moving
       const moving = Math.abs(input.movement.x) > 0.1 || Math.abs(input.movement.y) > 0.1
       if (moving) {
         player.direction = Math.atan2(input.movement.y, input.movement.x)
       }
-    } else {
-      // Normal state update
+    } else if (!isStunned) {
+      // Normal state update (stunned state already set above)
       const moving = Math.abs(input.movement.x) > 0.1 || Math.abs(input.movement.y) > 0.1
       player.state = moving ? 'running' : 'idle'
 
+      if (moving) {
+        player.direction = Math.atan2(input.movement.y, input.movement.x)
+      }
+    } else {
+      // Stunned — still update direction if moving
+      const moving = Math.abs(input.movement.x) > 0.1 || Math.abs(input.movement.y) > 0.1
       if (moving) {
         player.direction = Math.atan2(input.movement.y, input.movement.x)
       }
@@ -213,6 +230,9 @@ export class PhysicsEngine {
     for (const player of players.values()) {
       if (player.id === possessor.id || player.team === possessor.team) continue
 
+      // Stunned players cannot tackle
+      if (player.stunnedUntil && gameClock.now() < player.stunnedUntil) continue
+
       const distSq = GeometryUtils.distanceSquaredScalar(player.x, player.y, ball.x, ball.y)
 
       if (distSq < this.challengeRadiusSq && distSq < nearestOpponentDist) {
@@ -221,9 +241,11 @@ export class PhysicsEngine {
       }
     }
 
-    // Immediate possession transfer on contact
+    // Immediate possession transfer on contact — stun the dispossessed player
     if (nearestOpponent) {
       this.lastPossessionLossTime.set(possessor.id, gameClock.now())
+      possessor.stunnedUntil = gameClock.now() + PHYSICS_DEFAULTS.STUN_DURATION_MS
+      possessor.state = 'stunned'
       ball.possessedBy = nearestOpponent.id
       this.lastPossessionGainTime.set(nearestOpponent.id, gameClock.now())
       ball.pressureLevel = 0
@@ -272,6 +294,9 @@ export class PhysicsEngine {
         // Skip shooter during immunity
         if (hasImmunity && player.id === ball.lastShooter) continue
 
+        // Skip stunned players — they cannot recapture the ball
+        if (player.stunnedUntil && gameClock.now() < player.stunnedUntil) continue
+
         const distSq = GeometryUtils.distanceSquaredScalar(ball.x, ball.y, player.x, player.y)
 
         if (distSq < this.challengeRadiusSq) {
@@ -294,6 +319,9 @@ export class PhysicsEngine {
     ball: EngineBallData,
     onShootCallback?: (playerId: string) => void
   ): void {
+    // Block actions while stunned
+    if (player.stunnedUntil && gameClock.now() < player.stunnedUntil) return
+
     if (ball.possessedBy === player.id) {
       // Shoot in direction player is facing at full speed
       const dx = Math.cos(player.direction)
@@ -427,6 +455,7 @@ export class PhysicsEngine {
       player.velocityX = 0
       player.velocityY = 0
       player.state = 'idle'
+      player.stunnedUntil = undefined
     }
   }
 }
