@@ -10,6 +10,7 @@ import { AIManager } from '@/ai'
 import { sceneRouter } from '@/utils/SceneRouter'
 import type { Room } from 'colyseus.js'
 import { PixiSceneManager } from '@/utils/PixiSceneManager'
+import { WaitingOverlay } from '@/utils/WaitingOverlay'
 
 /**
  * Multiplayer Game Scene (PixiJS)
@@ -26,6 +27,7 @@ export class MultiplayerScene extends BaseGameScene {
   private aiEnabled: boolean = true
   private lastControlledPlayerId?: string
   private lastMovementWasNonZero: boolean = false
+  private waitingOverlay?: WaitingOverlay
   // Dead reckoning state — track last known server positions + velocities so we can
   // extrapolate between patches and eliminate visual stalls during network jitter
   private lastBallServerX: number = 0
@@ -191,7 +193,9 @@ export class MultiplayerScene extends BaseGameScene {
     this.colorInitialized = false
     this.positionInitialized = false
     this.returningToMenu = false
-    
+
+    this.hideWaitingOverlay()
+
     if (this.aiManager) {
       this.aiManager = undefined
     }
@@ -388,6 +392,13 @@ export class MultiplayerScene extends BaseGameScene {
 
       this.setupNetworkListeners()
       this.networkManager.checkExistingPlayers()
+
+      // Show QR code overlay while waiting for an opponent
+      const state = this.networkManager.getState()
+      if (roomId !== 'Unknown' && state?.phase === 'waiting') {
+        const joinUrl = `${window.location.origin}${window.location.pathname}#multiplayer?id=${roomId}`
+        this.waitingOverlay = new WaitingOverlay(joinUrl, this.cameraManager.getGameContainer())
+      }
     } catch (error) {
       console.error('❌ Multiplayer connection failed:', error)
       this.isMultiplayer = false
@@ -414,6 +425,10 @@ export class MultiplayerScene extends BaseGameScene {
                const roomId = this.networkManager?.getRoom()?.roomId || 'Unknown'
                this.roomDebugText.text = `Room: ${roomName} (${roomId})`
           }
+      })
+
+      this.networkManager.on('matchStart', () => {
+        this.hideWaitingOverlay()
       })
 
       this.networkManager.on('playerJoin', (player: any) => {
@@ -444,6 +459,11 @@ export class MultiplayerScene extends BaseGameScene {
           // the Map allocation that NetworkManager.onStateChange creates every patch.
           const state = this.networkManager?.getState() as any
           if (!state?.players) return
+
+          // Hide waiting overlay when match starts (fallback for matchStart event)
+          if (this.waitingOverlay && state.phase === 'playing') {
+            this.hideWaitingOverlay()
+          }
 
           // Create sprites for any new players
           state.players.forEach((player: any, playerId: string) => {
@@ -528,6 +548,13 @@ export class MultiplayerScene extends BaseGameScene {
       console.log('✅ Network listeners set up successfully')
     } catch (error) {
       console.error('[MultiplayerScene] Error setting up network listeners:', error)
+    }
+  }
+
+  private hideWaitingOverlay(): void {
+    if (this.waitingOverlay) {
+      this.waitingOverlay.destroy()
+      this.waitingOverlay = undefined
     }
   }
 
