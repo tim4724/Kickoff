@@ -3,7 +3,7 @@ import { GameState } from '../schema/GameState.js'
 import { gameClock } from '@kickoff/shared/engine/GameClock'
 import type { MatchRoomOptions, PlayerReadyEvent, MatchStartEvent, MatchEndEvent, RoomClosedEvent } from '../types/room.js'
 
-// These must match GAME_CONFIG in shared/src/types.ts
+// Must match GAME_CONFIG in shared/src/types.ts
 const TICK_RATE = 60
 const MATCH_DURATION = 120
 

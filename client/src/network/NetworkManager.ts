@@ -145,32 +145,13 @@ export interface GameStateData {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Network condition simulation (URL params: ?lag=150&loss=10)
-//   lag  — added one-way latency in ms applied to outgoing inputs AND
-//           incoming state patches (simulates round-trip degradation)
-//   loss — percentage of outgoing input packets to drop (0-100)
-// ---------------------------------------------------------------------------
-function readNetConditions(): { lagMs: number; lossRate: number } {
-  const p = new URLSearchParams(window.location.search)
-  const lagMs = Math.max(0, parseInt(p.get('lag') ?? '0', 10) || 0)
-  const lossRate = Math.max(0, Math.min(100, parseInt(p.get('loss') ?? '0', 10) || 0)) / 100
-  if (lagMs > 0 || lossRate > 0) {
-    console.warn(`[NetSim] Lag: ${lagMs}ms  Loss: ${(lossRate * 100).toFixed(0)}%`)
-  }
-  return { lagMs, lossRate }
-}
-
 export class NetworkManager {
   private static instance: NetworkManager
   private client: Client
   private room?: Room<ColyseusGameState>
   private config: NetworkConfig
-  private readonly sim = readNetConditions()
 
   private connected: boolean = false
-  // Lag simulation: delayed state snapshot delivered to getState()
-  private _simState: ColyseusGameState | undefined = undefined
   private sessionId: string = ''
   private lastRoomClosedReason: string | null = null
   private roomClosedListeners: Array<(reason: string) => void> = []
@@ -368,7 +349,6 @@ export class NetworkManager {
       this.room = undefined
     }
 
-    this._simState = undefined
     this.inputBuffer.clear()
     
     this.onStateChange = undefined
@@ -431,20 +411,7 @@ export class NetworkManager {
       timestamp: gameClock.now(),
     }
 
-    // Simulate packet loss — drop before sending
-    if (this.sim.lossRate > 0 && Math.random() < this.sim.lossRate) {
-      console.warn(`[NetSim] DROP outgoing input packet`)
-      this.inputBuffer.clear()
-      return
-    }
-
-    if (this.sim.lagMs > 0) {
-      // Capture room ref in case it changes before the timeout fires
-      const room = this.room
-      setTimeout(() => room?.send('inputs', multiInput), this.sim.lagMs)
-    } else {
-      this.room.send('inputs', multiInput)
-    }
+    this.room.send('inputs', multiInput)
     this.inputBuffer.clear()
   }
 
@@ -486,56 +453,28 @@ export class NetworkManager {
       tryHookPlayers(state)
       if (!state || !state.ball || !state.players) return
 
-      // Build a plain-object snapshot of the Colyseus state — Colyseus mutates
-      // the live object in-place, so values must be copied before any delay.
-      const snapPlayers = new Map<string, ColyseusPlayer>()
+      // Build GameStateData for onStateChange consumers
+      const gameState: GameStateData = {
+        matchTime: state.matchTime || 0,
+        scoreBlue: state.scoreBlue || 0,
+        scoreRed: state.scoreRed || 0,
+        phase: state.phase || 'waiting',
+        players: new Map(),
+        ball: {
+          x: state.ball.x || 0, y: state.ball.y || 0,
+          velocityX: state.ball.velocityX || 0, velocityY: state.ball.velocityY || 0,
+          possessedBy: state.ball.possessedBy || '', pressureLevel: state.ball.pressureLevel || 0,
+        },
+      }
       state.players.forEach((p: ColyseusPlayer, key: string) => {
-        snapPlayers.set(key, {
+        gameState.players.set(key, {
           id: p.id || key, team: p.team || 'blue',
-          isHuman: p.isHuman, isControlled: p.isControlled,
           x: p.x || 0, y: p.y || 0,
           velocityX: p.velocityX || 0, velocityY: p.velocityY || 0,
           state: p.state || 'idle', direction: p.direction || 0,
         })
       })
-      const snapBall = {
-        x: state.ball.x || 0, y: state.ball.y || 0,
-        velocityX: state.ball.velocityX || 0, velocityY: state.ball.velocityY || 0,
-        possessedBy: state.ball.possessedBy || '', pressureLevel: state.ball.pressureLevel || 0,
-      }
-      const snapshot: ColyseusGameState = {
-        matchTime: state.matchTime || 0,
-        scoreBlue: state.scoreBlue || 0,
-        scoreRed: state.scoreRed || 0,
-        phase: state.phase || 'waiting',
-        players: snapPlayers as any,
-        ball: snapBall as any,
-      }
-
-      const deliver = () => {
-        if (this.sim.lagMs > 0) this._simState = snapshot
-        // Build GameStateData for legacy onStateChange consumers
-        const gameState: GameStateData = {
-          matchTime: snapshot.matchTime, scoreBlue: snapshot.scoreBlue,
-          scoreRed: snapshot.scoreRed, phase: snapshot.phase,
-          players: new Map(),
-          ball: { ...snapBall },
-        }
-        snapPlayers.forEach((p, key) => {
-          gameState.players.set(key, {
-            id: p.id, team: p.team, x: p.x, y: p.y,
-            velocityX: p.velocityX, velocityY: p.velocityY,
-            state: p.state, direction: p.direction,
-          })
-        })
-        this.onStateChange?.(gameState)
-      }
-
-      if (this.sim.lagMs > 0) {
-        setTimeout(deliver, this.sim.lagMs)
-      } else {
-        deliver()
-      }
+      this.onStateChange?.(gameState)
     })
   }
 
@@ -592,8 +531,7 @@ export class NetworkManager {
   getRoom(): Room<ColyseusGameState> | undefined { return this.room }
   getMySessionId(): string { return this.sessionId }
   getState(): ColyseusGameState | undefined {
-    // Return the lag-delayed snapshot when simulation is active
-    return this.sim.lagMs > 0 ? this._simState : this.room?.state
+    return this.room?.state
   }
 
   private emitRoomClosed(reason: string) {
