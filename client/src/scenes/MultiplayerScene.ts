@@ -33,13 +33,16 @@ export class MultiplayerScene extends BaseGameScene {
   private lastBallServerVX: number = 0
   private lastBallServerVY: number = 0
   private lastBallStateReceivedAt: number = 0
-  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; errX: number; errY: number }>()
+  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; lastReceivedAt: number }>()
 
   // Per-frame cache for getUnifiedState() — avoids allocating a new Map 3+ times per frame
   private _cachedUnifiedState: GameEngineState | null = null
   private _cachedUnifiedStateFrame: number = -1
   private _frameCounter: number = 0
   private frameDeltaS: number = 0
+
+  // Network diagnostics — track patch timing and correction magnitudes
+  private _lastPatchAt: number = 0
 
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
@@ -76,6 +79,11 @@ export class MultiplayerScene extends BaseGameScene {
     // Advance frame counter so getUnifiedState() cache invalidates each frame
     this._frameCounter++
     this.frameDeltaS = delta / 1000
+
+    // Log frame spikes — anything >33ms (2 frames at 60Hz) is a visible stutter
+    if (this.frameDeltaS > 0.033) {
+      console.warn(`[Frame] Spike ${(this.frameDeltaS * 1000).toFixed(1)}ms (${(1 / this.frameDeltaS).toFixed(0)} fps)`)
+    }
 
     try {
       const dt = this.frameDeltaS
@@ -205,6 +213,7 @@ export class MultiplayerScene extends BaseGameScene {
     this._cachedUnifiedState = null
     this._cachedUnifiedStateFrame = -1
     this._frameCounter = 0
+    this._lastPatchAt = 0
 
     console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
   }
@@ -437,6 +446,16 @@ export class MultiplayerScene extends BaseGameScene {
 
       this.networkManager.on('stateChange', (_state: any) => {
         try {
+          // Log large patch gaps — normal ~16ms at 60Hz, >50ms = dropped patch
+          const now = performance.now()
+          if (this._lastPatchAt > 0) {
+            const gap = now - this._lastPatchAt
+            if (gap > 50) {
+              console.warn(`[Net] Patch gap ${gap.toFixed(0)}ms (expected ~16ms) — dropped patch?`)
+            }
+          }
+          this._lastPatchAt = now
+
           // After initialization, use the live Colyseus state directly to avoid
           // the Map allocation that NetworkManager.onStateChange creates every patch.
           const state = this.networkManager?.getState() as any
@@ -622,6 +641,10 @@ export class MultiplayerScene extends BaseGameScene {
 
       if (this.lastBallStateReceivedAt > 0) {
         const dtS = Math.min((performance.now() - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
+        // Log when dead-reckoning is extrapolating far ahead (stale patch)
+        if (dtS > 0.05) {
+          console.warn(`[Net] Ball DR dtS=${(dtS * 1000).toFixed(0)}ms — patch stale, extrapolating`)
+        }
         // Integrate velocity with exponential friction decay: v(t) = v0 * f^(t*60)
         // Displacement = integral of v(t) dt = v0 * (f^(t*60) - 1) / (60 * ln(f))
         const steps = dtS * 60
@@ -697,11 +720,13 @@ export class MultiplayerScene extends BaseGameScene {
 
     if (deltaX > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD || deltaY > VISUAL_CONSTANTS.LARGE_ERROR_THRESHOLD) {
       reconcileFactor = VISUAL_CONSTANTS.STRONG_RECONCILE_FACTOR
+      console.warn(`[Net] Large reconcile error dx=${deltaX.toFixed(1)} dy=${deltaY.toFixed(1)} (factor=${reconcileFactor})`)
     } else if (
       deltaX > VISUAL_CONSTANTS.MODERATE_ERROR_THRESHOLD ||
       deltaY > VISUAL_CONSTANTS.MODERATE_ERROR_THRESHOLD
     ) {
       reconcileFactor = VISUAL_CONSTANTS.MODERATE_RECONCILE_FACTOR
+      console.log(`[Net] Moderate reconcile error dx=${deltaX.toFixed(1)} dy=${deltaY.toFixed(1)} (factor=${reconcileFactor})`)
     }
 
     myPlayerSprite.x += (serverX - myPlayerSprite.x) * reconcileFactor
@@ -728,39 +753,35 @@ export class MultiplayerScene extends BaseGameScene {
       sprite.y = playerState.y
       this.lastRemotePlayerStates.set(sessionId, {
         x: playerState.x, y: playerState.y, vx: pvx, vy: pvy,
-        errX: 0, errY: 0,
+        lastReceivedAt: performance.now(),
       })
       return
     }
 
     // Detect when server sends a new snapshot (position or velocity changed)
     if (cached.x !== playerState.x || cached.y !== playerState.y || cached.vx !== pvx || cached.vy !== pvy) {
-      cached.errX = playerState.x - sprite.x
-      cached.errY = playerState.y - sprite.y
+      // Log the visual correction: how far the sprite was from the new server pos
+      const corrX = playerState.x - sprite.x
+      const corrY = playerState.y - sprite.y
+      const corrMag = Math.sqrt(corrX * corrX + corrY * corrY)
+      if (corrMag > 20) {
+        console.warn(`[Net] Remote ${sessionId.slice(-4)} snap ${corrMag.toFixed(1)}px srv=(${playerState.x.toFixed(0)},${playerState.y.toFixed(0)}) spr=(${sprite.x.toFixed(0)},${sprite.y.toFixed(0)})`)
+      }
       cached.x = playerState.x
       cached.y = playerState.y
       cached.vx = pvx
       cached.vy = pvy
+      cached.lastReceivedAt = performance.now()
     }
 
-    // 1. Velocity-based movement: advance sprite smoothly every frame.
-    //    Completely decoupled from patch timing — no stalls between patches.
-    //    Fallback to 1/60 on the very first frame before updateGameState has run.
-    const dt = this.frameDeltaS > 0 ? this.frameDeltaS : 1 / 60
-    sprite.x += cached.vx * dt
-    sprite.y += cached.vy * dt
-
-    // 2. Error correction: spread server position corrections over several frames.
-    //    50% per frame converges in ~4 frames (~67ms) — fast enough to prevent
-    //    drift but gradual enough to avoid visible pops.
-    if (cached.errX !== 0 || cached.errY !== 0) {
-      sprite.x += cached.errX * 0.5
-      sprite.y += cached.errY * 0.5
-      cached.errX *= 0.5
-      cached.errY *= 0.5
-      if (Math.abs(cached.errX) < 0.01) cached.errX = 0
-      if (Math.abs(cached.errY) < 0.01) cached.errY = 0
-    }
+    // Pure extrapolation from last known server position + velocity.
+    // The sprite is always at: serverPos + velocity * timeSinceSnapshot.
+    // This eliminates the steady-state ~12px error that velocity + 50% error
+    // correction created (the decay couldn't converge when snapshots arrived
+    // every frame, producing errX = velocity_per_frame / correction_rate).
+    const dtS = Math.min((performance.now() - cached.lastReceivedAt) / 1000, 0.1)
+    sprite.x = cached.x + cached.vx * dtS
+    sprite.y = cached.y + cached.vy * dtS
 
     // Clamp to field bounds
     sprite.x = Math.max(0, Math.min(sprite.x, GAME_CONFIG.FIELD_WIDTH))
