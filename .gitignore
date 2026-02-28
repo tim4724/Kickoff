@@ -41,6 +41,10 @@ Thumbs.db
 # Build artifacts
 *.tsbuildinfo
 .cache/
+shared/src/*.js
+shared/src/*.js.map
+shared/src/*.d.ts
+shared/src/*.d.ts.map
 
 # Debug
 .vscode-test/

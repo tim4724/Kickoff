@@ -348,7 +348,7 @@ export class NetworkManager {
       this.connected = false
       this.room = undefined
     }
-    
+
     this.inputBuffer.clear()
     
     this.onStateChange = undefined
@@ -453,6 +453,7 @@ export class NetworkManager {
       tryHookPlayers(state)
       if (!state || !state.ball || !state.players) return
 
+      // Build GameStateData for onStateChange consumers
       const gameState: GameStateData = {
         matchTime: state.matchTime || 0,
         scoreBlue: state.scoreBlue || 0,
@@ -460,28 +461,19 @@ export class NetworkManager {
         phase: state.phase || 'waiting',
         players: new Map(),
         ball: {
-          x: state.ball.x || 0,
-          y: state.ball.y || 0,
-          velocityX: state.ball.velocityX || 0,
-          velocityY: state.ball.velocityY || 0,
-          possessedBy: state.ball.possessedBy || '',
-          pressureLevel: state.ball.pressureLevel || 0,
+          x: state.ball.x || 0, y: state.ball.y || 0,
+          velocityX: state.ball.velocityX || 0, velocityY: state.ball.velocityY || 0,
+          possessedBy: state.ball.possessedBy || '', pressureLevel: state.ball.pressureLevel || 0,
         },
       }
-
-      state.players.forEach((player: ColyseusPlayer, key: string) => {
+      state.players.forEach((p: ColyseusPlayer, key: string) => {
         gameState.players.set(key, {
-          id: player.id || key,
-          team: player.team || 'blue',
-          x: player.x || 0,
-          y: player.y || 0,
-          velocityX: player.velocityX || 0,
-          velocityY: player.velocityY || 0,
-          state: player.state || 'idle',
-          direction: player.direction || 0,
+          id: p.id || key, team: p.team || 'blue',
+          x: p.x || 0, y: p.y || 0,
+          velocityX: p.velocityX || 0, velocityY: p.velocityY || 0,
+          state: p.state || 'idle', direction: p.direction || 0,
         })
       })
-
       this.onStateChange?.(gameState)
     })
   }
@@ -538,7 +530,9 @@ export class NetworkManager {
   getSessionId(): string { return this.sessionId }
   getRoom(): Room<ColyseusGameState> | undefined { return this.room }
   getMySessionId(): string { return this.sessionId }
-  getState(): ColyseusGameState | undefined { return this.room?.state }
+  getState(): ColyseusGameState | undefined {
+    return this.room?.state
+  }
 
   private emitRoomClosed(reason: string) {
     const listeners = [...this.roomClosedListeners]

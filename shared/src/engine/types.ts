@@ -68,6 +68,7 @@ export interface PhysicsConfig {
   fieldWidth: number
   fieldHeight: number
   playerSpeed: number
+  playerAcceleration: number // 0-1: lower = more inertia, 1 = instant
   ballRadius: number
   ballFriction: number
   shootSpeed: number

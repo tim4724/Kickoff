@@ -29,6 +29,7 @@ export abstract class BaseGameScene extends PixiScene {
   protected ball!: Graphics
   protected ballShadow!: Graphics
   protected controlArrow?: Graphics
+  private controlArrowDrawn: boolean = false
 
   // UI elements
   protected scoreboardContainer!: Container
@@ -216,26 +217,30 @@ export abstract class BaseGameScene extends PixiScene {
       }
     }
 
-    // Update broadcast-style scoreboard
-    if (this.blueScoreText) this.blueScoreText.text = `${state.scoreBlue}`
-    if (this.redScoreText) this.redScoreText.text = `${state.scoreRed}`
+    // Update scoreboard — only set .text when value changes to avoid expensive
+    // PixiJS Text re-renders (canvas draw + GPU texture upload on every change).
+    const blueStr = `${state.scoreBlue}`
+    const redStr = `${state.scoreRed}`
+    if (this.blueScoreText && this.blueScoreText.text !== blueStr) this.blueScoreText.text = blueStr
+    if (this.redScoreText && this.redScoreText.text !== redStr) this.redScoreText.text = redStr
 
     const minutes = Math.floor(state.matchTime / 60)
     const seconds = Math.floor(state.matchTime % 60)
-    this.timerText.text = `${minutes}:${seconds.toString().padStart(2, '0')}`
+    const timerStr = `${minutes}:${seconds.toString().padStart(2, '0')}`
+    if (this.timerText.text !== timerStr) this.timerText.text = timerStr
 
-    // Timer urgency effect in last 30 seconds
+    // Timer urgency effect in last 30 seconds (guard style.fill to avoid re-renders)
     if (state.matchTime <= 30 && state.matchTime > 0) {
-      this.timerText.style.fill = '#ff5252'
+      if (this.timerText.style.fill !== '#ff5252') this.timerText.style.fill = '#ff5252'
       if (this.timerBg) {
         this.timerBg.tint = 0xff5252
-        this.timerBg.alpha = 0.15 + Math.sin(Date.now() / 200) * 0.05 // Subtle pulse
+        this.timerBg.alpha = 0.15 + Math.sin(Date.now() / 200) * 0.05
       }
     } else {
-      this.timerText.style.fill = '#ffffff'
+      if (this.timerText.style.fill !== '#ffffff') this.timerText.style.fill = '#ffffff'
       if (this.timerBg) {
-        this.timerBg.tint = 0xffffff
-        this.timerBg.alpha = 1
+        if (this.timerBg.tint !== 0xffffff) this.timerBg.tint = 0xffffff
+        if (this.timerBg.alpha !== 1) this.timerBg.alpha = 1
       }
     }
   }
@@ -338,6 +343,7 @@ export abstract class BaseGameScene extends PixiScene {
       this.controlArrow = new Graphics()
       this.controlArrow.zIndex = 11
       this.controlArrow.visible = false
+      this.controlArrowDrawn = false
       this.cameraManager.getGameContainer().addChild(this.controlArrow)
     }
   }
@@ -563,21 +569,18 @@ export abstract class BaseGameScene extends PixiScene {
 
     const unifiedState = this.getUnifiedState()
     if (!unifiedState || !this.controlledPlayerId) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
 
     const playerState = unifiedState.players.get(this.controlledPlayerId)
     if (!playerState) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
 
     const sprite = this.players.get(this.controlledPlayerId)
     if (!sprite) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
@@ -586,7 +589,6 @@ export abstract class BaseGameScene extends PixiScene {
     const vy = playerState.velocityY ?? 0
 
     if (isNaN(vx) || isNaN(vy) || !isFinite(vx) || !isFinite(vy)) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
@@ -595,48 +597,36 @@ export abstract class BaseGameScene extends PixiScene {
     const MIN_SPEED_THRESHOLD = 15
 
     if (speed < MIN_SPEED_THRESHOLD) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
 
     const direction = playerState.direction
     if (direction === undefined || direction === null || Number.isNaN(direction)) {
-      this.controlArrow.clear()
       this.controlArrow.visible = false
       return
     }
 
-    const radius = GAME_CONFIG.PLAYER_RADIUS
-    const baseDistance = radius + 12
-    const tipDistance = baseDistance + 24
-    const baseHalfWidth = 18
+    // Draw the arrow shape once at the origin; afterwards just move + rotate
+    if (!this.controlArrowDrawn) {
+      const radius = GAME_CONFIG.PLAYER_RADIUS
+      const baseDistance = radius + 12
+      const tipDistance = baseDistance + 24
+      const baseHalfWidth = 18
 
-    const dirX = Math.cos(direction)
-    const dirY = Math.sin(direction)
-    const perpX = Math.cos(direction + Math.PI / 2)
-    const perpY = Math.sin(direction + Math.PI / 2)
+      // Arrow points along +X (rotation=0 means pointing right)
+      this.controlArrow.moveTo(tipDistance, 0)
+      this.controlArrow.lineTo(baseDistance, baseHalfWidth)
+      this.controlArrow.moveTo(tipDistance, 0)
+      this.controlArrow.lineTo(baseDistance, -baseHalfWidth)
+      this.controlArrow.stroke({ width: 4, color: 0xffffff, alpha: 0.95 })
+      this.controlArrowDrawn = true
+    }
 
-    const baseCenterX = sprite.x + dirX * baseDistance
-    const baseCenterY = sprite.y + dirY * baseDistance
-    const tipX = sprite.x + dirX * tipDistance
-    const tipY = sprite.y + dirY * tipDistance
-
-    const baseLeftX = baseCenterX + perpX * baseHalfWidth
-    const baseLeftY = baseCenterY + perpY * baseHalfWidth
-    const baseRightX = baseCenterX - perpX * baseHalfWidth
-    const baseRightY = baseCenterY - perpY * baseHalfWidth
-
-    this.controlArrow.clear()
+    // Position at player sprite and rotate to match direction — no clear/redraw needed
+    this.controlArrow.position.set(sprite.x, sprite.y)
+    this.controlArrow.rotation = direction
     this.controlArrow.visible = true
-
-    this.controlArrow.moveTo(tipX, tipY)
-    this.controlArrow.lineTo(baseLeftX, baseLeftY)
-
-    this.controlArrow.moveTo(tipX, tipY)
-    this.controlArrow.lineTo(baseRightX, baseRightY)
-
-    this.controlArrow.stroke({ width: 4, color: 0xffffff, alpha: 0.95 })
   }
 
   protected updateBallColor(state: any) {
@@ -1019,6 +1009,11 @@ export abstract class BaseGameScene extends PixiScene {
 
     if (this.joystick) this.joystick.destroy()
     if (this.actionButton) this.actionButton.destroy()
+    if (this.controlArrow) {
+      this.controlArrow.destroy()
+      this.controlArrow = undefined
+      this.controlArrowDrawn = false
+    }
     if (this.cameraManager) this.cameraManager.destroy()
     if (this.aiDebugRenderer) this.aiDebugRenderer.destroy()
 

@@ -68,6 +68,7 @@ export const GAME_CONFIG = {
 
   // Player physics
   PLAYER_SPEED: Math.round(FIELD_HEIGHT * 0.35),
+  PLAYER_ACCELERATION: 0.15, // 0-1: lower = more inertia, 1 = instant
 
   // Ball physics
   BALL_FRICTION: 0.98,
@@ -78,5 +79,6 @@ export const GAME_CONFIG = {
   GOAL_Y_MAX: Math.round(FIELD_HEIGHT / 2 + (FIELD_HEIGHT * GOAL_HEIGHT_RATIO) / 2),
 
   // Game timing
+  TICK_RATE: 60,
   MATCH_DURATION: 120,
 } as const

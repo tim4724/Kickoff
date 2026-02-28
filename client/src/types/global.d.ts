@@ -9,7 +9,6 @@ import type { VirtualJoystick } from '@/controls/VirtualJoystick'
 import type { ActionButton } from '@/controls/ActionButton'
 import type { gameClock } from '@shared/engine/GameClock'
 import type { PixiScene } from '@/utils/PixiScene'
-
 declare global {
   interface Window {
     // Menu scene flag

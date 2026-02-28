@@ -20,13 +20,26 @@ export class MultiplayerScene extends BaseGameScene {
   protected mySessionId?: string
   private isMultiplayer: boolean = false
   private roomDebugText!: Text
-  private stateUpdateCount: number = 0
   private colorInitialized: boolean = false
   private positionInitialized: boolean = false
   private returningToMenu: boolean = false
   private aiEnabled: boolean = true
   private lastControlledPlayerId?: string
   private lastMovementWasNonZero: boolean = false
+  // Dead reckoning state — track last known server positions + velocities so we can
+  // extrapolate between patches and eliminate visual stalls during network jitter
+  private lastBallServerX: number = 0
+  private lastBallServerY: number = 0
+  private lastBallServerVX: number = 0
+  private lastBallServerVY: number = 0
+  private lastBallStateReceivedAt: number = 0
+  private lastRemotePlayerStates = new Map<string, { x: number; y: number; vx: number; vy: number; lastReceivedAt: number }>()
+
+  // Per-frame cache for getUnifiedState() — avoids allocating a new Map 3+ times per frame
+  private _cachedUnifiedState: GameEngineState | null = null
+  private _cachedUnifiedStateFrame: number = -1
+  private _frameCounter: number = 0
+  private frameDeltaS: number = 0
 
   constructor(app: Application, key: string, manager: PixiSceneManager) {
     super(app, key, manager)
@@ -45,7 +58,6 @@ export class MultiplayerScene extends BaseGameScene {
     this.mySessionId = undefined
     this.colorInitialized = false
     this.positionInitialized = false
-    this.stateUpdateCount = 0
     this.lastControlledPlayerId = undefined
     this.lastMovementWasNonZero = false
 
@@ -61,8 +73,12 @@ export class MultiplayerScene extends BaseGameScene {
       return
     }
 
+    // Advance frame counter so getUnifiedState() cache invalidates each frame
+    this._frameCounter++
+    this.frameDeltaS = delta / 1000
+
     try {
-      const dt = delta / 1000 // Convert to seconds assuming delta is MS.
+      const dt = this.frameDeltaS
 
       const currentControlledId = this.controlledPlayerId
       if (this.lastControlledPlayerId && this.lastControlledPlayerId !== currentControlledId) {
@@ -89,6 +105,7 @@ export class MultiplayerScene extends BaseGameScene {
         const controlledSprite = this.players.get(this.controlledPlayerId)
 
         if (controlledSprite) {
+          // Instant velocity — matches server's playerAcceleration: 1 (MatchRoom GameEngine config)
           controlledSprite.x += movement.x * GAME_CONFIG.PLAYER_SPEED * dt
           controlledSprite.y += movement.y * GAME_CONFIG.PLAYER_SPEED * dt
 
@@ -99,11 +116,6 @@ export class MultiplayerScene extends BaseGameScene {
       }
 
       if (this.controlledPlayerId) {
-        const movement = this.collectMovementInput()
-        const hasMovement =
-          Math.abs(movement.x) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT ||
-          Math.abs(movement.y) > VISUAL_CONSTANTS.MIN_MOVEMENT_INPUT
-        
         if (hasMovement && this.networkManager.isConnected()) {
           this.networkManager.sendInput(
             movement,
@@ -184,13 +196,32 @@ export class MultiplayerScene extends BaseGameScene {
       this.aiManager = undefined
     }
 
+    this.lastRemotePlayerStates.clear()
+    this.lastBallStateReceivedAt = 0
+    this.lastBallServerX = 0
+    this.lastBallServerY = 0
+    this.lastBallServerVX = 0
+    this.lastBallServerVY = 0
+    this._cachedUnifiedState = null
+    this._cachedUnifiedStateFrame = -1
+    this._frameCounter = 0
     console.log('✅ [MultiplayerScene] Cleanup complete - disconnected and game stopped')
   }
 
   protected getUnifiedState(): GameEngineState | null {
+    // Return cached result if already computed this frame (avoids 3+ Map allocations per frame)
+    if (this._cachedUnifiedStateFrame === this._frameCounter) {
+      return this._cachedUnifiedState
+    }
     const rawState = this.networkManager?.getState()
-    if (!rawState) return null
-    return this.fromNetwork(rawState)
+    if (!rawState) {
+      this._cachedUnifiedState = null
+      this._cachedUnifiedStateFrame = this._frameCounter
+      return null
+    }
+    this._cachedUnifiedState = this.fromNetwork(rawState)
+    this._cachedUnifiedStateFrame = this._frameCounter
+    return this._cachedUnifiedState
   }
 
   /**
@@ -391,7 +422,7 @@ export class MultiplayerScene extends BaseGameScene {
           if (!this.players.has(player.id)) {
             this.createPlayerSprite(player.id, player.x, player.y, player.team)
           }
-          this.initializeAI()
+          if (!this.aiManager) this.initializeAI()
         } catch (error) {
           console.error('[MultiplayerScene] Error handling playerJoin:', error)
         }
@@ -401,24 +432,28 @@ export class MultiplayerScene extends BaseGameScene {
         try {
           console.log('👋 Remote player left:', playerId)
           this.removeRemotePlayer(playerId)
-          this.initializeAI()
+          if (!this.aiManager) this.initializeAI()
         } catch (error) {
           console.error('[MultiplayerScene] Error handling playerLeave:', error)
         }
       })
 
-      this.networkManager.on('stateChange', (state: any) => {
+      this.networkManager.on('stateChange', (_state: any) => {
         try {
-          if (state?.players) {
-            state.players.forEach((player: any, playerId: string) => {
-              if (!this.players.has(playerId)) {
-                console.log(`🎭 Creating player sprite from state: ${playerId} (${player.team})`)
-                this.createPlayerSprite(playerId, player.x, player.y, player.team)
-              }
-            })
-          }
+          // After initialization, use the live Colyseus state directly to avoid
+          // the Map allocation that NetworkManager.onStateChange creates every patch.
+          const state = this.networkManager?.getState() as any
+          if (!state?.players) return
 
-          if (!this.colorInitialized && state?.players?.has(this.myPlayerId)) {
+          // Create sprites for any new players
+          state.players.forEach((player: any, playerId: string) => {
+            if (!this.players.has(playerId)) {
+              console.log(`🎭 Creating player sprite from state: ${playerId} (${player.team})`)
+              this.createPlayerSprite(playerId, player.x, player.y, player.team)
+            }
+          })
+
+          if (!this.colorInitialized && state.players.has(this.myPlayerId)) {
             console.log(`🎨 [Init] Initializing colors (colorInitialized=${this.colorInitialized})`)
             this.updateLocalPlayerColor()
 
@@ -429,18 +464,18 @@ export class MultiplayerScene extends BaseGameScene {
 
             this.colorInitialized = true
             console.log(`🎨 [Init] Color initialization complete`)
-            
+
             this.initializeControlArrow()
             this.updatePlayerBorders()
           }
-          
+
           if (!this.myPlayerId && this.mySessionId) {
             console.warn('[MultiplayerScene] myPlayerId not set, initializing from sessionId')
             this.myPlayerId = `${this.mySessionId}-p1`
             this.controlledPlayerId = `${this.mySessionId}-p1`
           }
-          
-          if (this.colorInitialized && state?.players?.size > 0) {
+
+          if (this.colorInitialized && state.players.size > 0 && !this.aiManager) {
             this.initializeAI()
           }
         } catch (error) {
@@ -504,10 +539,13 @@ export class MultiplayerScene extends BaseGameScene {
     this.returningToMenu = true
     console.log(`🔙 Returning to menu: ${message}`)
 
-    // Disconnect immediately to allow server to clean up session while user sees the message
+    // Disconnect immediately to allow server to clean up session while user sees the message.
+    // Set isMultiplayer = false to stop the update loop from calling sendInput/flushInputs
+    // on the now-disconnected networkManager during the 2-second navigation delay.
     if (this.networkManager) {
       console.log('🔌 [ReturnToMenu] Disconnecting early to facilitate cleanup')
       this.networkManager.disconnect()
+      this.isMultiplayer = false
     }
     
     setTimeout(() => {
@@ -521,6 +559,7 @@ export class MultiplayerScene extends BaseGameScene {
       sprite.destroy()
       this.players.delete(sessionId)
     }
+    this.lastRemotePlayerStates.delete(sessionId)
     console.log('🗑️ Remote player removed:', sessionId)
   }
 
@@ -529,21 +568,79 @@ export class MultiplayerScene extends BaseGameScene {
       return
     }
 
-    if (!this.stateUpdateCount) this.stateUpdateCount = 0
-    this.stateUpdateCount++
+    const serverBall = state.ball
 
-    if (state.ball) {
-      if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
-        this.ball.x = state.ball.x
-        this.ball.y = state.ball.y
-      } else {
-        const lerpFactor = VISUAL_CONSTANTS.BALL_LERP_FACTOR
-        this.ball.x += (state.ball.x - this.ball.x) * lerpFactor
-        this.ball.y += (state.ball.y - this.ball.y) * lerpFactor
-      }
-      this.ballShadow.x = this.ball.x + 2
-      this.ballShadow.y = this.ball.y + 3
+    // Update dead-reckoning snapshot and timestamp when ball state changes.
+    // Timestamp tracks when the last *new* ball data arrived, so dead-reckoning
+    // can extrapolate forward between patches. Stationary balls (v=0) produce
+    // zero displacement regardless of dt, so a stale timestamp is harmless.
+    if (
+      serverBall.x !== this.lastBallServerX ||
+      serverBall.y !== this.lastBallServerY ||
+      serverBall.velocityX !== this.lastBallServerVX ||
+      serverBall.velocityY !== this.lastBallServerVY
+    ) {
+      this.lastBallServerX = serverBall.x
+      this.lastBallServerY = serverBall.y
+      this.lastBallServerVX = serverBall.velocityX
+      this.lastBallServerVY = serverBall.velocityY
+      this.lastBallStateReceivedAt = performance.now()
     }
+
+    if (this.ball.x == null || this.ball.y == null || isNaN(this.ball.x) || isNaN(this.ball.y)) {
+      this.ball.x = serverBall.x
+      this.ball.y = serverBall.y
+    } else if (serverBall.possessedBy) {
+      // Ball is possessed — lock it to the possessing player's SPRITE position
+      // instead of lerping toward the server ball position.  The server places
+      // the ball at player + direction * POSSESSION_BALL_OFFSET, but the player
+      // sprite is predicted ahead of the server (dead reckoning / client prediction).
+      // Lerping would make the ball visibly trail the player.
+      const possessorSprite = this.players.get(serverBall.possessedBy)
+      if (possessorSprite) {
+        // Use the server ball position relative to the server player position
+        // to compute the offset, then apply it to the local sprite position.
+        const possessorState = state.players?.get(serverBall.possessedBy)
+        if (possessorState) {
+          const offsetX = serverBall.x - possessorState.x
+          const offsetY = serverBall.y - possessorState.y
+          this.ball.x = possessorSprite.x + offsetX
+          this.ball.y = possessorSprite.y + offsetY
+        } else {
+          this.ball.x = serverBall.x
+          this.ball.y = serverBall.y
+        }
+      } else {
+        this.ball.x = serverBall.x
+        this.ball.y = serverBall.y
+      }
+    } else {
+      // Ball is free — dead reckoning extrapolation (no lerp).
+      // At 60Hz patches, corrections are ~1-3 px — invisible without smoothing.
+      // Adding a lerp chase creates a sawtooth: the ball lags behind the
+      // extrapolated target, then when a patch corrects the target backward
+      // the ball stalls momentarily.  Direct assignment avoids this.
+      let targetX = this.lastBallServerX
+      let targetY = this.lastBallServerY
+
+      if (this.lastBallStateReceivedAt > 0) {
+        const dtS = Math.min((performance.now() - this.lastBallStateReceivedAt) / 1000, 0.1) // cap at 100ms
+        // Integrate velocity with exponential friction decay: v(t) = v0 * f^(t*60)
+        // Displacement = integral of v(t) dt = v0 * (f^(t*60) - 1) / (60 * ln(f))
+        const steps = dtS * 60
+        const logF = Math.log(GAME_CONFIG.BALL_FRICTION) // ln(0.98) ≈ -0.0202
+        const displacement = (Math.pow(GAME_CONFIG.BALL_FRICTION, steps) - 1) / (60 * logF)
+        targetX = this.lastBallServerX + this.lastBallServerVX * displacement
+        targetY = this.lastBallServerY + this.lastBallServerVY * displacement
+        targetX = Math.max(0, Math.min(targetX, GAME_CONFIG.FIELD_WIDTH))
+        targetY = Math.max(0, Math.min(targetY, GAME_CONFIG.FIELD_HEIGHT))
+      }
+
+      this.ball.x = targetX
+      this.ball.y = targetY
+    }
+    this.ballShadow.x = this.ball.x + 2
+    this.ballShadow.y = this.ball.y + 3
 
     state.players.forEach((player: any, playerId: string) => {
       if (playerId === this.myPlayerId) {
@@ -553,28 +650,34 @@ export class MultiplayerScene extends BaseGameScene {
       }
     })
 
-    // Update broadcast-style scoreboard
-    if (this.blueScoreText) this.blueScoreText.text = `${state.scoreBlue}`
-    if (this.redScoreText) this.redScoreText.text = `${state.scoreRed}`
+    // Update scoreboard — only set .text when value changes to avoid expensive
+    // PixiJS Text re-renders (canvas draw + GPU texture upload on every change).
+    // The timer text changes every 1 second, which was causing a periodic frame drop.
+    const blueStr = `${state.scoreBlue}`
+    const redStr = `${state.scoreRed}`
+    if (this.blueScoreText && this.blueScoreText.text !== blueStr) this.blueScoreText.text = blueStr
+    if (this.redScoreText && this.redScoreText.text !== redStr) this.redScoreText.text = redStr
 
     const minutes = Math.floor(state.matchTime / 60)
     const seconds = Math.floor(state.matchTime % 60)
-    this.timerText.text = `${minutes}:${seconds.toString().padStart(2, '0')}`
+    const timerStr = `${minutes}:${seconds.toString().padStart(2, '0')}`
+    if (this.timerText.text !== timerStr) this.timerText.text = timerStr
 
-    // Timer urgency effect in last 30 seconds
+    // Timer urgency effect in last 30 seconds (guard style.fill to avoid re-renders)
     if (state.matchTime <= 30 && state.matchTime > 0) {
-      this.timerText.style.fill = '#ff5252'
+      if (this.timerText.style.fill !== '#ff5252') this.timerText.style.fill = '#ff5252'
       if (this.timerBg) {
         this.timerBg.tint = 0xff5252
         this.timerBg.alpha = 0.15 + Math.sin(Date.now() / 200) * 0.05
       }
     } else {
-      this.timerText.style.fill = '#ffffff'
+      if (this.timerText.style.fill !== '#ffffff') this.timerText.style.fill = '#ffffff'
       if (this.timerBg) {
         this.timerBg.tint = 0xffffff
         this.timerBg.alpha = 1
       }
     }
+
   }
 
   private reconcileLocalPlayer(playerState: any) {
@@ -585,6 +688,13 @@ export class MultiplayerScene extends BaseGameScene {
     const serverY = playerState.y
     const deltaX = Math.abs(myPlayerSprite.x - serverX)
     const deltaY = Math.abs(myPlayerSprite.y - serverY)
+
+    // Dead zone: skip reconciliation when error is below MIN_CORRECTION.
+    // Small errors are normal (client prediction is slightly ahead of server).
+    // Reconciling tiny errors every frame creates a constant pull-back jitter.
+    if (deltaX < VISUAL_CONSTANTS.MIN_CORRECTION && deltaY < VISUAL_CONSTANTS.MIN_CORRECTION) {
+      return
+    }
 
     let reconcileFactor: number = VISUAL_CONSTANTS.BASE_RECONCILE_FACTOR
 
@@ -611,9 +721,42 @@ export class MultiplayerScene extends BaseGameScene {
       if (!sprite) return
     }
 
-    const lerpFactor = VISUAL_CONSTANTS.REMOTE_PLAYER_LERP_FACTOR
-    sprite.x += (playerState.x - sprite.x) * lerpFactor
-    sprite.y += (playerState.y - sprite.y) * lerpFactor
+    const pvx = playerState.velocityX ?? 0
+    const pvy = playerState.velocityY ?? 0
+    let cached = this.lastRemotePlayerStates.get(sessionId)
+
+    // First snapshot — snap directly to server position
+    if (!cached) {
+      sprite.x = playerState.x
+      sprite.y = playerState.y
+      this.lastRemotePlayerStates.set(sessionId, {
+        x: playerState.x, y: playerState.y, vx: pvx, vy: pvy,
+        lastReceivedAt: performance.now(),
+      })
+      return
+    }
+
+    // Detect when server sends a new snapshot (position or velocity changed)
+    if (cached.x !== playerState.x || cached.y !== playerState.y || cached.vx !== pvx || cached.vy !== pvy) {
+      cached.x = playerState.x
+      cached.y = playerState.y
+      cached.vx = pvx
+      cached.vy = pvy
+      cached.lastReceivedAt = performance.now()
+    }
+
+    // Pure extrapolation from last known server position + velocity.
+    // The sprite is always at: serverPos + velocity * timeSinceSnapshot.
+    // This eliminates the steady-state ~12px error that velocity + 50% error
+    // correction created (the decay couldn't converge when snapshots arrived
+    // every frame, producing errX = velocity_per_frame / correction_rate).
+    const dtS = Math.min((performance.now() - cached.lastReceivedAt) / 1000, 0.1)
+    sprite.x = cached.x + cached.vx * dtS
+    sprite.y = cached.y + cached.vy * dtS
+
+    // Clamp to field bounds
+    sprite.x = Math.max(0, Math.min(sprite.x, GAME_CONFIG.FIELD_WIDTH))
+    sprite.y = Math.max(0, Math.min(sprite.y, GAME_CONFIG.FIELD_HEIGHT))
   }
 
   private updateLocalPlayerColor() {
@@ -680,32 +823,26 @@ export class MultiplayerScene extends BaseGameScene {
 
     const myTeam: 'blue' | 'red' = localPlayer.team
     
-    const myTeamPlayerIds: string[] = []
-    const opponentTeamPlayerIds: string[] = []
+    const bluePlayerIds: string[] = []
+    const redPlayerIds: string[] = []
 
     state.players.forEach((player: any, playerId: string) => {
-      if (player.team === myTeam) {
-        myTeamPlayerIds.push(playerId)
+      if (player.team === 'blue') {
+        bluePlayerIds.push(playerId)
+      } else {
+        redPlayerIds.push(playerId)
       }
     })
 
     if (!this.aiManager) {
       this.aiManager = new AIManager()
     }
-    
-    if (myTeam === 'blue') {
-      this.aiManager.initialize(
-        myTeamPlayerIds,
-        opponentTeamPlayerIds,
-        (playerId, decision) => this.applyAIDecision(playerId, decision)
-      )
-    } else {
-      this.aiManager.initialize(
-        opponentTeamPlayerIds,
-        myTeamPlayerIds,
-        (playerId, decision) => this.applyAIDecision(playerId, decision)
-      )
-    }
+
+    this.aiManager.initialize(
+      bluePlayerIds,
+      redPlayerIds,
+      (playerId, decision) => this.applyAIDecision(playerId, decision)
+    )
 
     console.log(`🤖 AI initialized for ${myTeam} team`)
   }
@@ -764,8 +901,10 @@ export class MultiplayerScene extends BaseGameScene {
       return super.shouldAllowAIControl(playerId)
     }
 
+    // Block AI control of the human-controlled player
     if (playerId === this.controlledPlayerId) return false
-    if (playerId === this.mySessionId) return true
+    // Allow AI control of bots belonging to this client's session (format: "<sessionId>-p2", "-p3")
+    if (this.mySessionId && playerId.startsWith(`${this.mySessionId}-`)) return true
 
     return super.shouldAllowAIControl(playerId)
   }
