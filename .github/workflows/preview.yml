@@ -71,6 +71,53 @@ jobs:
             namespace: github-runner
           RBAC
 
+          # Network policies: default-deny + allow DNS + allow traefik ingress
+          cat <<NETPOL | kubectl apply -n "$NS" -f -
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: default-deny-all
+          spec:
+            podSelector: {}
+            policyTypes:
+            - Ingress
+            - Egress
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: allow-dns
+          spec:
+            podSelector: {}
+            policyTypes:
+            - Egress
+            egress:
+            - to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+              ports:
+              - protocol: UDP
+                port: 53
+              - protocol: TCP
+                port: 53
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: allow-ingress-from-traefik
+          spec:
+            podSelector: {}
+            policyTypes:
+            - Ingress
+            ingress:
+            - from:
+              - ipBlock:
+                  cidr: 192.168.1.115/32
+              ports:
+              - protocol: TCP
+          NETPOL
+
           TLS_CRT=$(kubectl get secret kickoff-game-wildcard-tls -n default -o jsonpath='{.data.tls\.crt}')
           TLS_KEY=$(kubectl get secret kickoff-game-wildcard-tls -n default -o jsonpath='{.data.tls\.key}')
 
