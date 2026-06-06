@@ -2,7 +2,6 @@ import { Application, Text } from 'pixi.js'
 import { GAME_CONFIG } from '@shared/types'
 import { GameEngine } from '@shared'
 import { BaseGameScene } from './BaseGameScene'
-import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { AIManager } from '@/ai'
 import { gameClock as GameClock } from '@shared/engine/GameClock'
 import { PixiSceneManager } from '@/utils/PixiSceneManager'
@@ -193,15 +192,8 @@ export class AIOnlyScene extends BaseGameScene {
   }
 
   protected updatePlayerBorders(): void {
-    // In AI-only mode, ALL players should have uncontrolled borders
-    this.players.forEach((playerSprite, playerId) => {
-        const fillColor = this.playerFillColors.get(playerId) || 0xffffff
-
-        playerSprite.clear()
-        playerSprite.circle(0, 0, GAME_CONFIG.PLAYER_RADIUS)
-        playerSprite.fill(fillColor)
-        playerSprite.stroke({ width: 3, color: VISUAL_CONSTANTS.BORDER_COLOR, alpha: 1 })
-    })
+    // In AI-only mode there is no human-controlled player, so hide all highlights.
+    this.players.forEach((player) => player.setControlled(false))
   }
 
   private applyAIDecision(playerId: string, decision: any) {
