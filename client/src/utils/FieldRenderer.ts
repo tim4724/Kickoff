@@ -20,6 +20,15 @@ export class FieldRenderer {
   private static readonly LINE_COLOR = 0xffffff
   private static readonly STRIPE_COUNT = 10
 
+  // Marking geometry (visual only)
+  private static readonly CENTER_CIRCLE_RADIUS = 120
+  private static readonly PENALTY_ARC_RADIUS = 120
+  private static readonly CORNER_ARC_RADIUS = 28
+
+  // Goal net appearance
+  private static readonly NET_TILE_SCALE = 0.55
+  private static readonly NET_BACKING_ALPHA = 0.45
+
   /**
    * Create the field background, markings and goals.
    * Appends elements to the game container.
@@ -73,7 +82,7 @@ export class FieldRenderer {
     g.stroke({ width: 4, color: line, alpha: 0.8 })
 
     // Center circle + spot
-    g.circle(cx, cy, 120)
+    g.circle(cx, cy, FieldRenderer.CENTER_CIRCLE_RADIUS)
     g.stroke({ width: 4, color: line, alpha: 0.8 })
     g.circle(cx, cy, 8)
     g.fill(line)
@@ -84,7 +93,7 @@ export class FieldRenderer {
     const goalAreaDepth = Math.round(width * 0.055)
     const goalAreaHeight = Math.round(height * 0.46)
     const penaltySpotDist = Math.round(width * 0.10)
-    const arcRadius = 120
+    const arcRadius = FieldRenderer.PENALTY_ARC_RADIUS
 
     for (const side of [0, 1] as const) {
       const dir = side === 0 ? 1 : -1 // left goal opens right, right goal opens left
@@ -122,7 +131,7 @@ export class FieldRenderer {
     }
 
     // Corner arcs (moveTo before each so they stay disconnected)
-    const cr = 28
+    const cr = FieldRenderer.CORNER_ARC_RADIUS
     g.moveTo(cr, 0)
     g.arc(0, 0, cr, 0, Math.PI / 2)
     g.moveTo(width, cr)
@@ -150,7 +159,7 @@ export class FieldRenderer {
       // Dark backing so the net reads against the grass
       const backing = new Graphics()
       backing.rect(boxX, goalY, goalDepth, goalHeight)
-      backing.fill({ color: 0x12361a, alpha: 0.45 })
+      backing.fill({ color: 0x12361a, alpha: FieldRenderer.NET_BACKING_ALPHA })
       backing.zIndex = -6
       container.addChild(backing)
 
@@ -162,7 +171,7 @@ export class FieldRenderer {
           height: goalHeight,
         })
         net.position.set(boxX, goalY)
-        net.tileScale.set(0.55)
+        net.tileScale.set(FieldRenderer.NET_TILE_SCALE)
         net.alpha = 0.9
         net.zIndex = -5
         container.addChild(net)

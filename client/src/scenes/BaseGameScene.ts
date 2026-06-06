@@ -561,14 +561,14 @@ export abstract class BaseGameScene extends PixiScene {
   }
 
   /** Rotate each player's character to face its movement direction. */
-  protected updatePlayerFacing(): void {
+  protected updatePlayerFacing(delta: number): void {
     const state = this.getUnifiedState()
     if (!state) return
 
     for (const [playerId, data] of state.players) {
       const player = this.players.get(playerId)
       if (player) {
-        player.face(data.direction)
+        player.face(data.direction, delta)
       }
     }
   }
@@ -939,7 +939,7 @@ export abstract class BaseGameScene extends PixiScene {
 
     this.updateBallColor(state)
     this.updateControlArrow()
-    this.updatePlayerFacing()
+    this.updatePlayerFacing(delta)
     this.checkAutoSwitchOnPossession()
 
     if (this.debugEnabled) {
@@ -1012,6 +1012,8 @@ export abstract class BaseGameScene extends PixiScene {
   }
 
   destroy() {
+    // Stop update() from touching objects that teardown is about to destroy.
+    this.sceneReady = false
     console.log(`🔄 [Shutdown] ${this.sceneKey} shutting down...`)
 
     window.removeEventListener('orientationchange', this.handleOrientationChange)

@@ -21,9 +21,15 @@ export class PlayerVisual extends Container {
   private static readonly R = GAME_CONFIG.PLAYER_RADIUS
   private static readonly BODY_HEIGHT = PlayerVisual.R * 2.1
   private static readonly RING_RADIUS = PlayerVisual.R + 4
-  // The character art already points along +X, so no extra offset is needed.
+  // The Kenney top-down art points along +X (right) by default — verified in-game
+  // (an un-rotated sprite faces right, and direction 0 = +X), so direction maps
+  // straight to rotation with no offset. Do NOT add 90°: that points players
+  // perpendicular to their movement (the "crab walk").
   private static readonly FACING_OFFSET = 0
+  // Smoothing fraction applied per 60fps-equivalent frame; scaled by frame time
+  // in face() so rotation feels the same regardless of refresh rate.
   private static readonly ROTATION_SMOOTHING = 0.4
+  private static readonly REFERENCE_FRAME_MS = 1000 / 60
 
   constructor(team: 'blue' | 'red', variantIndex: number) {
     super()
@@ -44,11 +50,13 @@ export class PlayerVisual extends Container {
     this.ring.circle(0, 0, PlayerVisual.RING_RADIUS + 5)
     this.ring.stroke({ width: 3, color: 0xffd23f, alpha: 0.35 })
     this.ring.visible = false
-    this.addChild(this.ring)
 
     // --- Character body (the only part that rotates) ---
     this.body = PlayerVisual.createBody(team, variantIndex)
+
+    // Add body before ring so the highlight ring is never occluded by the body.
     this.addChild(this.body)
+    this.addChild(this.ring)
   }
 
   /** Builds the rotating character sprite, or a fallback circle if no texture. */
@@ -80,9 +88,11 @@ export class PlayerVisual extends Container {
 
   /**
    * Rotate the character to face `direction` (radians, 0 = +X). Smoothed along
-   * the shortest arc and kept normalized so it never drifts to huge values.
+   * the shortest arc, frame-rate independent (so it feels the same at 30 or 60
+   * fps), and kept normalized so it never drifts to huge values.
+   * @param deltaMs frame time in milliseconds (defaults to one 60fps frame)
    */
-  face(direction: number): void {
+  face(direction: number, deltaMs: number = PlayerVisual.REFERENCE_FRAME_MS): void {
     if (direction === undefined || direction === null || Number.isNaN(direction)) return
 
     const target = direction + PlayerVisual.FACING_OFFSET
@@ -90,7 +100,9 @@ export class PlayerVisual extends Container {
       Math.sin(target - this.body.rotation),
       Math.cos(target - this.body.rotation)
     )
-    const next = this.body.rotation + diff * PlayerVisual.ROTATION_SMOOTHING
+    const frames = deltaMs / PlayerVisual.REFERENCE_FRAME_MS
+    const alpha = 1 - Math.pow(1 - PlayerVisual.ROTATION_SMOOTHING, frames)
+    const next = this.body.rotation + diff * alpha
     this.body.rotation = Math.atan2(Math.sin(next), Math.cos(next))
   }
 }

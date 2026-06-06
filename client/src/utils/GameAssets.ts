@@ -73,11 +73,6 @@ export function getTexture(key: GameTextureKey): Texture | undefined {
   return textures[key]
 }
 
-/** True once loadGameAssets() has resolved at least once. */
-export function assetsReady(): boolean {
-  return Object.keys(textures).length > 0
-}
-
 /** Picks one of the N team-colored player textures, cycling by index. */
 export function getPlayerTexture(team: 'blue' | 'red', index: number): Texture | undefined {
   const variant = (((index % 3) + 3) % 3) + 1 // 1..3

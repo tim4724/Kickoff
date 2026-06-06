@@ -36,8 +36,11 @@ export class BallRenderer {
     ballShadow.zIndex = 15
     container.addChild(ballShadow)
 
-    // Ball container (glow + sprite move together)
+    // Ball container (glow + sprite move together). sortableChildren must be set
+    // BEFORE addChild so the zIndex ordering below actually takes effect (Pixi v8
+    // only flags a re-sort when children are added while sorting is enabled).
     const ball = new Container()
+    ball.sortableChildren = true
     ball.position.set(width / 2, height / 2)
     ball.zIndex = 16
 
@@ -68,9 +71,6 @@ export class BallRenderer {
       circle.zIndex = 1
       ball.addChild(circle)
     }
-
-    // Keep the glow explicitly behind the ball sprite regardless of child order.
-    ball.sortableChildren = true
 
     container.addChild(ball)
 
