@@ -7,6 +7,8 @@ import { ActionButton } from '@/controls/ActionButton'
 import { VISUAL_CONSTANTS } from './GameSceneConstants'
 import { FieldRenderer } from '@/utils/FieldRenderer'
 import { BallRenderer } from '@/utils/BallRenderer'
+import { PlayerVisual } from '@/utils/PlayerRenderer'
+import { loadGameAssets } from '@/utils/GameAssets'
 import { CameraManager } from '@/utils/CameraManager'
 import { AIDebugRenderer } from '@/utils/AIDebugRenderer'
 import type { GameEngineState } from '@shared/engine/types'
@@ -24,11 +26,13 @@ import { PixiSceneManager } from '@/utils/PixiSceneManager'
  */
 export abstract class BaseGameScene extends PixiScene {
   // Visual objects
-  protected players: Map<string, Graphics> = new Map()
-  protected playerFillColors: Map<string, number> = new Map()
-  protected ball!: Graphics
+  protected players: Map<string, PlayerVisual> = new Map()
+  protected ball!: Container
   protected ballShadow!: Graphics
+  protected ballGlow!: Graphics
   protected controlArrow?: Graphics
+  // Cycles character art variants per team for visual variety
+  private teamVariantCount: { blue: number; red: number } = { blue: 0, red: 0 }
   private controlArrowDrawn: boolean = false
 
   // UI elements
@@ -64,6 +68,10 @@ export abstract class BaseGameScene extends PixiScene {
   protected playerTeamColor: number = VISUAL_CONSTANTS.PLAYER_BLUE_COLOR
   protected goalScored: boolean = false
   protected matchEnded: boolean = false
+  // True only after create() finishes; create() is async (awaits asset loading)
+  // and the scene manager starts the ticker before create() resolves, so
+  // update() must not run until the game objects exist.
+  protected sceneReady: boolean = false
 
   // Auto-switch state
   protected lastBallPossessor: string = ''
@@ -273,6 +281,11 @@ export abstract class BaseGameScene extends PixiScene {
 
   async create() {
     console.log(`🎮 ${this.sceneKey} - Creating...`)
+    this.sceneReady = false
+
+    // Load sprite textures before any visual objects are created so renderers
+    // use the artwork instead of their procedural fallbacks.
+    await loadGameAssets()
 
     if (typeof window !== 'undefined' && window.__menuLoaded) {
       window.__menuLoaded = false
@@ -280,6 +293,7 @@ export abstract class BaseGameScene extends PixiScene {
     }
 
     this.players.clear()
+    this.teamVariantCount = { blue: 0, red: 0 }
 
     // Detect mobile
     // Enhanced detection for tests running on desktop browsers
@@ -293,6 +307,7 @@ export abstract class BaseGameScene extends PixiScene {
     const ballObjects = BallRenderer.createBall(this.cameraManager.getGameContainer())
     this.ball = ballObjects.ball
     this.ballShadow = ballObjects.shadow
+    this.ballGlow = ballObjects.glow
 
     // Setup UI Container
     this.createUI()
@@ -316,26 +331,20 @@ export abstract class BaseGameScene extends PixiScene {
 
     this.initializeGameState()
 
+    this.sceneReady = true
     console.log(`✅ ${this.sceneKey} ready`)
   }
 
-  protected createPlayerSprite(playerId: string, x: number, y: number, team: 'blue' | 'red'): Graphics {
-    const color = team === 'blue' ? VISUAL_CONSTANTS.PLAYER_BLUE_COLOR : VISUAL_CONSTANTS.PLAYER_RED_COLOR
-    const playerSprite = new Graphics()
+  protected createPlayerSprite(playerId: string, x: number, y: number, team: 'blue' | 'red'): PlayerVisual {
+    // Cycle through the character art variants so teammates look distinct.
+    const variant = team === 'blue' ? this.teamVariantCount.blue++ : this.teamVariantCount.red++
+    const player = new PlayerVisual(team, variant)
+    player.position.set(x, y)
 
-    // Draw player
-    playerSprite.circle(0, 0, GAME_CONFIG.PLAYER_RADIUS)
-    playerSprite.fill(color)
-    playerSprite.stroke({ width: 3, color: 0xffffff }) // White border
+    this.cameraManager.getGameContainer().addChild(player)
+    this.players.set(playerId, player)
 
-    playerSprite.position.set(x, y)
-    playerSprite.zIndex = 10
-
-    this.cameraManager.getGameContainer().addChild(playerSprite)
-    this.players.set(playerId, playerSprite)
-    this.playerFillColors.set(playerId, color)
-
-    return playerSprite
+    return player
   }
 
   protected initializeControlArrow() {
@@ -544,24 +553,24 @@ export abstract class BaseGameScene extends PixiScene {
   }
 
   protected updatePlayerBorders() {
-    this.players.forEach((playerSprite, playerId) => {
-      const isControlled = playerId === this.controlledPlayerId
-
-      const borderWidth = isControlled
-        ? VISUAL_CONSTANTS.CONTROLLED_PLAYER_BORDER
-        : VISUAL_CONSTANTS.UNCONTROLLED_PLAYER_BORDER
-
-      const strokeColor = 0xffffff // White border for everyone
-
-      const fillColor = this.playerFillColors.get(playerId) || 0xffffff
-
-      playerSprite.clear()
-      playerSprite.circle(0, 0, GAME_CONFIG.PLAYER_RADIUS)
-      playerSprite.fill(fillColor)
-      playerSprite.stroke({ width: borderWidth, color: strokeColor, alpha: 1 })
+    this.players.forEach((player, playerId) => {
+      player.setControlled(playerId === this.controlledPlayerId)
     })
 
     this.updateControlArrow()
+  }
+
+  /** Rotate each player's character to face its movement direction. */
+  protected updatePlayerFacing(delta: number): void {
+    const state = this.getUnifiedState()
+    if (!state) return
+
+    for (const [playerId, data] of state.players) {
+      const player = this.players.get(playerId)
+      if (player) {
+        player.face(data.direction, delta)
+      }
+    }
   }
 
   protected updateControlArrow(): void {
@@ -637,7 +646,7 @@ export abstract class BaseGameScene extends PixiScene {
     const possessorTeam = possessor?.team || null
 
     BallRenderer.updateBallColor(
-      this.ball,
+      this.ballGlow,
       possessorTeam,
       state.ball.pressureLevel || 0,
       VISUAL_CONSTANTS.BALL_BLUE_COLOR,
@@ -913,6 +922,9 @@ export abstract class BaseGameScene extends PixiScene {
   }
 
   update(delta: number) {
+    // create() is async; the ticker may fire before game objects exist.
+    if (!this.sceneReady) return
+
     if (this.actionButton) {
       this.actionButton.update()
     }
@@ -927,6 +939,7 @@ export abstract class BaseGameScene extends PixiScene {
 
     this.updateBallColor(state)
     this.updateControlArrow()
+    this.updatePlayerFacing(delta)
     this.checkAutoSwitchOnPossession()
 
     if (this.debugEnabled) {
@@ -999,13 +1012,14 @@ export abstract class BaseGameScene extends PixiScene {
   }
 
   destroy() {
+    // Stop update() from touching objects that teardown is about to destroy.
+    this.sceneReady = false
     console.log(`🔄 [Shutdown] ${this.sceneKey} shutting down...`)
 
     window.removeEventListener('orientationchange', this.handleOrientationChange)
     this.cleanupInput()
 
     this.players.clear()
-    this.playerFillColors.clear()
 
     if (this.joystick) this.joystick.destroy()
     if (this.actionButton) this.actionButton.destroy()
