@@ -31,12 +31,31 @@ export class FieldRenderer {
 
   /**
    * Create the field background, markings and goals.
-   * Appends elements to the game container.
+   *
+   * The pitch is entirely static, so we build it in its own container and cache
+   * it to a single texture. Without this, all the grass stripes, line markings
+   * and goal nets are re-rasterized every frame — cheap on a GPU, but costly
+   * under software WebGL (CI), where it can starve the render loop. Cached, the
+   * pitch is one textured quad per frame.
    */
   static createField(container: Container): void {
-    FieldRenderer.createGrass(container)
-    FieldRenderer.createMarkings(container)
-    FieldRenderer.createGoals(container)
+    const field = new Container()
+    field.label = 'field'
+    field.sortableChildren = true
+    field.zIndex = -100 // always behind players (10) and ball (16)
+
+    FieldRenderer.createGrass(field)
+    FieldRenderer.createMarkings(field)
+    FieldRenderer.createGoals(field)
+
+    container.addChild(field)
+
+    // Cache once the children exist. Match device resolution so lines stay crisp.
+    const resolution = Math.min(
+      (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
+      2
+    )
+    field.cacheAsTexture({ resolution, antialias: true })
   }
 
   /** Mowed-grass base with alternating vertical stripes. */
